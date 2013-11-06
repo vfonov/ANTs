@@ -33,8 +33,10 @@
 #include "itkRecursiveGaussianImageFilter.h"
 #include "itkResampleImageFilter.h"
 #include "itkTransformFileWriter.h"
-
+#include "itkTransformFactory.h"
 #include "vnl/vnl_math.h"
+#include "itkDisplacementFieldTransform.h"
+#include "itkMatrixOffsetTransformBase.h"
 
 namespace itk
 {
@@ -77,6 +79,7 @@ ANTSImageTransformation<TDimension, TReal>
     filePrefix = std::string( filePrefix, 0, pos );
     extension = std::string( this->m_NamingConvention, pos,
                              this->m_NamingConvention.length() - 1 );
+    
     if( extension == std::string( ".gz" ) )
       {
       gzExtension = std::string( ".gz" );
@@ -86,6 +89,8 @@ ANTSImageTransformation<TDimension, TReal>
       filePrefix = std::string( filePrefix, 0, pos );
       }
 
+    if( extension!= std::string( ".xfm" ) )
+    {
     // GetSupportedWriteExtensions
     typedef itk::ImageIOBase                           IOBaseType;
     typedef std::list<itk::LightObject::Pointer>       ArrayOfImageIOType;
@@ -126,40 +131,55 @@ ANTSImageTransformation<TDimension, TReal>
       extension = std::string(".mnc");
       }
     }
+    }
   else
     {
-    extension = std::string( ".mnc" );
+    extension = std::string( ".xfm" );
     }
     
   if( extension==std::string( ".xfm") )
     {
+      typedef itk::DisplacementFieldTransform<TReal,TDimension>          DisplacementFieldTransform;
+      typedef typename DisplacementFieldTransform::DisplacementFieldType DisplacementFieldType;
+      
+      itk::TransformFactory< itk::DisplacementFieldTransform<TReal,TDimension> >::RegisterTransform ();
+      itk::TransformFactory< itk::MatrixOffsetTransformBase<TReal,TDimension,TDimension> >::RegisterTransform ();
       
       std::string fw_filename = filePrefix + extension;
       std::string bw_filename = filePrefix + "_inverse" + extension;
       
       //using ITKv4 functionality to write transforms
-      typedef itk::TransformFileWriterTemplate<float> TransformFileWriterFloat;
+      typedef itk::TransformFileWriterTemplate<TReal> TransformFileWriterFloat;
       
-      TransformFileWriterFloat::Pointer fw_writer=TransformFileWriterFloat::New();
+      typename TransformFileWriterFloat::Pointer fw_writer=TransformFileWriterFloat::New();
       
       if( this->m_AffineTransform )
         fw_writer->AddTransform(this->m_AffineTransform);
       if(this->m_DisplacementField)
-        fw_writer->AddTransform(this->m_DisplacementField);
+      {
+        typename DisplacementFieldTransform::Pointer disp = DisplacementFieldTransform::New();
+        disp->SetDisplacementField(this->m_DisplacementField);
+        fw_writer->AddTransform(disp);
+      }
       
       fw_writer->SetFileName(fw_filename);
       fw_writer->Update();
       
-      TransformFileWriterFloat::Pointer bw_writer=TransformFileWriterFloat::New();
+      typename TransformFileWriterFloat::Pointer bw_writer=TransformFileWriterFloat::New();
       
       if(this->m_InverseDisplacementField)
-        bw_writer->AddTransform(this->m_InverseDisplacementField);
+      {
+        typename DisplacementFieldTransform::Pointer disp = DisplacementFieldTransform::New();
+        disp->SetDisplacementField(this->m_InverseDisplacementField);
+
+        bw_writer->AddTransform(disp);
+      }
       
       typename AffineTransformType::Pointer tmp=AffineTransformType::New();
-      
       if( this->m_AffineTransform )
       {
         this->m_AffineTransform->GetInverse(tmp);
+
         bw_writer->AddTransform(tmp);
       }
       
