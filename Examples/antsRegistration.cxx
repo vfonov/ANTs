@@ -28,7 +28,7 @@ static void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
   typedef itk::ants::CommandLineParser::OptionType OptionType;
 
-  // short names in use-  a:b:c:d:f:h:l:m:n:o:q:r:s:t:u::w:x:z
+  // short names in use-  a:b:c:d:f:g:h:l:m:n:o:q:r:s:t:u::w:x:z
 
     {
     std::string description =
@@ -71,51 +71,6 @@ static void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
     option->SetUsageOption( 0, "1/(0)" );
     option->SetDescription( description );
     option->AddFunction( std::string( "0" ) );
-    parser->AddOption( option );
-    }
-
-    {
-    std::string description =
-      std::string( "Several interpolation options are available in ITK. " )
-      + std::string( "These have all been made available.  Currently the interpolator " )
-      + std::string( "choice is only used to warp (and possibly inverse warp) the final " )
-      + std::string( "output image(s)." );
-
-    OptionType::Pointer option = OptionType::New();
-    option->SetLongName( "interpolation" );
-    option->SetShortName( 'n' );
-    option->SetUsageOption( 0, "Linear" );
-    option->SetUsageOption( 1, "NearestNeighbor" );
-    option->SetUsageOption( 2, "MultiLabel[<sigma=imageSpacing>,<alpha=4.0>]" );
-    option->SetUsageOption( 3, "Gaussian[<sigma=imageSpacing>,<alpha=1.0>]" );
-    option->SetUsageOption( 4, "BSpline[<order=3>]" );
-    option->SetUsageOption( 5, "CosineWindowedSinc" );
-    option->SetUsageOption( 6, "WelchWindowedSinc" );
-    option->SetUsageOption( 7, "HammingWindowedSinc" );
-    option->SetUsageOption( 8, "LanczosWindowedSinc" );
-    option->SetDescription( description );
-    parser->AddOption( option );
-    }
-
-  // Although this option will eventually be used, it is not needed now.
-
-    {
-    std::string description = std::string( "Specify the initial fixed transform(s) which get immediately " )
-      + std::string( "incorporated into the composite transform.  The order of the " )
-      + std::string( "transforms is stack-esque in that the last transform specified on " )
-      + std::string( "the command line is the first to be applied.  In addition to initialization " )
-      + std::string( "with ITK transforms, the user can perform an initial translation alignment " )
-      + std::string( "by specifying the fixed and moving images and selecting an initialization " )
-      + std::string( "feature.  These features include using the geometric center of the images (=0), " )
-      + std::string( "the image intensities (=1), or the origin of the images (=2)." );
-
-    OptionType::Pointer option = OptionType::New();
-    option->SetLongName( "initial-fixed-transform" );
-    option->SetShortName( 'q' );
-    option->SetUsageOption( 0, "initialTransform" );
-    option->SetUsageOption( 1, "[initialTransform,<useInverse>]" );
-    option->SetUsageOption( 2, "[fixedImage,movingImage,initializationFeature]" );
-    option->SetDescription( description );
     parser->AddOption( option );
     }
 
@@ -171,15 +126,75 @@ static void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
     {
     std::string description = std::string( "Collapse output transforms. " )
-      + std::string( "Specifically, enabling this option combines all adjacent linear transforms " )
-      + std::string( "and composes all adjacent displacement field transforms before writing the " )
-      + std::string( "results to disk in the form of an itk affine transform (called xxxGenericAffine.mat). " );
+      + std::string( "Specifically, enabling this option combines all adjacent transforms where" )
+      + std::string( "possible.  All adjacent linear transforms are written to disk in the form" )
+      + std::string( "an itk affine transform (called xxxGenericAffine.mat).  Similarly, all " )
+      + std::string( "adjacent displacement field transforms are combined when written to disk " )
+      + std::string( "(e.g. xxxWarp.nii.gz and xxxInverseWarp.nii.gz (if available))." );
     OptionType::Pointer option = OptionType::New();
     option->SetLongName( "collapse-output-transforms" );
     option->SetShortName( 'z' );
     option->SetUsageOption( 0, "(1)/0" );
     option->SetDescription( description );
     option->AddFunction( std::string( "1" ) );
+    parser->AddOption( option );
+    }
+
+    {
+    std::string description =
+      std::string( "Several interpolation options are available in ITK. " )
+      + std::string( "These have all been made available.  Currently the interpolator " )
+      + std::string( "choice is only used to warp (and possibly inverse warp) the final " )
+      + std::string( "output image(s)." );
+
+    OptionType::Pointer option = OptionType::New();
+    option->SetLongName( "interpolation" );
+    option->SetShortName( 'n' );
+    option->SetUsageOption( 0, "Linear" );
+    option->SetUsageOption( 1, "NearestNeighbor" );
+    option->SetUsageOption( 2, "MultiLabel[<sigma=imageSpacing>,<alpha=4.0>]" );
+    option->SetUsageOption( 3, "Gaussian[<sigma=imageSpacing>,<alpha=1.0>]" );
+    option->SetUsageOption( 4, "BSpline[<order=3>]" );
+    option->SetUsageOption( 5, "CosineWindowedSinc" );
+    option->SetUsageOption( 6, "WelchWindowedSinc" );
+    option->SetUsageOption( 7, "HammingWindowedSinc" );
+    option->SetUsageOption( 8, "LanczosWindowedSinc" );
+    option->SetDescription( description );
+    parser->AddOption( option );
+    }
+
+    {
+    std::string description = std::string( "This option allows the user to restrict the " )
+      + std::string( "optimization of the displacement field transform on a per-component " )
+      + std::string( "basis.  For example, if one wants to limit the deformation of a " )
+      + std::string( "3-D volume to the first two dimensions, this is possible by specifying " )
+      + std::string( "a weight vector of \'1x1x0\'." );
+
+    OptionType::Pointer option = OptionType::New();
+    option->SetLongName( "restrict-deformation" );
+    option->SetShortName( 'g' );
+    option->SetUsageOption( 0, "PxQxR" );
+    option->SetDescription( description );
+    parser->AddOption( option );
+    }
+
+    {
+    std::string description = std::string( "Specify the initial fixed transform(s) which get immediately " )
+      + std::string( "incorporated into the composite transform.  The order of the " )
+      + std::string( "transforms is stack-esque in that the last transform specified on " )
+      + std::string( "the command line is the first to be applied.  In addition to initialization " )
+      + std::string( "with ITK transforms, the user can perform an initial translation alignment " )
+      + std::string( "by specifying the fixed and moving images and selecting an initialization " )
+      + std::string( "feature.  These features include using the geometric center of the images (=0), " )
+      + std::string( "the image intensities (=1), or the origin of the images (=2)." );
+
+    OptionType::Pointer option = OptionType::New();
+    option->SetLongName( "initial-fixed-transform" );
+    option->SetShortName( 'q' );
+    option->SetUsageOption( 0, "initialTransform" );
+    option->SetUsageOption( 1, "[initialTransform,<useInverse>]" );
+    option->SetUsageOption( 2, "[fixedImage,movingImage,initializationFeature]" );
+    option->SetDescription( description );
     parser->AddOption( option );
     }
 
@@ -210,8 +225,8 @@ static void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
       + std::string( "GC: Global Correlation. " )
       + std::string( "The \"metricWeight\" variable is used to modulate the per stage weighting of the metrics.  " )
       + std::string( "The metrics can also employ a sampling strategy defined by a " )
-      + std::string( "sampling percentage. The sampling strategy defaults to dense, otherwise " )
-      + std::string( "it defines a point set over which to optimize the metric. " )
+      + std::string( "sampling percentage. The sampling strategy defaults to None (aka a dense sampling of ")
+      + std::string( "one sample per voxel), otherwise it defines a point set over which to optimize the metric. " )
       + std::string( "The point set can be on a regular lattice or a random lattice of points slightly " )
       + std::string( "perturbed to minimize aliasing artifacts. samplingPercentage defines the " )
       + std::string( "fraction of points to select from the domain. " );
@@ -444,7 +459,7 @@ private:
     };
     Cleanup_argv cleanup_argv( argv, argc + 1 );
 
-    antscout->set_stream( out_stream );
+    //    // antscout->set_stream( out_stream );
 
     ParserType::Pointer parser = ParserType::New();
 
@@ -464,7 +479,7 @@ private:
 
     if( argc < 2 || parser->Convert<bool>( parser->GetOption( "help" )->GetFunction()->GetName() ) )
       {
-      parser->PrintMenu( antscout, 5, false );
+      parser->PrintMenu( std::cout, 5, false );
       if( argc < 2 )
         {
         return EXIT_FAILURE;
@@ -473,7 +488,7 @@ private:
       }
     else if( parser->Convert<bool>( parser->GetOption( 'h' )->GetFunction()->GetName() ) )
       {
-      parser->PrintMenu( antscout, 5, true );
+      parser->PrintMenu( std::cout, 5, true );
       return EXIT_SUCCESS;
       }
     unsigned int dimension = 3;
@@ -485,7 +500,7 @@ private:
       }
     else
       {
-      antscout << "Image dimensionality not specified.  See command line option --dimensionality" << std::endl;
+      std::cout << "Image dimensionality not specified.  See command line option --dimensionality" << std::endl;
       return EXIT_FAILURE;
       }
 
@@ -493,12 +508,12 @@ private:
     OptionType::Pointer typeOption = parser->GetOption( "float" );
     if( typeOption && parser->Convert<bool>( typeOption->GetFunction( 0 )->GetName() ) )
       {
-      antscout << "Using single precision for computations." << std::endl;
+      std::cout << "Using single precision for computations." << std::endl;
       precisionType = "float";
       }
     else
       {
-      antscout << "Using double precision for computations." << std::endl;
+      std::cout << "Using double precision for computations." << std::endl;
       precisionType = "double";
       }
 
@@ -527,14 +542,14 @@ private:
           }
         }
       default:
-        antscout << "bad image dimension " << dimension << std::endl;
+        std::cout << "bad image dimension " << dimension << std::endl;
         return EXIT_FAILURE;
       }
     }
   catch( itk::ExceptionObject & err )
     {
-    antscout << "Exception Object caught: " << std::endl;
-    antscout << err << std::endl;
+    std::cout << "Exception Object caught: " << std::endl;
+    std::cout << err << std::endl;
     return EXIT_FAILURE;
     }
   return EXIT_SUCCESS;

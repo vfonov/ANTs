@@ -64,7 +64,7 @@ void Vector2Matrix( TensorType & dtv, MatrixType & dtm )
   unsigned int tensorIndex = 0;
   for(unsigned i = 0; i < matHelper::Rows(dtm); ++i)
     {
-    for(unsigned j = i; matHelper::Columns(dtm); ++j, ++tensorIndex)
+    for(unsigned j = i; j < matHelper::Columns(dtm); ++j, ++tensorIndex)
       {
       dtm(i,j) = dtm(j,i) = dtv[tensorIndex];
       }
@@ -95,7 +95,7 @@ TensorType Matrix2Vector( MatrixType dtm )
   unsigned int tensorIndex = 0;
   for(unsigned i = 0; i < dtm.rows(); ++i)
     {
-    for(unsigned j = i; dtm.cols(); ++j, ++tensorIndex)
+    for(unsigned j = i; j < dtm.cols(); ++j, ++tensorIndex)
       {
       dtv[tensorIndex] = dtm(i,j);
       }
@@ -217,7 +217,7 @@ TensorType TensorLogAndExp( TensorType dtv, bool takelog, bool & success)
   if( fabs(e3) < eps )
     {
     //success = false;
-    //ants::antscout << "-4" << std::flush;
+    //std::cout << "-4" << std::flush;
     //return dtv;
     }
 
@@ -557,8 +557,8 @@ float  GetTensorADC( TTensorType dtv,  unsigned int opt = 0)
   DT(1, 0) = DT(0, 1) = dtv[1];
   DT(2, 0) = DT(0, 2) = dtv[2];
   DT(2, 1) = DT(1, 2) = dtv[4];
-  //  if (takelog )ants::antscout << " TAKING LOG " << std::endl;  elseants::antscout << "TAKING EXP " << std::endl;
-  // ants::antscout << " dtv " << dtv << std::endl;
+  //  if (takelog )std::cout << " TAKING LOG " << std::endl;  elsestd::cout << "TAKING EXP " << std::endl;
+  // std::cout << " dtv " << dtv << std::endl;
   vnl_symmetric_eigensystem<double> eig(DT);
   double                            e1 = (eig.D(0, 0) );
   double                            e2 = (eig.D(1, 1) );
@@ -704,8 +704,8 @@ itk::RGBPixel<float>   GetTensorPrincipalEigenvector( TTensorType dtv )
   DT(1, 0) = DT(0, 1) = dtv[1];
   DT(2, 0) = DT(0, 2) = dtv[2];
   DT(2, 1) = DT(1, 2) = dtv[4];
-  //  if (takelog )ants::antscout << " TAKING LOG " << std::endl;  elseants::antscout << "TAKING EXP " << std::endl;
-  // ants::antscout << " dtv " << dtv << std::endl;
+  //  if (takelog )std::cout << " TAKING LOG " << std::endl;  elsestd::cout << "TAKING EXP " << std::endl;
+  // std::cout << " dtv " << dtv << std::endl;
   vnl_symmetric_eigensystem<double> eig(DT);
 
   itk::RGBPixel<float> rgb;
@@ -807,8 +807,8 @@ itk::Vector<float>   GetTensorPrincipalEigenvector( TTensorType dtv, unsigned in
   DT(1, 0) = DT(0, 1) = dtv[1];
   DT(2, 0) = DT(0, 2) = dtv[2];
   DT(2, 1) = DT(1, 2) = dtv[4];
-  //  if (takelog )ants::antscout << " TAKING LOG " << std::endl;  else ants::antscout << "TAKING EXP " << std::endl;
-  // ants::antscout << " dtv " << dtv << std::endl;
+  //  if (takelog )std::cout << " TAKING LOG " << std::endl;  else std::cout << "TAKING EXP " << std::endl;
+  // std::cout << " dtv " << dtv << std::endl;
   vnl_symmetric_eigensystem<double> eig(DT);
 
   itk::Vector<float, 3> rgb;

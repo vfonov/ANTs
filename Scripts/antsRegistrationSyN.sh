@@ -35,20 +35,12 @@ if [[ ${#ANTSPATH} -le 3 ]];
   fi
 
 ANTS=${ANTSPATH}/antsRegistration
-WARP=${ANTSPATH}/antsApplyTransforms
 
 if [[ ! -s ${ANTS} ]];
   then
     echo "antsRegistration program can't be found. Please (re)define \$ANTSPATH in your environment."
     exit
   fi
-
-if [[ ! -s ${WARP} ]];
-  then
-    echo "antsRegistration program can't be found. Please (re)define \$ANTSPATH in your environment."
-    exit
-  fi
-
 
 function Usage {
     cat <<USAGE
@@ -65,13 +57,19 @@ Compulsory arguments:
 
      -m:  Moving image or target image
 
-     -o:  OutputPrefix; A prefix that is prepended to all output files.
+     -o:  OutputPrefix: A prefix that is prepended to all output files.
 
 Optional arguments:
 
-     -n:  Number of threads
+     -n:  Number of threads (default = 1)
 
-     -s:  spline distance for deformable B-spline SyN transform
+     -t:  transform type (default = 's')
+        r: rigid
+        a: rigid + affine
+        s: rigid + affine + deformable syn
+        b: rigid + affine + deformable b-spline syn
+
+     -s:  spline distance for deformable B-spline SyN transform (default = 26)
 
 Example:
 
@@ -109,13 +107,19 @@ Compulsory arguments:
 
      -m:  Moving image or target image
 
-     -o:  OutputPrefix; A prefix that is prepended to all output files.
+     -o:  OutputPrefix: A prefix that is prepended to all output files.
 
 Optional arguments:
 
-     -n:  Number of threads
+     -n:  Number of threads (default = 1)
 
-     -s:  spline distance for deformable B-spline SyN transform
+     -t:  transform type (default = 's')
+        r: rigid
+        a: rigid + affine
+        s: rigid + affine + deformable syn
+        b: rigid + affine + deformable b-spline syn
+
+     -s:  spline distance for deformable B-spline SyN transform (default = 26)
 
 --------------------------------------------------------------------------------------
 Get the latest ANTS version at:
@@ -141,13 +145,8 @@ brain image registration:
 * Avants BB, Tustison NJ, Song G, Cook PA, Klein A, Gee JC. Neuroimage, 2011.
 
 Also see http://www.ncbi.nlm.nih.gov/pubmed/19818860 for more details.
-
-The script has been updated and improved since this publication.
-
 --------------------------------------------------------------------------------------
 script by Nick Tustison
---------------------------------------------------------------------------------------
-Apple XGrid support by Craig Stark
 --------------------------------------------------------------------------------------
 
 HELP
@@ -168,6 +167,7 @@ function reportMappingParameters {
  Moving image:             $MOVINGIMAGE
  Number of threads:        $NUMBEROFTHREADS
  Spline distance:          $SPLINEDISTANCE
+ Transform type:           $TRANSFORMTYPE
 --------------------------------------------------------------------------------------
 REPORTMAPPINGPARAMETERS
 }
@@ -208,7 +208,7 @@ control_c()
 
 
 # Provide output for Help
-if [[ "$1" == "-h" ]];
+if [[ "$1" == "-h" || $# -eq 0 ]];
   then
     Help >&2
   fi
@@ -225,13 +225,14 @@ MOVINGIMAGE=''
 OUTPUTNAME=output
 NUMBEROFTHREADS=1
 SPLINEDISTANCE=26
+TRANSFORMTYPE='s'
 
 # reading command line arguments
-while getopts "d:f:h:m:n:o:s:" OPT
+while getopts "d:f:h:m:n:o:s:t:" OPT
   do
   case $OPT in
       h) #help
-   echo "$USAGE"
+   Help
    exit 0
    ;;
       d)  # dimensions
@@ -246,11 +247,14 @@ while getopts "d:f:h:m:n:o:s:" OPT
       n)  # number of threads
    NUMBEROFTHREADS=$OPTARG
    ;;
+      o) #output name prefix
+   OUTPUTNAME=$OPTARG
+   ;;
       s)  # spline distance
    SPLINEDISTANCE=$OPTARG
    ;;
-      o) #output name prefix
-   OUTPUTNAME=$OPTARG
+      t)  # transform type
+   TRANSFORMTYPE=$OPTARG
    ;;
   esac
 done
@@ -263,12 +267,12 @@ done
 
 if [[ ! -f "$FIXEDIMAGE" ]];
   then
-    echo "Fixed image '$FIXEDIMAGE' does not exist."
+    echo "Fixed image '$FIXEDIMAGE' does not exist.  See usage: '$0 -h 1'"
     exit
   fi
 if [[ ! -f "$MOVINGIMAGE" ]];
   then
-    echo "Moving image '$MOVINGIMAGE' does not exist."
+    echo "Moving image '$MOVINGIMAGE' does not exist.  See usage: '$0 -h 1'"
     exit
   fi
 
@@ -282,27 +286,70 @@ ORIGINALNUMBEROFTHREADS=${ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS}
 ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$NUMBEROFTHREADS
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS
 
-${ANTSPATH}/antsRegistration --dimensionality $DIM \
-                             --output [$OUTPUTNAME,${OUTPUTNAME}Warped.nii.gz] \
-                             --interpolation Linear \
-                             --winsorize-image-intensities [0.005,0.995] \
-                             --initial-moving-transform [$FIXEDIMAGE,$MOVINGIMAGE,1] \
-                             --transform Rigid[0.1] \
-                             --metric MI[$FIXEDIMAGE,$MOVINGIMAGE,1,32,Regular,0.25] \
-                             --convergence 1000x500x250x100 \
-                             --shrink-factors 8x4x2x1 \
-                             --smoothing-sigmas 3x2x1x0 \
-                             --transform Affine[0.1] \
-                             --metric MI[$FIXEDIMAGE,$MOVINGIMAGE,1,32,Regular,0.25] \
-                             --convergence 1000x500x250x100 \
-                             --shrink-factors 8x4x2x1 \
-                             --smoothing-sigmas 3x2x1x0 \
-                             --transform BSplineSyN[0.1,${SPLINEDISTANCE},0,3] \
-                             --metric CC[$FIXEDIMAGE,$MOVINGIMAGE,1,4] \
-                             --convergence 100x70x50x20 \
-                             --shrink-factors 6x4x2x1 \
-                             --smoothing-sigmas 3x2x1x0
+##############################
+#
+# Print out options
+#
+##############################
+reportMappingParameters
 
+##############################
+#
+# Construct mapping stages
+#
+##############################
+
+RIGIDSTAGE="--initial-moving-transform [$FIXEDIMAGE,$MOVINGIMAGE,1] \
+            --transform Rigid[0.1] \
+            --metric MI[$FIXEDIMAGE,$MOVINGIMAGE,1,32,Regular,0.25] \
+            --convergence 1000x500x250x100 \
+            --shrink-factors 8x4x2x1 \
+            --smoothing-sigmas 3x2x1x0"
+
+AFFINESTAGE="--transform Affine[0.1] \
+             --metric MI[$FIXEDIMAGE,$MOVINGIMAGE,1,32,Regular,0.25] \
+             --convergence 1000x500x250x100 \
+             --shrink-factors 8x4x2x1 \
+             --smoothing-sigmas 3x2x1x0"
+
+SYNSTAGE="--metric CC[$FIXEDIMAGE,$MOVINGIMAGE,1,4] \
+          --convergence 100x70x50x20 \
+          --shrink-factors 6x4x2x1 \
+          --smoothing-sigmas 3x2x1x0"
+
+if [[ $TRANSFORMTYPE == 'b' ]];
+  then
+    SYNSTAGE="--transform BSplineSyN[0.1,${SPLINEDISTANCE},0,3] \
+             $SYNSTAGE"
+  fi
+if [[ $TRANSFORMTYPE == 's' ]];
+  then
+    SYNSTAGE="--transform SyN[0.1,3,0] \
+             $SYNSTAGE"
+  fi
+
+STAGES=''
+case "$TRANSFORMTYPE" in
+"r")
+  STAGES="$RIGIDSTAGE"
+  ;;
+"a")
+  STAGES="$RIGIDSTAGE $AFFINESTAGE"
+  ;;
+"b" | "s")
+  STAGES="$RIGIDSTAGE $AFFINESTAGE $SYNSTAGE"
+  ;;
+*)
+  echo "Transform type '$TRANSFORMTYPE' is not an option.  See usage: '$0 -h 1'"
+  exit
+  ;;
+esac
+
+${ANTS} --dimensionality $DIM \
+								--output [$OUTPUTNAME,${OUTPUTNAME}Warped.nii.gz] \
+								--interpolation Linear \
+								--winsorize-image-intensities [0.005,0.995] \
+								$STAGES
 
 ###############################
 #
@@ -312,8 +359,3 @@ ${ANTSPATH}/antsRegistration --dimensionality $DIM \
 
 ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$ORIGINALNUMBEROFTHREADS
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS
-
-
-
-
-

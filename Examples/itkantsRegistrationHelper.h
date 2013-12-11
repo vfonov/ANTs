@@ -143,9 +143,9 @@ public:
     };
   enum SamplingStrategy
     {
-    none = 0,
-    regular = 1,
-    random = 2,
+    none = 0,     // aka dense
+    regular = 1,  // regularly spaced sub-sampling
+    random = 2,   // irregularly spaced sub-sampling
     invalid = 17
     };
   class Metric
@@ -479,7 +479,7 @@ public:
   /**
    * Add the collected iterations list
    */
-  void SetIterations(const std::vector<std::vector<unsigned int> > & Iterations);
+  void SetIterations( const std::vector<std::vector<unsigned int> > & Iterations );
 
   /**
    * Add the collected convergence thresholds
@@ -495,6 +495,11 @@ public:
    * Add the collected smoothing sigmas list
    */
   void SetSmoothingSigmas( const std::vector<std::vector<float> > & SmoothingSigmas );
+
+  /**
+   * Add the restrict deformation optimizer weights
+   */
+  void SetRestrictDeformationOptimizerWeights( const std::vector<RealType> & restrictDeformationWeights );
 
   /**
    * Add the collected bool smoothing sigmas in voxel units list
@@ -658,6 +663,7 @@ private:
   std::vector<unsigned int>               m_ConvergenceWindowSizes;
   std::vector<std::vector<float> >        m_SmoothingSigmas;
   std::vector<bool>                       m_SmoothingSigmasAreInPhysicalUnits;
+  std::vector<RealType>                   m_RestrictDeformationOptimizerWeights;
   std::vector<std::vector<unsigned int> > m_ShrinkFactors;
   bool                                    m_UseHistogramMatching;
   bool                                    m_WinsorizeImageIntensities;
@@ -835,7 +841,7 @@ GetCompositeTransformFromParserOption( typename ParserType::Pointer & parser,
         }
       if( initialTransform.IsNull() )
         {
-        ::ants::antscout << "Can't read initial transform " << initialTransformName << std::endl;
+        std::cout << "Can't read initial transform " << initialTransformName << std::endl;
         return NULL;
         }
       if( useInverse )
@@ -843,7 +849,7 @@ GetCompositeTransformFromParserOption( typename ParserType::Pointer & parser,
         initialTransform = dynamic_cast<TransformType *>( initialTransform->GetInverseTransform().GetPointer() );
         if( initialTransform.IsNull() )
           {
-          ::ants::antscout << "Inverse does not exist for " << initialTransformName << std::endl;
+          std::cout << "Inverse does not exist for " << initialTransformName << std::endl;
           return NULL;
           }
         initialTransformName = std::string( "inverse of " ) + initialTransformName;
@@ -871,13 +877,13 @@ GetCompositeTransformFromParserOption( typename ParserType::Pointer & parser,
         }
       }
     }
-  antscout << "=============================================================================" << std::endl;
-  antscout << "The composite transform is comprised of the following transforms (in order): " << std::endl;
+  std::cout << "=============================================================================" << std::endl;
+  std::cout << "The composite transform is comprised of the following transforms (in order): " << std::endl;
   for( unsigned int n = 0; n < transformNames.size(); n++ )
     {
-    antscout << "  " << n + 1 << ". " << transformNames[n] << " (type = " << transformTypes[n] << ")" << std::endl;
+    std::cout << "  " << n + 1 << ". " << transformNames[n] << " (type = " << transformTypes[n] << ")" << std::endl;
     }
-  antscout << "=============================================================================" << std::endl;
+  std::cout << "=============================================================================" << std::endl;
   return compositeTransform;
 }
 

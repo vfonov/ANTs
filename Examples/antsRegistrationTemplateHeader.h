@@ -29,12 +29,11 @@ int
 DoRegistration(typename ParserType::Pointer & parser)
 {
   typedef TComputeType RealType;
-  typedef typename ants::RegistrationHelper<TComputeType, VImageDimension>      RegistrationHelperType;
-  typedef typename RegistrationHelperType::ImageType              ImageType;
-  typedef typename RegistrationHelperType::CompositeTransformType CompositeTransformType;
+  typedef typename ants::RegistrationHelper<TComputeType, VImageDimension>   RegistrationHelperType;
+  typedef typename RegistrationHelperType::ImageType                         ImageType;
+  typedef typename RegistrationHelperType::CompositeTransformType            CompositeTransformType;
 
-  typename RegistrationHelperType::Pointer regHelper =
-    RegistrationHelperType::New();
+  typename RegistrationHelperType::Pointer regHelper = RegistrationHelperType::New();
 
   OptionType::Pointer transformOption = parser->GetOption( "transform" );
 
@@ -46,6 +45,8 @@ DoRegistration(typename ParserType::Pointer & parser)
 
   OptionType::Pointer smoothingSigmasOption = parser->GetOption( "smoothing-sigmas" );
 
+  OptionType::Pointer restrictDeformationOption = parser->GetOption( "restrict-deformation" );
+
   OptionType::Pointer outputOption = parser->GetOption( "output" );
 
   OptionType::Pointer maskOption = parser->GetOption( "masks" );
@@ -56,7 +57,7 @@ DoRegistration(typename ParserType::Pointer & parser)
 
   if( !outputOption || outputOption->GetNumberOfFunctions() == 0 )
     {
-    antscout << "Output option not specified." << std::endl;
+    std::cout << "Output option not specified." << std::endl;
     return EXIT_FAILURE;
     }
 
@@ -189,9 +190,9 @@ DoRegistration(typename ParserType::Pointer & parser)
         }
       catch( itk::ExceptionObject & err )
         {
-        antscout << "Can't read specified mask image " << fname.c_str() << std::endl;
-        antscout << "Exception Object caught: " << std::endl;
-        antscout << err << std::endl;
+        std::cout << "Can't read specified mask image " << fname.c_str() << std::endl;
+        std::cout << "Exception Object caught: " << std::endl;
+        std::cout << err << std::endl;
         return EXIT_FAILURE;
         }
       if( m == 0 )
@@ -261,12 +262,25 @@ DoRegistration(typename ParserType::Pointer & parser)
     }
   regHelper->SetDoEstimateLearningRateAtEachIteration( doEstimateLearningRateAtEachIteration );
 
+  if( restrictDeformationOption && restrictDeformationOption->GetNumberOfFunctions() )
+    {
+    std::vector<RealType> restrictDeformationWeights =
+      parser->ConvertVector<RealType>( restrictDeformationOption->GetFunction( 0 )->GetName() );
+    if( restrictDeformationWeights.size() != VImageDimension )
+      {
+      std::cout << "The restrict deformation weights vector should be the same as the "
+        << "number of local parameters (=ImageDimension)." << std::endl;
+      }
+
+    regHelper->SetRestrictDeformationOptimizerWeights( restrictDeformationWeights );
+    }
+
   // We find both the number of transforms and the number of metrics
 
   unsigned int numberOfTransforms = transformOption->GetNumberOfFunctions();
   if( transformOption.IsNull() || numberOfTransforms == 0 )
     {
-    antscout << "No transformations are specified." << std::endl;
+    std::cout << "No transformations are specified." << std::endl;
     return EXIT_FAILURE;
     }
 
@@ -324,14 +338,14 @@ DoRegistration(typename ParserType::Pointer & parser)
                                                                 // points for interpolation.
         if( convergenceWindowSize < minAllowedconvergenceWindowSize )
           {
-          antscout << "Convergence Window Size must be greater than or equal to " << minAllowedconvergenceWindowSize
+          std::cout << "Convergence Window Size must be greater than or equal to " << minAllowedconvergenceWindowSize
                    << std::endl;
           }
         }
       }
     else
       {
-      antscout << "No convergence criteria are specified." << std::endl;
+      std::cout << "No convergence criteria are specified." << std::endl;
       return EXIT_FAILURE;
       }
 
@@ -340,7 +354,7 @@ DoRegistration(typename ParserType::Pointer & parser)
     convergenceWindowSizeList.push_back( convergenceWindowSize );
 
     unsigned int numberOfLevels = iterations.size();
-    antscout << "  number of levels = " << numberOfLevels << std::endl;
+    std::cout << "  number of levels = " << numberOfLevels << std::endl;
 
     // Get the first metricOption for the currentStage (for use with the B-spline transforms)
 				unsigned int numberOfMetrics = metricOption->GetNumberOfFunctions();
@@ -688,7 +702,7 @@ DoRegistration(typename ParserType::Pointer & parser)
         break;
       default:
         {
-        antscout << "Unknown registration method " << "\"" << whichTransform << "\"" << std::endl;
+        std::cout << "Unknown registration method " << "\"" << whichTransform << "\"" << std::endl;
         }
         break;
       }
@@ -714,8 +728,8 @@ DoRegistration(typename ParserType::Pointer & parser)
 
     std::string fixedImageFileName = metricOption->GetFunction( currentMetricNumber )->GetParameter( 0 );
     std::string movingImageFileName = metricOption->GetFunction( currentMetricNumber )->GetParameter( 1 );
-    antscout << "  fixed image: " << fixedImageFileName << std::endl;
-    antscout << "  moving image: " << movingImageFileName << std::endl;
+    std::cout << "  fixed image: " << fixedImageFileName << std::endl;
+    std::cout << "  moving image: " << movingImageFileName << std::endl;
 
     typename ImageType::Pointer fixedImage;
     typename ImageType::Pointer movingImage;
@@ -734,7 +748,7 @@ DoRegistration(typename ParserType::Pointer & parser)
       {
       if( stageID != numberOfTransforms - 1 )
         {
-        ::ants::antscout << "\n\n\n"
+        std::cout << "\n\n\n"
                          << "Error:  The number of stages does not match up with the metrics." << std::endl
                          << "The number of transforms is " << numberOfTransforms << " and the last stage ID "
                          << " as determined by the metrics is " << stageID << "." << std::endl;
@@ -836,7 +850,7 @@ DoRegistration(typename ParserType::Pointer & parser)
         }
         break;
       default:
-        antscout << "ERROR: Unrecognized image metric: " << whichMetric << std::endl;
+        std::cout << "ERROR: Unrecognized image metric: " << whichMetric << std::endl;
         return EXIT_FAILURE;
       }
     }
@@ -971,9 +985,9 @@ DoRegistration(typename ParserType::Pointer & parser)
           }
         catch( itk::ExceptionObject & err )
           {
-          antscout << "Can't write transform file " << curInverseFileName.str().c_str() << std::endl;
-          antscout << "Exception Object caught: " << std::endl;
-          antscout << err << std::endl;
+          std::cout << "Can't write transform file " << curInverseFileName.str().c_str() << std::endl;
+          std::cout << "Exception Object caught: " << std::endl;
+          std::cout << err << std::endl;
           }
         }
       }
@@ -1001,10 +1015,10 @@ DoRegistration(typename ParserType::Pointer & parser)
           }
         catch( itk::ExceptionObject & err )
           {
-          antscout << "Can't write velocity field transform file " << curVelocityFieldFileName.str().c_str()
+          std::cout << "Can't write velocity field transform file " << curVelocityFieldFileName.str().c_str()
                    << std::endl;
-          antscout << "Exception Object caught: " << std::endl;
-          antscout << err << std::endl;
+          std::cout << "Exception Object caught: " << std::endl;
+          std::cout << err << std::endl;
           }
         }
       }
