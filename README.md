@@ -2,7 +2,11 @@
 Advanced Normalization Tools 
 ============================
 
-Questions: [Discussion Site](http://sourceforge.net/p/advants/discussion/)
+Questions: [Discussion Site](http://sourceforge.net/p/advants/discussion/) or *new* [ANTsDoc](http://stnava.github.io/ANTsDoc/) or try [this version](http://issuu.com/brianavants/docs/ants2)
+
+[ANTsTalk - subject to change at any moment](http://stnava.github.io/ANTsTalk/)
+
+[ANTsRegistrationTalk - subject to change at any moment](http://stnava.github.io/ANTsRegistrationTalk/)
 
  Email: [antsr.me at gmail dot com](mailto:antsr.me@gmail.com)
 
@@ -13,9 +17,11 @@ Questions: [Discussion Site](http://sourceforge.net/p/advants/discussion/)
 [Source-Code](http://brianavants.wordpress.com/2012/04/13/updated-ants-compile-instructions-april-12-2012/)
 (recommended)
 
+[ANTs Dashboard](http://testing.psychiatry.uiowa.edu/CDash/index.php?project=ANTS) maintained by Hans J. Johnson
+
 ANTs extracts information from complex datasets that include imaging
 ([Word Cloud](http://brianavants.files.wordpress.com/2013/05/avants_wordcloud.jpg)).
-Paired with [ANTsR](http://stnava.github.com/ANTsR/) (answer), ANTs is
+Paired with [ANTsR](http://stnava.github.io/software/2014/01/08/antsr/) (answer), ANTs is
 useful for managing, interpreting and visualizing multidimensional data.
 ANTs is
 [popularly](https://sourceforge.net/projects/advants/files/ANTS/stats/timeline?dates=2010-07-19+to+2099-05-25)
@@ -35,7 +41,8 @@ Authors
 
 ### Nicholas J. Tustison - UVA
 
-**Role:** Compeller, Algorithm Design, Implementation Guru
+**Role:** Compeller, Algorithm Design, Implementation Guru,
+[more](http://ntustison.github.io/CV/)
 
 ### Hans J. Johnson - UIowa
 
@@ -43,7 +50,7 @@ Authors
 
 ### Team Members 
 
-**Core:** Gang Song (Originator), Jeffrey T. Duda (DTI), Ben M. Kandel (Perfusion, multivariate analysis), Kent Williams (software engineer, UIowa) 
+**Core:** Gang Song (Originator), Philip A. Cook, Jeffrey T. Duda (DTI), Ben M. Kandel (Perfusion, multivariate analysis), Kent Williams (software engineer, UIowa) 
 
 
 Image Registration
@@ -165,11 +172,21 @@ ANTs has won several unbiased & international competitions
 Learning about ANTs
 ----------------------------------------------------------
 
+**ANTs and ITK** [paper](http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4009425/)
+
+**Pre-built ANTs templates with spatial priors** [download](http://figshare.com/articles/ANTs_ANTsR_Brain_Templates/915436)
+
+**The ANTs Cortical Thickness Pipeline** [example](https://github.com/ntustison/KapowskiChronicles/blob/master/paper2.pdf?raw=true)
+
+**"Cooking" tissue priors for templates**
+  [example](https://github.com/ntustison/antsCookTemplatePriorsExample)
+  (after you build your template)
+
 **Basic Brain Mapping** [example](http://stnava.github.io/BasicBrainMapping/)
 
 **Large deformation** [example](http://stnava.github.io/C/)
 
-**Template construction** [example](https://github.com/ntustison/TemplateBuildingExample)
+**Template construction** [example](http://ntustison.github.io/TemplateBuildingExample/)
 
 **Automobile** [example](http://stnava.github.io/cars/)
 
@@ -179,7 +196,7 @@ Learning about ANTs
 
 **Feature matching** [example](http://stnava.github.io/featureMatching/) ... not up to date ...
 
-**Chimpanzee cortical thickness** [example](http://stnava.github.io/WHopkinsNHP/)
+**Chimpanzee cortical thickness** [example](https://github.com/stnava/WHopkinsNHP/)
 
 **Global optimization** [example](http://stnava.github.io/butterfly/)
 
@@ -192,6 +209,14 @@ Learning about ANTs
 **fMRI prediction** [example](http://stnava.github.io/Haxby2001/) ... WIP ...
 
 **Cardiac** [example](http://stnava.github.io/LabelMyHeart)
+
+**Brain extraction** [example](https://github.com/ntustison/antsBrainExtractionExample)
+
+**N4 bias correction <-> segmentation** [example](https://github.com/ntustison/antsAtroposN4Example)
+
+**Cortical thickness** [example](https://github.com/ntustison/antsCorticalThicknessExample)
+
+**MALF labeling example** [example](https://github.com/ntustison/MalfLabelingExample)
 
 **Bibliography** [bibtex of ANTs-related papers](https://github.com/stnava/ANTsBibliography)
 
@@ -220,3 +245,7 @@ Scholar](http://scholar.google.com/scholar?q=Advanced+Normalization+Tools+%22ANT
 [Pubmed](http://www.ncbi.nlm.nih.gov/pubmed?term=%22Avants%20B%22%20OR%20%22Tustison%20N%22)
 
 ANTs was supported by: R01-EB006266-01
+
+
+
+[![githalytics.com alpha](https://cruel-carlota.pagodabox.com/a912f82c8178a07889f508871d94e77d "githalytics.com")](http://githalytics.com/stnava/ANTs)

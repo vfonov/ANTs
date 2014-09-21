@@ -23,7 +23,7 @@
 #include "itkLaplacianRecursiveGaussianImageFilter.h"
 #include "itkGradientRecursiveGaussianImageFilter.h"
 
-#include "ReadWriteImage.h"
+#include "ReadWriteData.h"
 
 namespace ants
 {
@@ -81,7 +81,7 @@ int IntegrateVelocityField(int argc, char *argv[])
 
   if( !timeVaryingVelocity )
     {
-    std::cout << " No TV Field " << std::endl;  return EXIT_FAILURE;
+    std::cerr << " No TV Field " << std::endl;  return EXIT_FAILURE;
     }
   typedef itk::ImageRegionIteratorWithIndex<DisplacementFieldType> FieldIterator;
   typedef itk::ImageRegionIteratorWithIndex<tvt>                   TVFieldIterator;
@@ -122,7 +122,7 @@ int IntegrateVelocityField(int argc, char *argv[])
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ANTSIntegrateVelocityField( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int ANTSIntegrateVelocityField( std::vector<std::string> args, std::ostream* /*out_stream = NULL */)
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -167,7 +167,7 @@ private:
 
   if( argc < 4 )
     {
-    std::cout << "Usage:   " << argv[0]
+    std::cerr << "Usage:   " << argv[0]
              << " reference_image  VelocityIn.mhd DeformationOut.nii.gz  time0 time1 dT  " << std::endl;
     if( argc >= 2 &&
         ( std::string( argv[1] ) == std::string("--help") || std::string( argv[1] ) == std::string("-h") ) )
@@ -203,7 +203,7 @@ private:
       }
       break;
     default:
-      std::cout << "Unsupported dimension" << std::endl;
+      std::cerr << "Unsupported dimension" << std::endl;
       return EXIT_FAILURE;
     }
 

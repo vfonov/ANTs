@@ -7,7 +7,7 @@
 #include "itkDiReCTImageFilter.h"
 #include "itkDiscreteGaussianImageFilter.h"
 #include "itkImage.h"
-#include "ReadWriteImage.h"
+#include "ReadWriteData.h"
 #include "itkTimeProbe.h"
 
 #include <string>
@@ -196,6 +196,7 @@ int DiReCT( itk::ants::CommandLineParser *parser )
     whiteMatterProbabilityImage = smoother->GetOutput();
     }
   direct->SetWhiteMatterProbabilityImage( whiteMatterProbabilityImage );
+
   //
   // label priors
   //
@@ -205,13 +206,9 @@ int DiReCT( itk::ants::CommandLineParser *parser )
     {
     std::string labFile = tpOption->GetFunction( 0 )->GetName();
     ReadImage<ImageType>( thicknessPriorImage, labFile.c_str()   );
+    direct->SetThicknessPriorImage( thicknessPriorImage );
     }
-  else
-    {
-    std::cout << "  White matter probability image not specified. "
-             << "Creating one from the segmentation image." << std::endl << std::endl;
-    }
-  direct->SetThicknessPriorImage( thicknessPriorImage );
+
   //
   // convergence options
   //
@@ -258,14 +255,33 @@ int DiReCT( itk::ants::CommandLineParser *parser )
     }
 
   //
-  // smoothing variance for the velocity field
+  // do B-spline smoothing?
   //
   typename itk::ants::CommandLineParser::OptionType::Pointer
-    smoothingVelocityFieldVarianceOption = parser->GetOption( "smoothing-velocity-field-variance" );
-  if( smoothingVelocityFieldVarianceOption && smoothingVelocityFieldVarianceOption->GetNumberOfFunctions() )
+    bsplineSmoothingOption = parser->GetOption( "use-bspline-smoothing" );
+  if( bsplineSmoothingOption && bsplineSmoothingOption->GetNumberOfFunctions() )
     {
-    direct->SetSmoothingVelocityFieldVariance( parser->Convert<RealType>(
-                                               smoothingVelocityFieldVarianceOption->GetFunction( 0 )->GetName() ) );
+    direct->SetUseBSplineSmoothing( parser->Convert<bool>(
+                                 bsplineSmoothingOption->GetFunction( 0 )->GetName() ) );
+    }
+
+  //
+  // smoothing parameter for the velocity field
+  //
+  typename itk::ants::CommandLineParser::OptionType::Pointer
+    smoothingVelocityFieldParameterOption = parser->GetOption( "smoothing-velocity-field-parameter" );
+  if( smoothingVelocityFieldParameterOption && smoothingVelocityFieldParameterOption->GetNumberOfFunctions() )
+    {
+    if( direct->GetUseBSplineSmoothing() )
+      {
+      direct->SetBSplineSmoothingIsotropicMeshSpacing( parser->Convert<RealType>(
+                                                 smoothingVelocityFieldParameterOption->GetFunction( 0 )->GetName() ) );
+      }
+    else
+      {
+      direct->SetSmoothingVelocityFieldVariance( parser->Convert<RealType>(
+                                               smoothingVelocityFieldParameterOption->GetFunction( 0 )->GetName() ) );
+      }
     }
 
   //
@@ -361,7 +377,7 @@ int DiReCT( itk::ants::CommandLineParser *parser )
   return EXIT_SUCCESS;
 }
 
-void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
+void KellyKapowskiInitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
   typedef itk::ants::CommandLineParser::OptionType OptionType;
 
@@ -488,12 +504,28 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
     {
     std::string description =
-      std::string( "Defines the Gaussian smoothing of the velocity field.  Default = 1.5." );
+      std::string( "Defines the Gaussian smoothing of the velocity field (default = 1.5)." )
+      + std::string( "If the b-spline smoothing option is chosen, then this " )
+      + std::string( "defines the isotropic mesh spacing for the smoothing spline (default = 15)." );
 
     OptionType::Pointer option = OptionType::New();
-    option->SetLongName( "smoothing-velocity-field-variance" );
+    option->SetLongName( "smoothing-velocity-field-parameter" );
     option->SetShortName( 'm' );
     option->SetUsageOption( 0, "variance" );
+    option->SetUsageOption( 1, "isotropicMeshSpacing" );
+    option->SetDescription( description );
+    parser->AddOption( option );
+    }
+
+    {
+    std::string description =
+      std::string( " Sets the option for B-spline smoothing of the velocity field." )
+      + std::string( "Default = false." );
+
+    OptionType::Pointer option = OptionType::New();
+    option->SetLongName( "use-bspline-smoothing" );
+    option->SetShortName( 'b' );
+    option->SetUsageOption( 0, "1/(0)" );
     option->SetDescription( description );
     parser->AddOption( option );
     }
@@ -542,7 +574,6 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
     OptionType::Pointer option = OptionType::New();
     option->SetShortName( 'h' );
     option->SetDescription( description );
-    option->AddFunction( std::string( "0" ) );
     parser->AddOption( option );
     }
 
@@ -552,14 +583,13 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
     OptionType::Pointer option = OptionType::New();
     option->SetLongName( "help" );
     option->SetDescription( description );
-    option->AddFunction( std::string( "0" ) );
     parser->AddOption( option );
     }
 }
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int KellyKapowski( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int KellyKapowski( std::vector<std::string> args, std::ostream* /*out_stream = NULL */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -616,19 +646,21 @@ private:
     + std::string( "45:867--879." );
 
   parser->SetCommandDescription( commandDescription );
-  InitializeCommandLineOptions( parser );
+  KellyKapowskiInitializeCommandLineOptions( parser );
 
   parser->Parse( argc, argv );
-  if( argc < 2 || parser->Convert<bool>( parser->GetOption( "help" )->GetFunction( 0 )->GetName() ) )
+
+  if( argc == 1 )
     {
     parser->PrintMenu( std::cout, 5, false );
-    if( argc < 2 )
-      {
-      return EXIT_FAILURE;
-      }
+    return EXIT_FAILURE;
+    }
+  else if( parser->GetOption( "help" )->GetFunction() && parser->Convert<bool>( parser->GetOption( "help" )->GetFunction()->GetName() ) )
+    {
+    parser->PrintMenu( std::cout, 5, false );
     return EXIT_SUCCESS;
     }
-  else if( parser->Convert<bool>( parser->GetOption( 'h' )->GetFunction( 0 )->GetName() ) )
+  else if( parser->GetOption( 'h' )->GetFunction() && parser->Convert<bool>( parser->GetOption( 'h' )->GetFunction()->GetName() ) )
     {
     parser->PrintMenu( std::cout, 5, true );
     return EXIT_SUCCESS;

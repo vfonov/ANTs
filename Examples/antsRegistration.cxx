@@ -24,7 +24,7 @@
 namespace ants
 {
 
-static void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
+static void antsRegistrationInitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
   typedef itk::ants::CommandLineParser::OptionType OptionType;
 
@@ -221,15 +221,16 @@ static void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
     {
     std::string description = std::string( "These image metrics are available--- " )
       + std::string( "CC:  ANTS neighborhood cross correlation, MI:  Mutual information, " )
-      + std::string( "Demons: (Thirion), MeanSquares, and " )
-      + std::string( "GC: Global Correlation. " )
+      + std::string( "Demons: (Thirion), MeanSquares, and GC: Global Correlation. " )
       + std::string( "The \"metricWeight\" variable is used to modulate the per stage weighting of the metrics.  " )
       + std::string( "The metrics can also employ a sampling strategy defined by a " )
-      + std::string( "sampling percentage. The sampling strategy defaults to None (aka a dense sampling of ")
+      + std::string( "sampling percentage. The sampling strategy defaults to \'None\' (aka a dense sampling of ")
       + std::string( "one sample per voxel), otherwise it defines a point set over which to optimize the metric. " )
       + std::string( "The point set can be on a regular lattice or a random lattice of points slightly " )
       + std::string( "perturbed to minimize aliasing artifacts. samplingPercentage defines the " )
-      + std::string( "fraction of points to select from the domain. " );
+      + std::string( "fraction of points to select from the domain. " )
+      + std::string( "In addition, three point set metrics are available:  Euclidean " )
+      + std::string( "(ICP), Point-set expectation (PSE), and Jensen-Havrda-Charvet-Tsallis (JHCT)." );
 
     OptionType::Pointer option = OptionType::New();
     option->SetLongName( "metric" );
@@ -252,6 +253,15 @@ static void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
     option->SetUsageOption(
       5,
       "GC[fixedImage,movingImage,metricWeight,radius=NA,<samplingStrategy={None,Regular,Random}>,<samplingPercentage=[0,1]>]" );
+    option->SetUsageOption(
+      6,
+      "ICP[fixedPointSet,movingPointSet,metricWeight,<samplingPercentage=[0,1]>,<boundaryPointsOnly=0>]" );
+    option->SetUsageOption(
+      7,
+      "PSE[fixedPointSet,movingPointSet,metricWeight,<samplingPercentage=[0,1]>,<boundaryPointsOnly=0>,<pointSetSigma=>,<kNeighborhood=50>]" );
+    option->SetUsageOption(
+      8,
+      "JHCT[fixedPointSet,movingPointSet,metricWeight,<samplingPercentage=[0,1]>,<boundaryPointsOnly=0>,<pointSetSigma=>,<kNeighborhood=50>,<alpha=1.1>,<useAnisotropicCovariances=1>]" );
     option->SetDescription( description );
     parser->AddOption( option );
     }
@@ -396,17 +406,16 @@ static void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
     OptionType::Pointer option = OptionType::New();
     option->SetShortName( 'h' );
     option->SetDescription( description );
-    option->AddFunction( std::string( "0" ) );
     parser->AddOption( option );
     }
 
     {
-    std::string description = std::string( "Print the help menu." );
+    std::string description = std::string( "Print the help menu.  Will also print values " )
+      + std::string( "used on the current command line call." );
 
     OptionType::Pointer option = OptionType::New();
     option->SetLongName( "help" );
     option->SetDescription( description );
-    option->AddFunction( std::string( "0" ) );
     parser->AddOption( option );
     }
 }
@@ -416,7 +425,7 @@ static void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
 
-int antsRegistration( std::vector<std::string> args, std::ostream * out_stream )
+int antsRegistration( std::vector<std::string> args, std::ostream * /*out_stream = NULL */ )
 {
   try
     {
@@ -473,24 +482,26 @@ private:
       + std::string( "and smoothing-sigmas parameters are mandatory." );
 
     parser->SetCommandDescription( commandDescription );
-    InitializeCommandLineOptions( parser );
+    antsRegistrationInitializeCommandLineOptions( parser );
 
     parser->Parse( argc, argv );
 
-    if( argc < 2 || parser->Convert<bool>( parser->GetOption( "help" )->GetFunction()->GetName() ) )
+    if( argc == 1 )
       {
       parser->PrintMenu( std::cout, 5, false );
-      if( argc < 2 )
-        {
-        return EXIT_FAILURE;
-        }
+      return EXIT_FAILURE;
+      }
+    else if( parser->GetOption( "help" )->GetFunction() && parser->Convert<bool>( parser->GetOption( "help" )->GetFunction()->GetName() ) )
+      {
+      parser->PrintMenu( std::cout, 5, false );
       return EXIT_SUCCESS;
       }
-    else if( parser->Convert<bool>( parser->GetOption( 'h' )->GetFunction()->GetName() ) )
+    else if( parser->GetOption( 'h' )->GetFunction() && parser->Convert<bool>( parser->GetOption( 'h' )->GetFunction()->GetName() ) )
       {
       parser->PrintMenu( std::cout, 5, true );
       return EXIT_SUCCESS;
       }
+
     unsigned int dimension = 3;
 
     ParserType::OptionType::Pointer dimOption = parser->GetOption( "dimensionality" );
@@ -500,7 +511,7 @@ private:
       }
     else
       {
-      std::cout << "Image dimensionality not specified.  See command line option --dimensionality" << std::endl;
+      std::cerr << "Image dimensionality not specified.  See command line option --dimensionality" << std::endl;
       return EXIT_FAILURE;
       }
 
@@ -542,14 +553,14 @@ private:
           }
         }
       default:
-        std::cout << "bad image dimension " << dimension << std::endl;
+        std::cerr << "bad image dimension " << dimension << std::endl;
         return EXIT_FAILURE;
       }
     }
   catch( itk::ExceptionObject & err )
     {
-    std::cout << "Exception Object caught: " << std::endl;
-    std::cout << err << std::endl;
+    std::cerr << "Exception Object caught: " << std::endl;
+    std::cerr << err << std::endl;
     return EXIT_FAILURE;
     }
   return EXIT_SUCCESS;

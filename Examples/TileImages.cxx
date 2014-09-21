@@ -5,6 +5,7 @@
 #include "itkImageFileReader.h"
 #include "itkImageFileWriter.h"
 
+#include "itkExtractImageFilter.h"
 #include "itkTileImageFilter.h"
 
 #include <string>
@@ -12,52 +13,6 @@
 
 namespace ants
 {
-template <class TValue>
-TValue Convert( std::string optionString )
-{
-  TValue             value;
-  std::istringstream iss( optionString );
-
-  iss >> value;
-  return value;
-}
-
-template <class TValue>
-std::vector<TValue> ConvertVector( std::string optionString )
-{
-  std::vector<TValue>    values;
-  std::string::size_type crosspos = optionString.find( 'x', 0 );
-
-  if( crosspos == std::string::npos )
-    {
-    values.push_back( Convert<TValue>( optionString ) );
-    }
-  else
-    {
-    std::string        element = optionString.substr( 0, crosspos );
-    TValue             value;
-    std::istringstream iss( element );
-    iss >> value;
-    values.push_back( value );
-    while( crosspos != std::string::npos )
-      {
-      std::string::size_type crossposfrom = crosspos;
-      crosspos = optionString.find( 'x', crossposfrom + 1 );
-      if( crosspos == std::string::npos )
-        {
-        element = optionString.substr( crossposfrom + 1, optionString.length() );
-        }
-      else
-        {
-        element = optionString.substr( crossposfrom + 1, crosspos );
-        }
-      std::istringstream iss2( element );
-      iss2 >> value;
-      values.push_back( value );
-      }
-    }
-  return values;
-}
 
 template <unsigned int ImageDimension>
 int TileImages( unsigned int argc, char *argv[] )
@@ -95,9 +50,122 @@ int TileImages( unsigned int argc, char *argv[] )
   return EXIT_SUCCESS;
 }
 
+int CreateMosaic( unsigned int argc, char *argv[] )
+{
+  if( argc != 5 )
+    {
+    std::cerr <<  "Usage: "<< argv[0] << " imageDimension outputImage layout inputImage1" << std::endl;
+    return EXIT_FAILURE;
+    }
+
+  const unsigned int ImageDimension = 3;
+
+  typedef float                                   PixelType;
+  typedef itk::Image<PixelType, ImageDimension>   ImageType;
+  typedef itk::Image<PixelType, ImageDimension-1> SliceType;
+
+  typedef itk::ImageFileReader<ImageType> ReaderType;
+  ReaderType::Pointer reader = ReaderType::New();
+  reader->SetFileName( argv[4] );
+  reader->Update();
+
+  std::vector<int> layout = ConvertVector<int>( std::string( argv[3] ) );
+  if( layout.size() != 3 )
+    {
+    std::cerr << "Layout for CreateMosaic is DxRxC where" << std::endl;
+    std::cerr << "  D is direction, i.e. 0, 1, or 2.  If not any of those numbers, we pick the coarsest spacing." << std::endl;
+    std::cerr << "  R is number of rows." << std::endl;
+    std::cerr << "  C is number of cols." << std::endl;
+    std::cerr << "  If R < 0 and C > 0 (or vice versa), the negative value is selected based on D" << std::endl;
+    return EXIT_FAILURE;
+    }
+
+  ImageType::SpacingType spacing = reader->GetOutput()->GetSpacing();
+  ImageType::SizeType size = reader->GetOutput()->GetRequestedRegion().GetSize();
+
+  if( layout[0] < 0 || layout[0] > 2 )
+    {
+    float maxSpacing = spacing[0];
+    unsigned int maxIndex = 0;
+    for( unsigned int d = 1; d < ImageDimension; d++ )
+      {
+      if( spacing[d] > maxSpacing )
+        {
+        maxSpacing = spacing[d];
+        maxIndex = d;
+        }
+      }
+    layout[0] = maxIndex;
+    }
+
+  unsigned long numberOfSlices = size[layout[0]];
+
+  int numberOfRows = vnl_math_min( static_cast<int>( layout[1] ), static_cast<int>( numberOfSlices ) );
+  int numberOfColumns = vnl_math_min( static_cast<int>( layout[2] ), static_cast<int>( numberOfSlices ) );
+
+  if( numberOfRows <= 0 && numberOfColumns > 0 )
+    {
+    numberOfRows = vcl_ceil( static_cast<float>( numberOfSlices ) / static_cast<float>( numberOfColumns ) );
+    }
+  else if( numberOfColumns <= 0 && numberOfRows > 0 )
+    {
+    numberOfColumns = vcl_ceil( static_cast<float>( numberOfSlices ) / static_cast<float>( numberOfRows ) );
+    }
+  else if( numberOfColumns <= 0 && numberOfRows <= 0 )
+    {
+    numberOfRows = static_cast<int>( vcl_sqrt( static_cast<float>( numberOfSlices ) ) );
+    numberOfColumns = vcl_ceil( static_cast<float>( numberOfSlices ) / static_cast<float>( numberOfRows ) );
+    }
+
+  std::cout << "Slices[" << layout[0] << "]: " << numberOfSlices << std::endl;
+  std::cout << "Rows:  " << numberOfRows << std::endl;
+  std::cout << "Columns:  " << numberOfColumns << std::endl;
+
+  typedef itk::TileImageFilter<SliceType, SliceType> FilterType;
+  FilterType::LayoutArrayType array;
+
+  array[0] = numberOfColumns;
+  array[1] = numberOfRows;
+
+  ImageType::RegionType region;
+  size[layout[0]] = 0;
+
+  ImageType::Pointer inputImage = reader->GetOutput();
+
+  FilterType::Pointer filter = FilterType::New();
+  filter->SetLayout( array );
+
+  for( unsigned int n = 0; n < numberOfSlices; n++ )
+    {
+    ImageType::IndexType index;
+    index.Fill( 0 );
+    index[layout[0]] = static_cast<int>( n );
+    region.SetIndex( index );
+    region.SetSize( size );
+
+    typedef itk::ExtractImageFilter<ImageType, SliceType> ExtracterType;
+    ExtracterType::Pointer extracter = ExtracterType::New();
+    extracter->SetInput( reader->GetOutput() );
+    extracter->SetExtractionRegion( region );
+    extracter->SetDirectionCollapseToIdentity();
+    extracter->Update();
+
+    filter->SetInput( n, extracter->GetOutput() );
+    }
+  filter->Update();
+
+  typedef itk::ImageFileWriter<SliceType> WriterType;
+  WriterType::Pointer writer = WriterType::New();
+  writer->SetFileName( argv[2] );
+  writer->SetInput( filter->GetOutput() );
+  writer->Update();
+
+  return EXIT_SUCCESS;
+}
+
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int TileImages( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int TileImages( std::vector<std::string> args, std::ostream* /*out_stream = NULL */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -151,7 +219,25 @@ private:
     std::cout << "  The input images must have a dimension less than or equal to the output " << std::endl;
     std::cout << "  image. The output image could have a larger dimension than the input. " << std::endl;
     std::cout << "  For example, This filter can be used to create a 3-d volume from a series " << std::endl;
-    std::cout << "  of 2-d inputs by specifying a layout of 1x1x0. " << std::endl;
+    std::cout << "  of 2-d inputs by specifying a layout of 1x1x0. " << std::endl << std::endl;
+
+    std::cout << "  In addition to the above functionality, there is another usage option" << std::endl;
+    std::cout << "  for creating a 2-d tiled mosaic from a 3-D image.  The command line options" << std::endl;
+    std::cout << "  are the same except only 1 input is expected and the layout for this option" << std::endl;
+    std::cout << "  is DxRxC where:" << std::endl;
+    std::cout << "      D is direction, i.e. 0, 1, or 2.  If not any of those numbers, we pick the coarsest spacing." << std::endl;
+    std::cout << "      R is number of rows." << std::endl;
+    std::cout << "      C is number of cols." << std::endl;
+    std::cout << "      If R < 0 and C > 0 (or vice versa), the negative value is selected based on D" << std::endl;
+
+    // Should add the following options:
+    //    * add rgb overlay (with alpha value?)
+    //    * number of slices to skip
+    //    * beginning and ending slice
+    //    * add or subtract border around each slice/tile
+    //    * if adding, set pad constant value
+
+
     if( argc >= 2 &&
         ( std::string( argv[1] ) == std::string("--help") || std::string( argv[1] ) == std::string("-h") ) )
       {
@@ -160,26 +246,35 @@ private:
     return EXIT_FAILURE;
     }
 
-  switch( atoi( argv[1] ) )
+  const int ImageDimension = static_cast<int>( atoi( argv[1] ) );
+
+  if( ImageDimension == 3 && argc == 5 )
     {
-    case 2:
+    CreateMosaic( argc, argv );
+    }
+  else
+    {
+    switch( ImageDimension )
       {
-      TileImages<2>( argc, argv );
+      case 2:
+        {
+        TileImages<2>( argc, argv );
+        }
+        break;
+      case 3:
+        {
+        TileImages<3>( argc, argv );
+        }
+        break;
+      case 4:
+        {
+        TileImages<4>( argc, argv );
+        }
+        break;
+      default:
+        std::cout << "Unsupported dimension" << std::endl;
+        return EXIT_FAILURE;
       }
-      break;
-    case 3:
-      {
-      TileImages<3>( argc, argv );
-      }
-      break;
-    case 4:
-      {
-      TileImages<4>( argc, argv );
-      }
-      break;
-    default:
-      std::cout << "Unsupported dimension" << std::endl;
-      return EXIT_FAILURE;
     }
   return EXIT_SUCCESS;
 }

@@ -47,10 +47,10 @@ static bool AverageAffineTransform_ParseInput(int argc, char * *argv, char *& ou
       opt.filename = argv[ind];
       if( CheckFileType(opt.filename) != AFFINE_FILE )
         {
-        std::cout << "file: " << opt.filename
+        std::cerr << "file: " << opt.filename
                  << " is not an affine .txt file. Invalid to use '-i' "
                  << std::endl;
-        return false;
+        return EXIT_FAILURE;
         }
       opt.file_type = AFFINE_FILE;
       opt.do_affine_inv = true;
@@ -73,9 +73,9 @@ static bool AverageAffineTransform_ParseInput(int argc, char * *argv, char *& ou
       opt.filename = argv[ind];
       if( CheckFileType(opt.filename) != AFFINE_FILE )
         {
-        std::cout << "file: " << opt.filename
+        std::cerr << "file: " << opt.filename
                  << " is not an affine .txt file." << std::endl;
-        return false;
+        return EXIT_FAILURE;
         }
       opt.file_type = CheckFileType(opt.filename);
       opt.do_affine_inv = false;
@@ -174,7 +174,8 @@ void AverageAffineTransform(char *output_affine_txt, char *reference_affine_txt,
         }
         break;
       default:
-        std::cout << "Unknown file type!" << std::endl;
+        std::cerr << "Unknown file type!" << std::endl;
+
       }
     }
 
@@ -199,7 +200,7 @@ void AverageAffineTransform(char *output_affine_txt, char *reference_affine_txt,
       }
     else
       {
-      std::cout << "No affine input is given. nothing to do ......" << std::endl;
+      std::cerr << "No affine input is given. nothing to do ......" << std::endl;
       return;
       }
     }
@@ -225,7 +226,7 @@ void AverageAffineTransform(char *output_affine_txt, char *reference_affine_txt,
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int AverageAffineTransform( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int AverageAffineTransform( std::vector<std::string> args, std::ostream* /*out_stream = NULL */)
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -270,7 +271,7 @@ private:
 
   if( argc <= 3 )
     {
-    std::cout
+    std::cerr
       << "AverageAffineTransform ImageDimension output_affine_transform [-R reference_affine_transform] "
       << "{[-i] affine_transform_txt [weight(=1)] ]}"
       << std::endl
@@ -348,7 +349,7 @@ private:
 
   else
     {
-    std::cout << "Input error!" << std::endl;
+    std::cerr << "Input error!" << std::endl;
     return EXIT_FAILURE;
     }
 

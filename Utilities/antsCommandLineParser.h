@@ -26,13 +26,22 @@
 
 #include <list>
 #include <sstream>
+#include <stdio.h>
 #include <string>
 #include <vector>
+
+#include <typeinfo>
 
 namespace itk
 {
 namespace ants
 {
+  /**
+   * A untilty function to convert internal typeid(???).name() to
+   * the human readable equivalent format.
+   */
+  extern std::string ConvertToHumanReadable(const std::string input);
+
 /** \class CommandLineParser
     \brief Simple command line parser.
     \par
@@ -102,50 +111,46 @@ public:
    */
   void AssignStages();
 
+
   template <class TValue>
-  TValue Convert( std::string optionString )
-  {
+  TValue Convert( std::string optionString ) const
+    {
+    //Strip whitespace at end
+    optionString.erase(optionString.find_last_not_of(" \n\r\t")+1);
     TValue             value;
     std::istringstream iss( optionString );
-
-    iss >> value;
+    if (!(iss >> value)  //Conversion did not fail
+      || !( iss.peek() == EOF ) // All content parsed
+    )
+      {
+      std::string internalTypeName( typeid(value).name() );
+      itkExceptionMacro( "ERROR: Parse error occured during command line argument processing\n"
+        << "ERROR: Unable to convert '" << optionString
+        << "' to type '" << internalTypeName << "' as " << ConvertToHumanReadable(internalTypeName) << std::endl);
+      }
     return value;
-  }
+    }
 
   template <class TValue>
-  std::vector<TValue> ConvertVector( std::string optionString )
+  std::vector<TValue> ConvertVector( std::string optionString ) const
   {
-    std::vector<TValue>    values;
-    std::string::size_type crosspos = optionString.find( 'x', 0 );
+    //Strip whitespace at end
+    optionString.erase(optionString.find_last_not_of(" \n\r\t")+1);
 
-    if( crosspos == std::string::npos )
+    std::vector<std::string> optionElementString;
+    std::istringstream f(optionString);
+    std::string s;
+    while( std::getline(f, s, 'x'))
       {
-      values.push_back( this->Convert<TValue>( optionString ) );
+      optionElementString.push_back(s);
       }
-    else
+
+    std::vector< TValue > values;
+    for ( std::vector< std::string >::const_iterator oESit = optionElementString.begin();
+      oESit != optionElementString.end(); ++oESit)
       {
-      std::string        element = optionString.substr( 0, crosspos );
-      TValue             value;
-      std::istringstream iss( element );
-      iss >> value;
-      values.push_back( value );
-      while( crosspos != std::string::npos )
-        {
-        std::string::size_type crossposfrom = crosspos;
-        crosspos = optionString.find( 'x', crossposfrom + 1 );
-        if( crosspos == std::string::npos )
-          {
-          element = optionString.substr(
-              crossposfrom + 1, optionString.length() );
-          }
-        else
-          {
-          element = optionString.substr( crossposfrom + 1, crosspos );
-          }
-        std::istringstream iss2( element );
-        iss2 >> value;
-        values.push_back( value );
-        }
+      const TValue & value = this->Convert<TValue>( *oESit );
+      values.push_back ( value );
       }
     return values;
   }

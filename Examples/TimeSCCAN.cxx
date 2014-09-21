@@ -23,7 +23,7 @@
 #include "antsCommandLineOption.h"
 #include "antsCommandLineParser.h"
 #include "antsSCCANObject.h"
-#include "ReadWriteImage.h"
+#include "ReadWriteData.h"
 #include "itkImageRegionIteratorWithIndex.h"
 #include <vnl/vnl_vector.h>
 #include <vnl/vnl_matrix.h>
@@ -57,7 +57,7 @@ double vnl_pearson_corr( vnl_vector<TComp> v1, vnl_vector<TComp> v2 )
 
 template <class NetworkType>
 bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Pointer time, typename NetworkType::Pointer labels,
-                unsigned int nLabels, unsigned int minRegionSize, unsigned int n_evec, unsigned int iterct, float sparsity, 
+                unsigned int nLabels, unsigned int minRegionSize, unsigned int n_evec, unsigned int iterct, float sparsity,
                 bool robust, bool useL1, float gradstep, bool keepPositive, unsigned int minClusterSize )
 {
   typedef itk::ants::antsSCCANObject<NetworkType, double>  SCCANType;
@@ -70,7 +70,7 @@ bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Poi
 
   if ( nLabels == 0 )
     {
-    
+
     while( !it.IsAtEnd() )
       {
       if ( it.Value() > 0 )
@@ -80,7 +80,7 @@ bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Poi
       ++it;
       }
     }
-  else 
+  else
     {
     for ( unsigned int i=0; i<nLabels; i++ )
       {
@@ -217,7 +217,7 @@ bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Poi
           // is truecorr just sccancorrs[0]?
           cca->SparsePartialArnoldiCCA(n_evec);
           VectorType sccancorrs = cca->GetCanonicalCorrelations();
-                            
+
           VectorType pVec = cca->GetVariateP();
           for ( unsigned int ip=0; ip<pVec.size(); ip++)
             {
@@ -232,12 +232,12 @@ bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Poi
             qVec[iq] = vnl_math_abs( qVec[iq] );
             }
           //qVec = qVec.normalize();
-          qVec = Q * qVec;       
+          qVec = Q * qVec;
 
           double final_corr = vnl_pearson_corr(pVec,qVec);
           if ( ! vnl_math_isfinite( final_corr ) )
             {
-            final_corr = 0.0; 
+            final_corr = 0.0;
             }
 
           typename NetworkType::IndexType connIdx;
@@ -276,7 +276,7 @@ bool RegionAveraging(typename NetworkType::Pointer network, typename NetworkType
 
   if ( nLabels == 0 )
     {
-    
+
     while( !it.IsAtEnd() )
       {
       if ( it.Value() > 0 )
@@ -286,7 +286,7 @@ bool RegionAveraging(typename NetworkType::Pointer network, typename NetworkType
       ++it;
       }
     }
-  else 
+  else
     {
     for ( unsigned int i=0; i<nLabels; i++ )
       {
@@ -324,9 +324,9 @@ bool RegionAveraging(typename NetworkType::Pointer network, typename NetworkType
     {
     typename NetworkType::IndexType idx;
     idx[1] = 0;
-    
+
     for ( unsigned int v=0; v<nVoxels; v++)
-      {      
+      {
       idx[0] = v;
       if ( labels->GetPixel(idx) == (i+1) )
         {
@@ -356,9 +356,9 @@ bool RegionAveraging(typename NetworkType::Pointer network, typename NetworkType
 
 for (unsigned int i=0; i<N; i++)
     {
-    for ( unsigned int j=(i+1); j<N; j++ )      
+    for ( unsigned int j=(i+1); j<N; j++ )
       {
-      
+
       if ( (labelCounts[i] > minSize) && (labelCounts[j] > minSize ) )
         {
         VectorType p = timeSig.get_row(i);
@@ -368,9 +368,9 @@ for (unsigned int i=0; i<N; i++)
 
         if ( ! vnl_math_isfinite( corr ) )
           {
-          corr = 0.0; 
+          corr = 0.0;
           }
-               
+
         typename NetworkType::IndexType connIdx;
         connIdx[0] = i;
         connIdx[1] = j;
@@ -378,13 +378,13 @@ for (unsigned int i=0; i<N; i++)
         connIdx[0] = j;
         connIdx[1] = i;
         network->SetPixel( connIdx, corr );
-          
+
         }
       }
     }
 
   return network;
-  
+
 }
 
 int timesccan( itk::ants::CommandLineParser *parser )
@@ -516,28 +516,19 @@ int timesccan( itk::ants::CommandLineParser *parser )
     robustify = parser->Convert<unsigned int>( robust_option->GetFunction()->GetName() );
     }
 
-  unsigned int                                      evecgradientpenalty = 1;
   itk::ants::CommandLineParser::OptionType::Pointer evecg_option =
     parser->GetOption( "EvecGradPenalty" );
-  if( !evecg_option || evecg_option->GetNumberOfFunctions() == 0 )
+  if( evecg_option && evecg_option->GetNumberOfFunctions() != 0 )
     {
-    }
-  else
-    {
-    evecgradientpenalty = parser->Convert<unsigned int>( evecg_option->GetFunction()->GetName() );
+    parser->Convert<unsigned int>( evecg_option->GetFunction()->GetName() );
     }
 
-  bool                                              eigen_imp = false;
   itk::ants::CommandLineParser::OptionType::Pointer eigen_option =
     parser->GetOption( "ridge_cca" );
-  if( !eigen_option || eigen_option->GetNumberOfFunctions() == 0 )
+  if( eigen_option && eigen_option->GetNumberOfFunctions() != 0 )
     {
-    //    std::cout << "Warning:  no permutation option set." << std::endl;
+    parser->Convert<bool>( eigen_option->GetFunction()->GetName() );
     }
-  else
-    {
-    eigen_imp = parser->Convert<bool>( eigen_option->GetFunction()->GetName() );
-    }  
 
   NetworkType::Pointer network = NetworkType::New();
 
@@ -552,7 +543,7 @@ int timesccan( itk::ants::CommandLineParser *parser )
       }
     std::string connectivityStrategy = netOption->GetFunction()->GetName();
     std::string timeMatrixName = std::string(netOption->GetFunction( 0 )->GetParameter( 0 ) );
-    std::string labelMatrixName = std::string(netOption->GetFunction( 0 )->GetParameter( 1 ) );    
+    std::string labelMatrixName = std::string(netOption->GetFunction( 0 )->GetParameter( 1 ) );
 
     std::cout << "Method: " << connectivityStrategy << std::endl;
 
@@ -565,7 +556,7 @@ int timesccan( itk::ants::CommandLineParser *parser )
       ReadImage<NetworkType>( timeMat, timeMatrixName.c_str() );
 
       NetworkType::Pointer labelMat = NULL;
-      ReadImage<NetworkType>( labelMat, labelMatrixName.c_str() );      
+      ReadImage<NetworkType>( labelMat, labelMatrixName.c_str() );
 
       float gradstep = -0.5 + vnl_math_abs( usel1 );
 
@@ -581,7 +572,7 @@ int timesccan( itk::ants::CommandLineParser *parser )
       ReadImage<NetworkType>( timeMat, timeMatrixName.c_str() );
 
       NetworkType::Pointer labelMat = NULL;
-      ReadImage<NetworkType>( labelMat, labelMatrixName.c_str() );  
+      ReadImage<NetworkType>( labelMat, labelMatrixName.c_str() );
 
       RegionAveraging<NetworkType>( network, timeMat, labelMat, nLabels, roiSize );
       }
@@ -590,7 +581,7 @@ int timesccan( itk::ants::CommandLineParser *parser )
       std::cout << "Unknown method:" << connectivityStrategy << std::endl;
       return EXIT_FAILURE;
       }
-    
+
     }
 
   WriteImage<NetworkType>( network, outname.c_str() );
@@ -609,7 +600,6 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   OptionType::Pointer option = OptionType::New();
   option->SetShortName( 'h' );
   option->SetDescription( description );
-  option->AddFunction( std::string( "0" ) );
   parser->AddOption( option );
   }
 
@@ -618,10 +608,9 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   OptionType::Pointer option = OptionType::New();
   option->SetLongName( "help" );
   option->SetDescription( description );
-  option->AddFunction( std::string( "0" ) );
   parser->AddOption( option );
   }
-  
+
   {
   std::string description =
     std::string( "Output is a 2D correlation matrix." );
@@ -632,7 +621,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   option->SetDescription( description );
   parser->AddOption( option );
   }
-  
+
   {
   std::string description =
     std::string( "Number of consecutive labels in data" );
@@ -687,7 +676,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   option->SetDescription( description );
   parser->AddOption( option );
   }
-  
+
   {
   std::string description =
     std::string( "rank-based scca" );
@@ -698,7 +687,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   option->SetDescription( description );
   parser->AddOption( option );
   }
-  
+
   {
   std::string description =
     std::string(
@@ -710,7 +699,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   option->SetDescription( description );
   parser->AddOption( option );
   }
-  
+
   {
   std::string description =
     std::string( "cluster threshold on view P" );
@@ -720,7 +709,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   option->SetDescription( description );
   parser->AddOption( option );
   }
-  
+
   {
   std::string description =
     std::string( "Number of permutations to use in scca." );
@@ -731,7 +720,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   option->SetDescription( description );
   parser->AddOption( option );
   }
-  
+
   {
   std::string description =
     std::string( "Choices for pscca: PQ, PminusRQ, PQminusR, PminusRQminusR " );
@@ -741,7 +730,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   option->SetDescription( description );
   parser->AddOption( option );
   }
-  
+
   {
   std::string description =
     std::string( "takes a timeseries (4D) image " )
@@ -756,12 +745,12 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   option->SetDescription( description );
   parser->AddOption( option );
   }
-  
+
   {
   std::string description =
     std::string( "takes a labeled (3D) image " )
     + std::string( "and converts it to a 2D matrix csv format as output." );
-  
+
   OptionType::Pointer option = OptionType::New();
   option->SetLongName( "labelsimage-to-matrix" );
   option->SetUsageOption(
@@ -786,10 +775,10 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   parser->AddOption( option );
   }
 }
-  
+
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int TimeSCCAN( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int TimeSCCAN( std::vector<std::string> args, std::ostream* /*out_stream = NULL */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -851,7 +840,7 @@ private:
     parser->GetOption( 'h' );
   itk::ants::CommandLineParser::OptionType::Pointer longHelpOption =
     parser->GetOption( "help" );
-  if( argc < 2 || ( shortHelpOption &&
+  if( argc < 2 || ( shortHelpOption->GetFunction() &&
                     parser->Convert<unsigned int>( shortHelpOption->GetFunction()->GetName() ) == 1 ) )
     {
     parser->PrintMenu( std::cout, 5, true );
@@ -861,7 +850,7 @@ private:
       }
     return EXIT_SUCCESS;
     }
-  if( longHelpOption && parser->Convert<unsigned int>( longHelpOption->GetFunction()->GetName() ) == 1 )
+  if( longHelpOption->GetFunction() && parser->Convert<unsigned int>( longHelpOption->GetFunction()->GetName() ) == 1 )
     {
     parser->PrintMenu( std::cout, 5, false );
     return EXIT_SUCCESS;

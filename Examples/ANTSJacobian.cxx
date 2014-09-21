@@ -11,7 +11,7 @@
 #include "itkImageRegionIteratorWithIndex.h"
 #include "vnl/algo/vnl_determinant.h"
 
-#include "ReadWriteImage.h"
+#include "ReadWriteData.h"
 
 #include "vnl/algo/vnl_determinant.h"
 #include "itkDiscreteGaussianImageFilter.h"
@@ -122,6 +122,8 @@ TransformVector(TDisplacementField* field, typename TImage::IndexType index )
 {
   enum { ImageDimension = TImage::ImageDimension };
   typename TDisplacementField::PixelType vec = field->GetPixel(index);
+  return vec;
+  /* buggy code from before
   typename TDisplacementField::PixelType newvec;
   newvec.Fill(0);
   for( unsigned int row = 0; row < ImageDimension; row++ )
@@ -131,8 +133,8 @@ TransformVector(TDisplacementField* field, typename TImage::IndexType index )
       newvec[row] += vec[col] * field->GetDirection()[row][col];
       }
     }
-
   return newvec;
+  */
 }
 
 template <class TImage, class TDisplacementField>
@@ -553,7 +555,7 @@ int Jacobian(int argc, char *argv[])
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ANTSJacobian( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int ANTSJacobian( std::vector<std::string> args, std::ostream* /*out_stream = NULL */)
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -595,6 +597,9 @@ private:
   Cleanup_argv cleanup_argv( argv, argc + 1 );
 
   // antscout->set_stream( out_stream );
+  std::cout << "Sorry! " << argv[0] << " is deprecated " << std::endl;
+  std::cout << "Please use CreateJacobianDeterminantImage " << std::endl;
+  return EXIT_SUCCESS;
 
   if( argc < 3 )
     {

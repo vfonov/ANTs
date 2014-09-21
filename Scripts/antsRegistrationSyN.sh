@@ -69,14 +69,30 @@ Optional arguments:
         s: rigid + affine + deformable syn
         b: rigid + affine + deformable b-spline syn
 
+     -r:  radius for cross correlation metric used during SyN stage (default = 4)
+
      -s:  spline distance for deformable B-spline SyN transform (default = 26)
+
+     -p:  precision type (default = 'd')
+        f: float
+        d: double
+
+     -j:  use histogram matching (default = 0)
+        0: false
+        1: true
+
+     NB:  Multiple image pairs can be specified for registration during the SyN stage.
+          Specify additional images using the '-m' and '-f' options.  Note that image
+          pair correspondence is given by the order specified on the command line.
+          Only the first fixed and moving image pair is used for the linear resgitration
+          stages.
 
 Example:
 
 `basename $0` -d 3 -f fixedImage.nii.gz -m movingImage.nii.gz -o output
 
 --------------------------------------------------------------------------------------
-ANTS was created by:
+ANTs was created by:
 --------------------------------------------------------------------------------------
 Brian B. Avants, Nick Tustison and Gang Song
 Penn Image Computing And Science Laboratory
@@ -119,10 +135,26 @@ Optional arguments:
         s: rigid + affine + deformable syn
         b: rigid + affine + deformable b-spline syn
 
+     -r:  radius for cross correlation metric used during SyN stage (default = 4)
+
      -s:  spline distance for deformable B-spline SyN transform (default = 26)
 
+     -p:  precision type (default = 'd')
+        f: float
+        d: double
+
+     -j:  use histogram matching (default = 0)
+        0: false
+        1: true
+
+     NB:  Multiple image pairs can be specified for registration during the SyN stage.
+          Specify additional images using the '-m' and '-f' options.  Note that image
+          pair correspondence is given by the order specified on the command line.
+          Only the first fixed and moving image pair is used for the linear resgitration
+          stages.
+
 --------------------------------------------------------------------------------------
-Get the latest ANTS version at:
+Get the latest ANTs version at:
 --------------------------------------------------------------------------------------
 https://github.com/stnava/ANTs/
 
@@ -138,13 +170,9 @@ Brian B. Avants, Nick Tustison and Gang Song
 Penn Image Computing And Science Laboratory
 University of Pennsylvania
 
-Please reference http://www.ncbi.nlm.nih.gov/pubmed/20851191 when employing this script
-in your studies. A reproducible evaluation of ANTs similarity metric performance in
-brain image registration:
-
-* Avants BB, Tustison NJ, Song G, Cook PA, Klein A, Gee JC. Neuroimage, 2011.
-
-Also see http://www.ncbi.nlm.nih.gov/pubmed/19818860 for more details.
+Relevent references for this script include:
+   * http://www.ncbi.nlm.nih.gov/pubmed/20851191
+   * http://www.frontiersin.org/Journal/10.3389/fninf.2013.00039/abstract
 --------------------------------------------------------------------------------------
 script by Nick Tustison
 --------------------------------------------------------------------------------------
@@ -163,12 +191,15 @@ function reportMappingParameters {
 
  Dimensionality:           $DIM
  Output name prefix:       $OUTPUTNAME
- Fixed image:              $FIXEDIMAGE
- Moving image:             $MOVINGIMAGE
+ Fixed images:             ${FIXEDIMAGES[@]}
+ Moving images:            ${MOVINGIMAGES[@]}
  Number of threads:        $NUMBEROFTHREADS
  Spline distance:          $SPLINEDISTANCE
  Transform type:           $TRANSFORMTYPE
---------------------------------------------------------------------------------------
+ CC radius:                $CCRADIUS
+ Precision:                $PRECISIONTYPE
+ Use histogram matching    $USEHISTOGRAMMATCHING
+======================================================================================
 REPORTMAPPINGPARAMETERS
 }
 
@@ -188,10 +219,10 @@ runningANTSpids=( `ps -C antsRegistration | awk '{ printf "%s\n", $1 ; }'` )
   #echo list 1: ${runningANTSpids[@]}
 
 # kill these processes, skip the first since it is text and not a PID
-for ((i = 1; i < ${#runningANTSpids[@]} ; i++))
+for (( i = 1; i < ${#runningANTSpids[@]}; i++ ))
   do
-  echo "killing:  ${runningANTSpids[${i}]}"
-  kill ${runningANTSpids[${i}]}
+    echo "killing:  ${runningANTSpids[${i}]}"
+    kill ${runningANTSpids[${i}]}
 done
 
   return $?
@@ -220,15 +251,18 @@ if [[ "$1" == "-h" || $# -eq 0 ]];
 #################
 
 DIM=3
-FIXEDIMAGE=''
-MOVINGIMAGE=''
+FIXEDIMAGES=()
+MOVINGIMAGES=()
 OUTPUTNAME=output
 NUMBEROFTHREADS=1
 SPLINEDISTANCE=26
 TRANSFORMTYPE='s'
+PRECISIONTYPE='d'
+USEHISTOGRAMMATCHING=0
+CCRADIUS=4
 
 # reading command line arguments
-while getopts "d:f:h:m:n:o:s:t:" OPT
+while getopts "d:f:h:j:m:n:o:p:r:s:t:" OPT
   do
   case $OPT in
       h) #help
@@ -239,10 +273,13 @@ while getopts "d:f:h:m:n:o:s:t:" OPT
    DIM=$OPTARG
    ;;
       f)  # fixed image
-   FIXEDIMAGE=$OPTARG
+   FIXEDIMAGES[${#FIXEDIMAGES[@]}]=$OPTARG
+   ;;
+      j)  # histogram matching
+   USEHISTOGRAMMATCHING=$OPTARG
    ;;
       m)  # moving image
-   MOVINGIMAGE=$OPTARG
+   MOVINGIMAGES[${#MOVINGIMAGES[@]}]=$OPTARG
    ;;
       n)  # number of threads
    NUMBEROFTHREADS=$OPTARG
@@ -250,11 +287,21 @@ while getopts "d:f:h:m:n:o:s:t:" OPT
       o) #output name prefix
    OUTPUTNAME=$OPTARG
    ;;
+      p)  # precision type
+   PRECISIONTYPE=$OPTARG
+   ;;
+      r)  # cc radius
+   CCRADIUS=$OPTARG
+   ;;
       s)  # spline distance
    SPLINEDISTANCE=$OPTARG
    ;;
       t)  # transform type
    TRANSFORMTYPE=$OPTARG
+   ;;
+     \?) # getopts issues an error message
+   echo "$USAGE" >&2
+   exit 1
    ;;
   esac
 done
@@ -264,17 +311,25 @@ done
 # Check inputs
 #
 ###############################
+if [[ ${#FIXEDIMAGES[@]} -ne ${#MOVINGIMAGES[@]} ]];
+  then
+    echo "Number of fixed images is not equal to the number of moving images."
+    exit 1
+  fi
 
-if [[ ! -f "$FIXEDIMAGE" ]];
-  then
-    echo "Fixed image '$FIXEDIMAGE' does not exist.  See usage: '$0 -h 1'"
-    exit
-  fi
-if [[ ! -f "$MOVINGIMAGE" ]];
-  then
-    echo "Moving image '$MOVINGIMAGE' does not exist.  See usage: '$0 -h 1'"
-    exit
-  fi
+for(( i=0; i<${#FIXEDIMAGES[@]}; i++ ))
+  do
+    if [[ ! -f "${FIXEDIMAGES[$i]}" ]];
+      then
+        echo "Fixed image '${FIXEDIMAGES[$i]}' does not exist.  See usage: '$0 -h 1'"
+        exit 1
+      fi
+    if [[ ! -f "${MOVINGIMAGES[$i]}" ]];
+      then
+        echo "Moving image '${MOVINGIMAGES[$i]}' does not exist.  See usage: '$0 -h 1'"
+        exit 1
+      fi
+  done
 
 ###############################
 #
@@ -291,7 +346,30 @@ export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS
 # Print out options
 #
 ##############################
+
 reportMappingParameters
+
+##############################
+#
+# Infer the number of levels based on
+# the size of the input fixed image.
+#
+##############################
+
+ISLARGEIMAGE=0
+
+SIZESTRING=$( ${ANTSPATH}/PrintHeader ${FIXEDIMAGES[0]} 2 )
+SIZESTRING="${SIZESTRING%\\n}"
+SIZE=( `echo $SIZESTRING | tr 'x' ' '` )
+
+for (( i=0; i<${#SIZE[@]}; i++ ))
+  do
+    if [[ ${SIZE[$i]} -gt 256 ]];
+      then
+        ISLARGEIMAGE=1
+        break
+      fi
+  done
 
 ##############################
 #
@@ -299,23 +377,56 @@ reportMappingParameters
 #
 ##############################
 
-RIGIDSTAGE="--initial-moving-transform [$FIXEDIMAGE,$MOVINGIMAGE,1] \
+RIGIDCONVERGENCE="[1000x500x250x100,1e-6,10]"
+RIGIDSHRINKFACTORS="8x4x2x1"
+RIGIDSMOOTHINGSIGMAS="3x2x1x0vox"
+
+AFFINECONVERGENCE="[1000x500x250x100,1e-6,10]"
+AFFINESHRINKFACTORS="8x4x2x1"
+AFFINESMOOTHINGSIGMAS="3x2x1x0vox"
+
+SYNCONVERGENCE="[100x70x50x20,1e-6,10]"
+SYNSHRINKFACTORS="8x4x2x1"
+SYNSMOOTHINGSIGMAS="3x2x1x0vox"
+
+if [[ $ISLARGEIMAGE -eq 1 ]];
+  then
+    RIGIDCONVERGENCE="[1000x500x250x100,1e-6,10]"
+    RIGIDSHRINKFACTORS="12x8x4x2"
+    RIGIDSMOOTHINGSIGMAS="4x3x2x1vox"
+
+    AFFINECONVERGENCE="[1000x500x250x100,1e-6,10]"
+    AFFINESHRINKFACTORS="12x8x4x2"
+    AFFINESMOOTHINGSIGMAS="4x3x2x1vox"
+
+    SYNCONVERGENCE="[100x100x70x50x20,1e-6,10]"
+    SYNSHRINKFACTORS="10x6x4x2x1"
+    SYNSMOOTHINGSIGMAS="5x3x2x1x0vox"
+  fi
+
+RIGIDSTAGE="--initial-moving-transform [${FIXEDIMAGES[0]},${MOVINGIMAGES[0]},1] \
             --transform Rigid[0.1] \
-            --metric MI[$FIXEDIMAGE,$MOVINGIMAGE,1,32,Regular,0.25] \
-            --convergence 1000x500x250x100 \
-            --shrink-factors 8x4x2x1 \
-            --smoothing-sigmas 3x2x1x0"
+            --metric MI[${FIXEDIMAGES[0]},${MOVINGIMAGES[0]},1,32,Regular,0.25] \
+            --convergence $RIGIDCONVERGENCE \
+            --shrink-factors $RIGIDSHRINKFACTORS \
+            --smoothing-sigmas $RIGIDSMOOTHINGSIGMAS"
 
 AFFINESTAGE="--transform Affine[0.1] \
-             --metric MI[$FIXEDIMAGE,$MOVINGIMAGE,1,32,Regular,0.25] \
-             --convergence 1000x500x250x100 \
-             --shrink-factors 8x4x2x1 \
-             --smoothing-sigmas 3x2x1x0"
+             --metric MI[${FIXEDIMAGES[0]},${MOVINGIMAGES[0]},1,32,Regular,0.25] \
+             --convergence $AFFINECONVERGENCE \
+             --shrink-factors $AFFINESHRINKFACTORS \
+             --smoothing-sigmas $AFFINESMOOTHINGSIGMAS"
 
-SYNSTAGE="--metric CC[$FIXEDIMAGE,$MOVINGIMAGE,1,4] \
-          --convergence 100x70x50x20 \
-          --shrink-factors 6x4x2x1 \
-          --smoothing-sigmas 3x2x1x0"
+SYNMETRICS=''
+for(( i=0; i<${#FIXEDIMAGES[@]}; i++ ))
+  do
+    SYNMETRICS="$SYNMETRICS --metric CC[${FIXEDIMAGES[$i]},${MOVINGIMAGES[$i]},1,${CCRADIUS}]"
+  done
+
+SYNSTAGE="${SYNMETRICS} \
+          --convergence $SYNCONVERGENCE \
+          --shrink-factors $SYNSHRINKFACTORS \
+          --smoothing-sigmas $SYNSMOOTHINGSIGMAS"
 
 if [[ $TRANSFORMTYPE == 'b' ]];
   then
@@ -345,11 +456,33 @@ case "$TRANSFORMTYPE" in
   ;;
 esac
 
-${ANTS} --dimensionality $DIM \
-								--output [$OUTPUTNAME,${OUTPUTNAME}Warped.nii.gz] \
-								--interpolation Linear \
-								--winsorize-image-intensities [0.005,0.995] \
-								$STAGES
+PRECISION=''
+case "$PRECISIONTYPE" in
+"f")
+  PRECISION="--float 1"
+  ;;
+"d")
+  PRECISION="--float 0"
+  ;;
+*)
+  echo "Precision type '$PRECISIONTYPE' is not an option.  See usage: '$0 -h 1'"
+  exit
+  ;;
+esac
+
+COMMAND="${ANTS} --dimensionality $DIM $PRECISION \
+                 --output [$OUTPUTNAME,${OUTPUTNAME}Warped.nii.gz] \
+                 --interpolation Linear \
+                 --winsorize-image-intensities [0.005,0.995] \
+                 --use-histogram-matching ${USEHISTOGRAMMATCHING} \
+                 $STAGES"
+
+echo " antsRegistration call:"
+echo "--------------------------------------------------------------------------------------"
+echo ${COMMAND}
+echo "--------------------------------------------------------------------------------------"
+
+$COMMAND
 
 ###############################
 #

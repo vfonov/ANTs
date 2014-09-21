@@ -57,8 +57,11 @@ Optional arguments:
      -f:  Brain extraction registration mask    Mask used for registration to limit the metric computation to
                                                 a specific region.
      -s:  image file suffix                     Any of the standard ITK IO formats e.g. nrrd, nii.gz (default), mhd
+     -u:  use random seeding                    Use random number generated from system clock in Atropos (default = 1)
      -k:  keep temporary files                  Keep brain extraction/segmentation warps, etc (default = false).
      -q:  use floating point precision          Use antsRegistration with floating point precision.
+
+     -z:  Test / debug mode                     If > 0, runs a faster version of the script. Only for debugging, results will not be good.
 
 USAGE
     exit 1
@@ -86,6 +89,7 @@ echoParameters() {
        likelihood             = ${ATROPOS_BRAIN_EXTRACTION_LIKELIHOOD}
        initialization         = ${ATROPOS_BRAIN_EXTRACTION_INITIALIZATION}
        mrf                    = ${ATROPOS_BRAIN_EXTRACTION_MRF}
+       use clock random seed  = ${USE_RANDOM_SEEDING}
 
 PARAMETERS
 }
@@ -94,16 +98,37 @@ PARAMETERS
 #    local  myresult='some value'
 #    echo "$myresult"
 
-# Echos a command to both stdout and stderr, then runs it
+# Echos a command to stdout, then runs it
+# Will immediately exit on error unless you set debug flag here
+DEBUG_MODE=0
+
 function logCmd() {
   cmd="$*"
   echo "BEGIN >>>>>>>>>>>>>>>>>>>>"
   echo $cmd
-  logCmdOutput=$( $cmd | tee /dev/tty )
+  $cmd
+
+  cmdExit=$?
+
+  if [[ $cmdExit -gt 0 ]];
+    then
+      echo "ERROR: command exited with nonzero status $cmdExit"
+      echo "Command: $cmd"
+      echo
+      if [[ ! $DEBUG_MODE -gt 0 ]];
+        then
+          exit 1
+        fi
+    fi
+
   echo "END   <<<<<<<<<<<<<<<<<<<<"
   echo
   echo
+
+  return $cmdExit
 }
+
+
 
 ################################################################################
 #
@@ -120,6 +145,8 @@ OUTPUT_PREFIX=${OUTPUT_DIR}/tmp
 OUTPUT_SUFFIX="nii.gz"
 
 KEEP_TMP_IMAGES=0
+
+USE_RANDOM_SEEDING=1
 
 DIMENSION=3
 
@@ -159,7 +186,7 @@ if [[ $# -lt 3 ]] ; then
   Usage >&2
   exit 1
 else
-  while getopts "a:d:e:f:h:k:m:o:q:s:" OPT
+  while getopts "a:d:e:f:h:k:m:o:q:s:u:z:" OPT
     do
       case $OPT in
           d) #dimensions
@@ -198,6 +225,12 @@ else
           s) #output suffix
        OUTPUT_SUFFIX=$OPTARG
        ;;
+          u) #use random seeding
+       USE_RANDOM_SEEDING=$OPTARG
+       ;;
+          z) #debug mode
+       DEBUG_MODE=$OPTARG
+       ;;
           *) # getopts issues an error message
        echo "ERROR:  unrecognized option -$OPT $OPTARG"
        exit 1
@@ -221,7 +254,6 @@ if [[ -z "$ATROPOS_SEGMENTATION_MRF" ]];
       fi
   fi
 
-ATROPOS_SEGMENTATION_CONVERGENCE="[${ATROPOS_SEGMENTATION_NUMBER_OF_ITERATIONS},0.0]"
 
 ################################################################################
 #
@@ -246,6 +278,22 @@ if [[ ! -d $OUTPUT_DIR ]];
     echo "The output directory \"$OUTPUT_DIR\" does not exist. Making it."
     mkdir -p $OUTPUT_DIR
   fi
+
+if [[ $DEBUG_MODE -gt 0 ]];
+  then
+
+   echo "    WARNING - Running in test / debug mode. Results will be suboptimal "
+
+   # Speed up by doing fewer its. Careful about changing this because
+   # certain things are hard coded elsewhere, eg number of levels
+
+   ANTS_MAX_ITERATIONS="40x40x20x0"
+   ANTS_LINEAR_CONVERGENCE="[100x100x50x10,1e-8,10]"
+
+   # Leave N4 / Atropos alone because they're pretty fast
+
+  fi
+
 
 echoParameters >&2
 
@@ -378,6 +426,7 @@ if [[ ! -f ${EXTRACTION_MASK} || ! -f ${EXTRACTION_WM} ]];
               then
                 exe_initial_align="${exe_initial_align} ${EXTRACTION_REGISTRATION_MASK}"
               fi
+
             logCmd $exe_initial_align
 
             basecall="${ANTS} -d ${DIMENSION} -u 1 -w [0.025,0.975] -o ${EXTRACTION_WARP_OUTPUT_PREFIX} -r ${EXTRACTION_INITIAL_AFFINE} -z 1 --float ${USE_FLOAT_PRECISION}"
@@ -410,6 +459,7 @@ if [[ ! -f ${EXTRACTION_MASK} || ! -f ${EXTRACTION_WM} ]];
           fi
 
         ## Step 2 ##
+
         exe_brain_extraction_2="${WARP} -d ${DIMENSION} -i ${EXTRACTION_PRIOR} -o ${EXTRACTION_MASK_PRIOR_WARPED} -r ${ANATOMICAL_IMAGES[0]} -n Gaussian -t [${EXTRACTION_GENERIC_AFFINE},1] -t ${EXTRACTION_INVERSE_WARP} --float ${USE_FLOAT_PRECISION}"
         logCmd $exe_brain_extraction_2
 
@@ -425,8 +475,14 @@ if [[ ! -f ${EXTRACTION_MASK} || ! -f ${EXTRACTION_WM} ]];
             ATROPOS_ANATOMICAL_IMAGES_COMMAND_LINE="${ATROPOS_ANATOMICAL_IMAGES_COMMAND_LINE} -a ${N4_CORRECTED_IMAGES[$i]}";
           done
 
-        exe_brain_extraction_3="${ATROPOS} -d ${DIMENSION} -o ${EXTRACTION_SEGMENTATION} ${ATROPOS_ANATOMICAL_IMAGES_COMMAND_LINE} -x ${EXTRACTION_MASK} -i ${ATROPOS_BRAIN_EXTRACTION_INITIALIZATION} -c ${ATROPOS_BRAIN_EXTRACTION_CONVERGENCE} -m ${ATROPOS_BRAIN_EXTRACTION_MRF} -k ${ATROPOS_BRAIN_EXTRACTION_LIKELIHOOD}"
+        exe_brain_extraction_3="${ATROPOS} -d ${DIMENSION} -o ${EXTRACTION_SEGMENTATION} ${ATROPOS_ANATOMICAL_IMAGES_COMMAND_LINE} -x ${EXTRACTION_MASK} -i ${ATROPOS_BRAIN_EXTRACTION_INITIALIZATION} -c ${ATROPOS_BRAIN_EXTRACTION_CONVERGENCE} -m ${ATROPOS_BRAIN_EXTRACTION_MRF} -k ${ATROPOS_BRAIN_EXTRACTION_LIKELIHOOD} -r ${USE_RANDOM_SEEDING}"
         logCmd $exe_brain_extraction_3
+
+        # Pad image here to avoid errors from dilating into the edge of the image
+        padVoxels=10
+
+        logCmd ${ANTSPATH}/ImageMath ${DIMENSION} ${EXTRACTION_SEGMENTATION} PadImage ${EXTRACTION_SEGMENTATION} $padVoxels
+        logCmd ${ANTSPATH}/ImageMath ${DIMENSION} ${EXTRACTION_MASK_PRIOR_WARPED} PadImage ${EXTRACTION_MASK_PRIOR_WARPED} $padVoxels
 
         logCmd ${ANTSPATH}/ThresholdImage ${DIMENSION} ${EXTRACTION_SEGMENTATION} ${EXTRACTION_WM} 3 3 1 0
         logCmd ${ANTSPATH}/ThresholdImage ${DIMENSION} ${EXTRACTION_SEGMENTATION} ${EXTRACTION_GM} 2 2 1 0
@@ -456,6 +512,12 @@ if [[ ! -f ${EXTRACTION_MASK} || ! -f ${EXTRACTION_WM} ]];
         logCmd ${ANTSPATH}ImageMath ${DIMENSION} ${EXTRACTION_MASK} MD ${EXTRACTION_MASK} 5
         logCmd ${ANTSPATH}ImageMath ${DIMENSION} ${EXTRACTION_MASK} ME ${EXTRACTION_MASK} 5
 
+        # De-pad
+        for img in ${EXTRACTION_SEGMENTATION} ${EXTRACTION_MASK} ${EXTRACTION_WM} ${EXTRACTION_GM} ${EXTRACTION_CSF} ${EXTRACTION_MASK_PRIOR_WARPED}
+          do
+            logCmd ${ANTSPATH}/ImageMath ${DIMENSION} ${img} PadImage ${img} -$padVoxels
+          done
+
       fi
 
     if [[ ! -f ${EXTRACTION_WM} ]];
@@ -466,18 +528,24 @@ if [[ ! -f ${EXTRACTION_MASK} || ! -f ${EXTRACTION_WM} ]];
             ATROPOS_ANATOMICAL_IMAGES_COMMAND_LINE="${ATROPOS_ANATOMICAL_IMAGES_COMMAND_LINE} -a ${N4_CORRECTED_IMAGES[$i]}";
           done
 
-        exe_brain_extraction_3="${ATROPOS} -d ${DIMENSION} -o ${EXTRACTION_SEGMENTATION} ${ATROPOS_ANATOMICAL_IMAGES_COMMAND_LINE} -x ${EXTRACTION_MASK} -i ${ATROPOS_BRAIN_EXTRACTION_INITIALIZATION} -c ${ATROPOS_BRAIN_EXTRACTION_CONVERGENCE} -m ${ATROPOS_BRAIN_EXTRACTION_MRF} -k ${ATROPOS_BRAIN_EXTRACTION_LIKELIHOOD}"
+        exe_brain_extraction_3="${ATROPOS} -d ${DIMENSION} -o ${EXTRACTION_SEGMENTATION} ${ATROPOS_ANATOMICAL_IMAGES_COMMAND_LINE} -x ${EXTRACTION_MASK} -i ${ATROPOS_BRAIN_EXTRACTION_INITIALIZATION} -c ${ATROPOS_BRAIN_EXTRACTION_CONVERGENCE} -m ${ATROPOS_BRAIN_EXTRACTION_MRF} -k ${ATROPOS_BRAIN_EXTRACTION_LIKELIHOOD} -r ${USE_RANDOM_SEEDING}"
         logCmd $exe_brain_extraction_3
 
         logCmd ${ANTSPATH}/ThresholdImage ${DIMENSION} ${EXTRACTION_SEGMENTATION} ${EXTRACTION_WM} 3 3 1 0
       fi
 
-    logCmd ${ANTSPATH}/MultiplyImages ${DIMENSION} ${EXTRACTION_MASK} ${N4_CORRECTED_IMAGES[0]} ${EXTRACTION_BRAIN}
+    logCmd ${ANTSPATH}/MultiplyImages ${DIMENSION} ${N4_CORRECTED_IMAGES[0]} ${EXTRACTION_MASK} ${EXTRACTION_BRAIN}
 
     if [[ ! -f ${EXTRACTION_MASK} ]];
       then
         echo "Expected output was not produced.  The brain mask doesn't exist:"
         echo "   $EXTRACTION_MASK"
+        exit 1
+      fi
+    if [[ ! -f ${EXTRACTION_BRAIN} ]];
+      then
+        echo "Expected output was not produced.  The brain extracted image doesn't exist:"
+        echo "   $EXTRACTION_BRAIN"
         exit 1
       fi
 
@@ -491,11 +559,17 @@ if [[ ! -f ${EXTRACTION_MASK} || ! -f ${EXTRACTION_WM} ]];
     echo
   fi
 
+
 if [[ $KEEP_TMP_IMAGES -eq 0 ]];
   then
     for f in ${TMP_FILES[@]}
       do
-        logCmd rm $f
+        if [[ -e $f ]];
+          then
+            logCmd rm $f
+          else
+            echo "WARNING: expected temp file doesn't exist: $f"
+          fi
       done
   fi
 

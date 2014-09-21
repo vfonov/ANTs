@@ -9,7 +9,7 @@
 #include "itkImageIOFactory.h"
 #include <math.h>
 #include <iostream>
-#include "ReadWriteImage.h"
+#include "ReadWriteData.h"
 #include "itkTransformFileWriter.h"
 
 #include <vnl/vnl_matrix.h>
@@ -35,7 +35,7 @@ void WriteAffineTransformFile(typename TransformType::Pointer & transform,
     }
   catch( itk::ExceptionObject & err )
     {
-    std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl
+    std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl
              << "Exception in writing tranform file: " << std::endl
              << filename << std::endl;
     return;
@@ -382,7 +382,7 @@ int LandmarkBasedTransformInitializer3D(int, char * argv[])
 
 int LandmarkBasedTransformInitializer2D(int, char * [])
 {
-  std::cout << " not implemented " << std::endl;
+  std::cerr << " not implemented " << std::endl;
   return EXIT_FAILURE;
 
   /*
@@ -403,7 +403,7 @@ typedef itk::Rigid2DTransform< double > TransformType;
    */
 }
 
-int ANTSUseLandmarkImagesToGetAffineTransform( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int ANTSUseLandmarkImagesToGetAffineTransform( std::vector<std::string> args, std::ostream* /*out_stream = NULL */)
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;

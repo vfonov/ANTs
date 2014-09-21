@@ -18,7 +18,7 @@
 #include "antsUtilities.h"
 #include <algorithm>
 #include "itkImage.h"
-#include "ReadWriteImage.h"
+#include "ReadWriteData.h"
 #include "itkResampleImageFilter.h"
 #include "itkIdentityTransform.h"
 #include "itkLinearInterpolateImageFunction.h"
@@ -31,7 +31,7 @@ namespace ants
 {
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ResampleImageBySpacing( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int ResampleImageBySpacing( std::vector<std::string> args, std::ostream* /*out_stream = NULL */ )
 {
   args.insert( args.begin(), "ResampleImageBySpacing" );
   int     argc = args.size();

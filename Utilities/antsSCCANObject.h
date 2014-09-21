@@ -34,7 +34,7 @@ namespace ants
 {
 template <class TInputImage, class TRealType = double>
 class antsSCCANObject :
-  public         ImageToImageFilter<TInputImage, TInputImage>
+  public ImageToImageFilter<TInputImage, TInputImage>
 {
 public:
   /** Standard class typdedefs. */
@@ -65,6 +65,8 @@ public:
   typedef TRealType RealType;
   typedef Image<RealType,
                 itkGetStaticConstMacro( ImageDimension )>         RealImageType;
+  typedef Image<RealType,
+                itkGetStaticConstMacro( ImageDimension-1 )>       RealImageTypeDminus1;
 
   /** Define eigen types */
   //  typedef Eigen::Matrix<RealType, Eigen::Dynamic, Eigen::Dynamic> eMatrix;
@@ -102,12 +104,13 @@ public:
   itkGetMacro( Silent, bool );
   itkSetMacro( RowSparseness, RealType );
   itkGetMacro( RowSparseness, RealType );
-  itkSetMacro( UseLongitudinalFormulation , RealType );
-  itkGetMacro( UseLongitudinalFormulation , RealType );
-  itkSetMacro( Smoother , RealType );
-  itkGetMacro( Smoother , RealType );
+  itkSetMacro( UseLongitudinalFormulation, RealType );
+  itkGetMacro( UseLongitudinalFormulation, RealType );
+  itkSetMacro( Smoother, RealType );
+  itkGetMacro( Smoother, RealType );
 
   void NormalizeWeights(const unsigned int k );
+
   void NormalizeWeightsByCovariance(const unsigned int k, const TRealType taup = 0, const TRealType tauq = 0);
 
   void WhitenDataSetForRunSCCANMultiple(unsigned int nvecs = 0);
@@ -201,7 +204,9 @@ public:
     for( unsigned int j = 0; j < M.cols(); j++ )
       {
       VectorType Mvec = M.get_column(j);
-      double     ratio = inner_product(Mvec, V) / inner_product(V, V);
+      double     vnorm = inner_product(V, V);
+      if ( vnorm < this->m_Epsilon ) vnorm = 1;
+      double     ratio = inner_product(Mvec, V) / vnorm;
       VectorType ortho = Mvec - V * ratio;
       M.set_column(j, ortho);
       }
@@ -266,7 +271,7 @@ public:
       matrix.rows(), matrix.cols() ); this->m_OriginalMatrixQ.update(matrix); this->m_MatrixQ.update(matrix);
   }
 
-  itkSetMacro( Covering, bool );
+  itkSetMacro( Covering, unsigned int );
   itkSetMacro( UseL1, bool );
   itkSetMacro( GradStep, RealType );
   itkSetMacro( FractionNonZeroR, RealType );
@@ -385,11 +390,13 @@ public:
   RealType PowerIteration( MatrixType & A,  VectorType & x_k, unsigned int, bool);
 
   RealType IHTPowerIteration( MatrixType & A,  VectorType & x_k, unsigned int, unsigned int );
+  RealType IHTPowerIterationU( MatrixType & A,  VectorType & x_k, unsigned int, unsigned int );
 
   RealType IHTPowerIterationPrior( MatrixType & A,  VectorType & x_k, VectorType & x_k_1, unsigned int, unsigned int,
                                    double );
 
-  void SoftClustThreshold( VectorType& v_in, RealType fractional_goal, bool allow_negative_weights , unsigned int, ImagePointer );
+  void SoftClustThreshold( VectorType & v_in, RealType fractional_goal, bool allow_negative_weights, unsigned int,
+                           ImagePointer );
   void ReSoftThreshold( VectorType& v_in, RealType fractional_goal, bool allow_negative_weights );
 
   void ConstantProbabilityThreshold( VectorType& v_in, RealType probability_goal, bool allow_negative_weights );
@@ -397,6 +404,7 @@ public:
   VectorType InitializeV( MatrixType p, unsigned long seed = 0 );
 
   TRealType InitializeSCCA_simple( unsigned int n_vecs );
+
   TRealType InitializeSCCA( unsigned int n_vecs, unsigned int seeder );
 
   TRealType InitializeSPCA( unsigned int n_vecs, unsigned int seeder, MatrixType &, VectorType & );
@@ -530,10 +538,9 @@ public:
 
   void SetMatrixPriorROI2(  MatrixType matrix )
   {
-   this->m_MatrixPriorROI2.set_size( matrix.rows(), matrix.cols() );
-   this->m_MatrixPriorROI2.update( matrix);
+    this->m_MatrixPriorROI2.set_size( matrix.rows(), matrix.cols() );
+    this->m_MatrixPriorROI2.update( matrix);
   }
-
 
   // itkSetMacro( priorScale, RealType );
   // itkGetMacro( priorScale, RealType );
@@ -595,13 +602,13 @@ public:
 
   VectorType FastOuterProductVectorMultiplication( VectorType& p, VectorType& v )
   {     // computes  outer_product( p , p ) * v
-	  
-	//std::cout << p.size() <<v.size() <<std::endl;  
+
+    // std::cout << p.size() <<v.size() <<std::endl;
     if( p.size() != v.size() )
       {
       std::cout << "FastOuterProductVectorMultiplication Usage Error " << std::endl;
-		std::cout <<"Size 1: " <<p.size()<<"Size 2: " <<v.size() <<std::endl;   
-		  return v;
+      std::cout << "Size 1: " << p.size() << "Size 2: " << v.size() << std::endl;
+      return v;
       }
     RealType   ip = inner_product( p, v );
     VectorType vout( p );
@@ -657,9 +664,9 @@ public:
 
   RealType SparsePartialCCA(unsigned int nvecs);
 
-  bool CCAUpdate(unsigned int nvecs, bool , bool );
+  bool CCAUpdate(unsigned int nvecs, bool, bool , unsigned int );
 
-  bool CCAUpdateLong(unsigned int nvecs, bool , bool );
+  bool CCAUpdateLong(unsigned int nvecs, bool, bool );
 
   RealType SparsePartialArnoldiCCA(unsigned int nvecs);
 
@@ -676,6 +683,8 @@ public:
   RealType SparseReconHome(unsigned int nvecs);
 
   RealType SparseArnoldiSVDGreedy(unsigned int nvecs);
+
+  RealType SparseArnoldiSVD_Other( MatrixType & A );
 
   RealType SparseArnoldiSVD(unsigned int nvecs);
 
@@ -741,6 +750,8 @@ public:
 
   void MRFFilterVariateMatrix();
 
+  ImagePointer ConvertVariateToSpatialImage( VectorType variate, ImagePointer mask, bool threshold_at_zero = false );
+
 protected:
 
   void SortResults(unsigned int n_vecs);
@@ -748,9 +759,9 @@ protected:
 // for pscca
   void UpdatePandQbyR();
 
-  void PositivePart( VectorType& x_k1 , bool takemin = false )
+  void PositivePart( VectorType& x_k1, bool takemin = false )
   {
-    if ( takemin )
+    if( takemin )
       {
       RealType minval = x_k1.min_value();
       x_k1 = x_k1 - minval;
@@ -760,50 +771,76 @@ protected:
       {
       if( x_k1[i] < 0 )
         {
-	x_k1[i] = vnl_math_abs( x_k1[i] );
-	x_k1[i] = 0;
+        x_k1[i] = vnl_math_abs( x_k1[i] );
+        x_k1[i] = 0;
         }
       }
   }
 
-  void SparsifyOther( VectorType& x_k1  )
+  void SparsifyOther( VectorType& x_k1 , bool doclassic = false )
   {
     RealType fnp = vnl_math_abs( this->m_RowSparseness );
-    if ( fnp < 1.e-11 ) return;
-    bool usel1 = this->m_UseL1; 
+    if( fnp < 1.e-11 )
+      {
+      return;
+      }
+    if ( doclassic ) {
+    if ( this->m_RowSparseness < 0  ) 
+      {
+      if ( fnp > x_k1.max_value() ) fnp = x_k1.max_value() * 0.9;
+      for ( unsigned int i = 0; i < x_k1.size(); i++ )
+	{
+	RealType delta = vnl_math_abs( x_k1( i ) ) - fnp;
+	if ( delta < 0 ) delta = 0; else if ( x_k1( i ) < 0 ) delta *= ( -1 );
+	x_k1( i ) = delta;
+	}
+      return;
+      }
+    if ( this->m_RowSparseness > 0  ) 
+      {
+      if ( fnp > x_k1.max_value() ) fnp = x_k1.max_value() * 0.9;
+      for ( unsigned int i = 0; i < x_k1.size(); i++ )
+	{
+	RealType delta = vnl_math_abs( x_k1( i ) ) - fnp;
+	if ( delta < 0 ) delta = 0; 
+	x_k1( i ) = delta;
+	}
+      return;
+      }
+    }//doclassic
+
+    bool usel1 = this->m_UseL1;
     this->m_UseL1 = true;
     bool keeppos = false;
-    if ( this->m_RowSparseness > 1.e-11 ) keeppos = true;
-    VectorType x_k1_inv( x_k1 );
-    for ( unsigned int i = 0; i < x_k1.size(); i++ )
+    if( this->m_RowSparseness > 1.e-11 )
       {
-      if (  vnl_math_abs( x_k1_inv( i ) ) > 1.e-9 ) x_k1_inv( i ) = x_k1( i ) ;
+      keeppos = true;
       }
-    this->Sparsify( x_k1_inv, fnp, keeppos , 0, NULL );
-    for ( unsigned int i = 0; i < x_k1.size(); i++ )
-      {
-      if (  vnl_math_abs( x_k1_inv( i ) ) > 1.e-9 ) x_k1( i ) = x_k1_inv( i ) ;
-      }
-    this->m_UseL1 = usel1; 
+    this->Sparsify( x_k1, fnp, keeppos, 0, NULL );
+    this->m_UseL1 = usel1;
   }
 
   void SparsifyP( VectorType& x_k1 )
   {
     RealType fnp = vnl_math_abs( this->m_FractionNonZeroP  );
-    this->Sparsify( x_k1, fnp, this->m_KeepPositiveP , this->m_MinClusterSizeP, this->m_MaskImageP);
+    this->Sparsify( x_k1, fnp, this->m_KeepPositiveP, this->m_MinClusterSizeP, this->m_MaskImageP);
   }
 
   void SparsifyQ( VectorType& x_k1 )
   {
     RealType fnp = vnl_math_abs( this->m_FractionNonZeroQ  );
-    this->Sparsify( x_k1, fnp, this->m_KeepPositiveQ , this->m_MinClusterSizeQ, this->m_MaskImageQ);
+    this->Sparsify( x_k1, fnp, this->m_KeepPositiveQ, this->m_MinClusterSizeQ, this->m_MaskImageQ);
   }
 
-  void Sparsify( VectorType& x_k1 , RealType fnp, bool keeppos, unsigned int clust, ImagePointer mask  )
+
+  void Sparsify( VectorType& x_k1, RealType fnp, bool keeppos, unsigned int clust, ImagePointer mask  )
   {
-    
-    if ( x_k1.size() <= 1 ) return;
-    if (  fnp >= 1 &&  keeppos )
+
+    if( x_k1.size() <= 1 )
+      {
+      return;
+      }
+    if(  fnp >= 1 &&  keeppos )
       {
       this->PositivePart( x_k1 );
       return;
@@ -823,19 +860,102 @@ protected:
       }
     RealType initmax = x_k1.max_value();
     x_k1 = x_k1 / initmax;
-    RealType low  = 0;
-    RealType high = 1;
-    RealType eng = fnp;
-    RealType mid = low + 0.5 * ( high - low );
+    std::vector<RealType> x_k1sort( x_k1.size() , 0 );
+    for ( unsigned long j = 0; j < x_k1.size(); ++j ) x_k1sort[j] = ( x_k1(j) );
+    sort(x_k1sort.begin(), x_k1sort.end() , std::less<RealType>() );
+    //    std::cout << "Sorted " << x_k1sort[1] << " " << x_k1sort[x_k1.size()-1] << std::endl;
+    RealType     low  = 0;
+    RealType maxj = static_cast<RealType>(  x_k1.size() );
+    unsigned long maxjind = static_cast<unsigned long>( (1-fnp*0.5) * maxj + 0.5 );
+    unsigned long minjind = static_cast<unsigned long>( (  fnp*0.5) * maxj + 0.5 );
+    if ( maxjind > ( maxj - 1 ) ) maxjind = ( maxj - 1 );
+    RealType  maxval = x_k1sort[ maxjind ]; 
+    RealType  minval = x_k1sort[ minjind ]; 
+    RealType    high = maxval;
+    if ( vnl_math_abs( minval ) > high ) high = vnl_math_abs( minval );
+    //    if ( high * 0.2  > 0 ) low = high * 0.2; // hack to speed convergence
+    RealType     eng = fnp;
+    RealType     mid = low + 0.5 * ( high - low );
     unsigned int its = 0;
-    RealType fnm = 0;
-    RealType lastfnm = 1;
-    while ( ( ( eng > 1.e-3 )  &&  
-	      ( vnl_math_abs( high - low ) > 1.e-3  )  && 
-	      ( its < 25 ) &&  
-	      ( vnl_math_abs( fnm - lastfnm ) > 1.e-8  ) )
-	     || its < 5
-	    )
+    RealType     fnm = 0;
+    RealType     lastfnm = 1;
+    while( ( ( eng > (fnp*0.1) )  &&
+             ( vnl_math_abs( high - low ) > this->m_Epsilon )  &&
+             ( its < 20 ) ) || 
+	     its < 3  
+	 )
+      {
+      mid = low + 0.5 * ( high - low );
+      VectorType searcherm( x_k1 );
+      //      if ( its > 10 & fnm > 0.99 ) std::cout << " A " << searcherm << std::endl;
+      this->SoftClustThreshold( searcherm, mid, keeppos,  clust, mask );
+      //      if ( its > 10 & fnm > 0.99 ) std::cout << " B " << searcherm << std::endl;
+      searcherm = this->SpatiallySmoothVector( searcherm, mask );
+      //      if ( its > 10 & fnm > 0.99 ) std::cout << " C " << searcherm << std::endl;
+      //      if ( its > 10 & fnm > 0.99 ) exit(1);
+      lastfnm = fnm;
+      fnm = this->CountNonZero( searcherm );
+      if( fnm > fnp )
+        {
+        low = mid; // 0.5 * ( low + mid  ); // relax this b/c it may not be a strictly quadratic space
+        }
+      if( fnm < fnp )
+        {
+	high = mid; // 0.5 * ( high + mid  );
+        }
+      eng = vnl_math_abs( fnp - fnm );
+      its++;
+      }
+    this->SoftClustThreshold( x_k1, mid, keeppos,  clust, mask  );
+    x_k1 = this->SpatiallySmoothVector( x_k1, mask );
+    if( negate )
+      {
+      x_k1 = x_k1 * ( -1 );
+      }
+    return;
+  }
+
+
+
+  void SparsifyOld( VectorType& x_k1, RealType fnp, bool keeppos, unsigned int clust, ImagePointer mask  )
+  {
+
+    if( x_k1.size() <= 1 )
+      {
+      return;
+      }
+    if(  fnp >= 1 &&  keeppos )
+      {
+      this->PositivePart( x_k1 );
+      return;
+      }
+    if( fnp >= 1 )
+      {
+      return;
+      }
+    bool negate = false;
+    if( x_k1.mean() <= 0 )
+      {
+      negate = true;
+      }
+    if( negate )
+      {
+      x_k1 = x_k1 * ( -1 );
+      }
+    RealType initmax = x_k1.max_value();
+    x_k1 = x_k1 / initmax;
+    RealType     low  = 0;
+    RealType     high = 1;
+    RealType     eng = fnp;
+    RealType     mid = low + 0.5 * ( high - low );
+    unsigned int its = 0;
+    RealType     fnm = 0;
+    RealType     lastfnm = 1;
+    while( ( ( eng > 5.e-3 )  &&
+             ( vnl_math_abs( high - low ) > this->m_Epsilon )  &&
+             ( its < 50 ) ) || 
+	     its < 5  
+	 )
       {
       mid = low + 0.5 * ( high - low );
       VectorType searcherm( x_k1 );
@@ -843,12 +963,19 @@ protected:
       searcherm = this->SpatiallySmoothVector( searcherm, mask );
       lastfnm = fnm;
       fnm = this->CountNonZero( searcherm );
-      if ( fnm > fnp ) { low = mid;  }
-      if ( fnm < fnp ) { high = mid; }
+      //      if ( mask ) std::cout <<" its " << its << " spar " << fnm << " low " << low << " mid " << mid << " high " << high << " eng " << eng << std::endl;
+      if( fnm > fnp )
+        {
+        low = mid;
+        }
+      if( fnm < fnp )
+        {
+        high = mid;
+        }
       eng = vnl_math_abs( fnp - fnm );
-      //      if ( mask ) std::cout <<" its " << its << " spar " << fnm << " initmax " << initmax << std::endl;
       its++;
       }
+
     this->SoftClustThreshold( x_k1, mid, keeppos,  clust, mask  );
     x_k1 = this->SpatiallySmoothVector( x_k1, mask );
     if( negate )
@@ -900,7 +1027,7 @@ protected:
 
     for( unsigned int i = 0; i < v.size(); i++ )
       {
-	if( vnl_math_abs( v[i] ) > this->m_Epsilon )
+      if( vnl_math_abs( v[i] ) > this->m_Epsilon )
         {
         ct++;
         }
@@ -908,10 +1035,17 @@ protected:
     return (RealType)ct / (RealType)v.size();
   }
 
+  bool Close2Zero( RealType x ) 
+  {
+    RealType eps = this->m_Epsilon * 5.0;
+    //    eps = 0.0001;
+    if ( vnl_math_abs( x - itk::NumericTraits<RealType>::Zero ) < eps ) return true;
+    return false;
+  }
+
   RealType PearsonCorr(VectorType v1, VectorType v2 )
   {
     double xysum = 0;
-
     for( unsigned int i = 0; i < v1.size(); i++ )
       {
       xysum += v1(i) * v2(i);
@@ -928,6 +1062,49 @@ protected:
       }
     return vnl_math_abs( numer / denom );
   }
+
+  RealType RPearsonCorr(VectorType v1, VectorType v2 )
+  {
+    std::vector<TRealType> zeromatch( v1.size(), 0);
+    unsigned int zct = 0;
+    for ( unsigned int zm = 0; zm < v1.size(); zm++ )
+      {
+	if ( ( this->Close2Zero( v1(zm) )  ||  
+	       this->Close2Zero( v2(zm) ) ) ) 
+	{ 
+	zct++;
+        zeromatch[ zm ] = 1;
+	v1(zm) = 0;
+	v2(zm) = 0;
+	}
+      }
+
+    double frac = 1.0 / (double)v1.size();
+    double xysum = 0;
+    double xsum = 0;
+    double ysum = 0;
+    double xsqr = 0;
+    double ysqr = 0;
+    for( unsigned int i = 0; i < v1.size(); i++ )
+      {
+      if ( zeromatch[i] == 0 )  
+        {
+	xysum += v1(i) * v2(i);
+	xsum  += v1(i);
+	xsqr  += v1(i) * v1(i);
+	ysum  += v2(i);
+	ysqr  += v2(i) * v2(i);
+	}
+      }
+    double numer = xysum - frac * xsum * ysum;
+    double denom = sqrt( ( xsqr - frac * xsum * xsum) * ( ysqr - frac * ysum * ysum) );
+    if( denom <= 0 )
+      {
+      return 0;
+      }
+    return vnl_math_abs( numer / denom );
+  }
+
 
   RealType GoldenSection( MatrixType& A, VectorType&  x_k, VectorType&  p_k, VectorType&  bsol, RealType a, RealType b,
                           RealType c, RealType tau, RealType lambda);
@@ -1027,17 +1204,17 @@ protected:
     mat_to_add_to = outmat;
   }
 
-  RealType CurvatureSparseness( VectorType& x, RealType sparsenessgoal, unsigned int maxit, ImagePointer );
+  RealType CurvatureSparseness( VectorType & x, RealType sparsenessgoal, unsigned int maxit, ImagePointer );
 
-  // , MatrixType& A, VectorType& b );
 private:
 
-  ImagePointer ConvertVariateToSpatialImage( VectorType variate, ImagePointer mask, bool threshold_at_zero = false );
+  ImagePointer ConvertVariateToSpatialImage4D( VectorType variate, ImagePointer mask, bool threshold_at_zero = false );
 
   MatrixType m_OriginalMatrixPriorROI;
   VectorType ConvertImageToVariate(  ImagePointer image, ImagePointer mask );
-
+  VectorType ConvertImageToVariate4D(  ImagePointer image, ImagePointer mask );
   VectorType ClusterThresholdVariate( VectorType &, ImagePointer mask, unsigned int);
+  VectorType ClusterThresholdVariate4D( VectorType &, ImagePointer mask, unsigned int);
 
   bool       m_Debug;
   bool       m_Silent;
@@ -1093,7 +1270,7 @@ private:
   VariateType m_VariatesP;
   VariateType m_VariatesQ;
   /** solution to   X - U V */
-  MatrixType   m_MatrixU;
+  MatrixType m_MatrixU;
 
   VectorType   m_WeightsR;
   MatrixType   m_MatrixR;
@@ -1107,7 +1284,8 @@ private:
 
   /** softer = true will compute the update  : if ( beta > thresh )  beta <- beta - thresh
    *     rather than the default update      : if ( beta > thresh )  beta <- beta  */
-  bool     m_Covering;
+  unsigned int     m_Covering;
+  unsigned int     m_VecToMaskSize;
   bool     m_UseL1;
   bool     m_AlreadyWhitened;
   bool     m_SpecializationForHBM2011;
@@ -1116,6 +1294,7 @@ private:
 
   // this->ComputeIntercept( A, x, b );
   RealType                   m_Intercept;
+  unsigned int               m_NTimeDimensions;
   unsigned int               m_MinClusterSizeP;
   unsigned int               m_MinClusterSizeQ;
   unsigned int               m_KeptClusterSize;

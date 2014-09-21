@@ -59,7 +59,12 @@ spec = c(
 'gdens'    , 'g', 0.25, "numeric","graph density",
 'tr'       , 't', "2x4", "character","TR for BOLD and ASL e.g. 2.2x4",
 'help'     , 'h', 0, "logical" ," print the help ", 
-'output'   , 'o', "1", "character"," the output prefix ")
+'output'   , 'o', "1", "character"," the output prefix ", 
+'bloodt1'  , 'b', 2, "numeric", "blood relaxation (inv of t1, defaults to 0.67 s^-1", 
+'robust'   , 'r', 2, "numeric", "robustness parameter", 
+'nboot'    , 'n', 2, "numeric", "number of bootstrap runs", 
+'pctboot'  , 'p', 2, "numeric", "percent to sample per bootstrap run", 
+'replace ' , 'e', 2, "logical", "resample with replacement during bootstrap?")
 # ............................................. #
 spec=matrix(spec,ncol=5,byrow=TRUE)
 # get the options
@@ -86,6 +91,16 @@ cat(ex)
 q(status=1);
 }
 #
+# take care of optional parameters
+if(is.null(opt$bloodt1)) opt$bloodt1 <- 0.67
+if(is.null(opt$robust)) opt$robust <- 0.95
+if(is.null(opt$nboot)) opt$nboot <- 20
+if(is.null(opt$pctboot)) opt$pctboot <- 0.70
+if(opt$pctboot > 1.0) {
+  cat('pctboot was greater than 1; setting to 70%.\n')
+  opt$pctboot <- 0.70 
+}
+if(is.null(opt$replace)) opt$replace <- FALSE
 for ( myfn in c( opt$mask, opt$fmri, opt$labels ) )
   {
     if ( !file.exists(myfn) ) 
@@ -117,20 +132,68 @@ mask<-antsImageRead( opt$mask, 3 )
 if ( as.character(opt$modality) == "ASLCBF" | as.character(opt$modality) == "ASLBOLD" )
   {
     mat<-timeseries2matrix( fmri, mask )
-    cbflist<-list( ) 
-    for ( i in 1:20 ) {
-      timeinds<-sample( 2:nrow(mat) , round( nrow(mat) )*0.35 ) 
+    cbflist<-list( )
+    moco_results <- motion_correction(fmri)
+    regweights <- aslPerfusion(fmri, mask=mask, moreaccurate=T, dorobust=opt$robust, moco_results=moco_results)$regweights
+    for ( i in 1:opt$nboot ) {
+      timeinds<-sample( 2:nrow(mat) , round( nrow(mat) )*(opt$pctboot/2) , replace=opt$replace ) 
       timeinds<-( timeinds %% 2 )+timeinds
       timeinds<-interleave( timeinds-1, timeinds )
       aslarr<-as.array( fmri ) 
       aslarr2<-aslarr[,,,timeinds]
       aslsub<-as.antsImage( aslarr2 )
       antsSetSpacing( aslsub , antsGetSpacing( fmri ) )
-      proc <- aslPerfusion( aslsub, mask=mask, moreaccurate=TRUE ,  dorobust=0.95 )
+      
+      mocoarr <- as.array(moco_results$moco_img)
+      mocoarr2<-mocoarr[,,,timeinds]
+      mocosub<-as.antsImage( mocoarr2 )
+      antsSetSpacing( mocosub , antsGetSpacing( fmri ) )
+
+      mocoparams <- as.data.frame(moco_results$moco_params)
+      mocoparams.sub <- mocoparams[timeinds, ]
+
+      moco_results.sub <- list(moco_img=mocosub, moco_params=mocoparams.sub, moco_avg_img=moco_results$moco_avg_img)
+      regweights.sub <- regweights[timeinds] 
+      proc <- aslPerfusion( aslsub, mask=mask, moreaccurate=TRUE, dorobust=opt$robust, moco_results=moco_results.sub, regweights=regweights.sub)
       param <- list( sequence="pcasl", m0=proc$m0 )
       cbf <- quantifyCBF( proc$perfusion, mask, param )
       cbflist<-lappend( cbflist, cbf$kmeancbf )
     }
+    write.csv(data.frame(Regweights=regweights), paste(opt$output, 'ExcludedTimePoints.csv', sep=''))
+    motion <- as.data.frame(moco_results$moco_params)
+    templateFD<-rep(0,nrow(motion))
+    DVARS<-rep(0,nrow(motion))
+    omat <- mat 
+    for ( i in 2:nrow(motion) ) {
+      mparams1<-c( motion[i,3:14] )
+      tmat1<-matrix( as.numeric(mparams1[1:9]), ncol = 3, nrow = 3)
+      mparams2<-c( motion[i-1,3:14] )
+      tmat2<-matrix( as.numeric(mparams2[1:9]), ncol = 3, nrow = 3)
+      pt<-t( matrix(  rep(10,3), nrow=1) )
+      newpt1<-data.matrix(tmat1) %*%  data.matrix( pt )+as.numeric(mparams1[10:12])
+      newpt2<-data.matrix(tmat2) %*%  data.matrix( pt )+as.numeric(mparams1[10:12])
+      templateFD[i]<-sum(abs(newpt2-newpt1))
+      DVARS[i]<-sqrt( mean( ( omat[i,] - omat[i-1,] )^2 ) )
+    }
+    omotionnuis<-as.matrix(motion[, 3:ncol(motion)] )
+    motnuisshift<-ashift(omotionnuis,c(1,0))
+    motmag<-apply( omotionnuis, FUN=mean,MARGIN=2)
+    matmag<-sqrt( sum(motmag[1:9]*motmag[1:9]) )
+    tranmag<-sqrt( sum(motmag[10:12]*motmag[10:12]) )
+    motsd<-apply( omotionnuis-motnuisshift, FUN=mean,MARGIN=2)
+    matsd<-sqrt( sum(motsd[1:9]*motsd[1:9]) )
+    transd<-sqrt( sum(motsd[10:12]*motsd[10:12]) )
+    dmatrix<-(omotionnuis-motnuisshift)[,1:9]
+    dtran<-(omotionnuis-motnuisshift)[,10:12]
+    dmatrixm<-apply( dmatrix * dmatrix , FUN=sum, MARGIN=1 )
+    dtranm<-apply( dtran * dtran , FUN=sum, MARGIN=1 )
+    names(matmag)<-"MatrixMotion"
+    names(tranmag)<-"TransMotion"
+    names(matsd)<-"DMatrixMotion"
+    names(transd)<-"DTransMotion"
+    write.csv(cbind(motion, data.frame(templateFD=templateFD, DVARS=DVARS)), paste(opt$output, 'MotionParams.csv', sep=''))
+    write.csv(data.frame(MatrixMotion=matmag, Transmotion=tranmag, DMatrixMotion=matsd, DTransMotion=transd), 
+      paste(opt$output, 'MotionSummary.csv', sep=''), row.names=F)
     cbfout<-antsImageClone( mask )
     avgcbf<-avgimg( cbflist , mask )
     sdi<-sdimg( cbflist , mask )
@@ -139,8 +202,8 @@ if ( as.character(opt$modality) == "ASLCBF" | as.character(opt$modality) == "ASL
     cbfout[ sdi <= thresh ] <- avgcbf[ sdi <= thresh ]
     fn<-paste( opt$output,"_kcbf.nii.gz",sep='')
     antsImageWrite( cbfout , fn )
-    pcasl.processing <- aslPerfusion( fmri, mask=mask, moreaccurate=TRUE , dorobust = 0.85 )
-    pcasl.parameters <- list( sequence="pcasl", m0=pcasl.processing$m0 )
+    pcasl.processing <- aslPerfusion( fmri, mask=mask, moreaccurate=TRUE , dorobust = opt$robust, moco_results=moco_results)
+    pcasl.parameters <- list( sequence="pcasl", m0=pcasl.processing$m0, T1b=opt$bloodt1)
     cbf <- quantifyCBF( pcasl.processing$perfusion, mask, pcasl.parameters )
     filterpcasl<-getfMRInuisanceVariables( fmri, mask = mask , moreaccurate=TRUE )
     xideal<-pcasl.processing$xideal

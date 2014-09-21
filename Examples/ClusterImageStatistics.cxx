@@ -38,7 +38,7 @@
 #include "itkRelabelComponentImageFilter.h"
 #include "itkLabelStatisticsImageFilter.h"
 
-#include  "ReadWriteImage.h"
+#include  "ReadWriteData.h"
 
 namespace ants
 {
@@ -135,8 +135,8 @@ int  ClusterStatistics(unsigned int argc, char *argv[])
       }
     catch( itk::ExceptionObject & excep )
       {
-      std::cout << "Relabel: exception caught !" << std::endl;
-      std::cout << excep << std::endl;
+      std::cerr << "Relabel: exception caught !" << std::endl;
+      std::cerr << excep << std::endl;
       }
 
     typename ImageType::Pointer Clusters = MakeNewImage<ImageType>(valimage, 0);
@@ -299,7 +299,7 @@ int  ClusterStatistics(unsigned int argc, char *argv[])
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ClusterImageStatistics( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int ClusterImageStatistics( std::vector<std::string> args, std::ostream* /*out_stream = NULL */)
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;

@@ -22,16 +22,40 @@ namespace itk
 {
 namespace ants
 {
+
+  std::string ConvertToHumanReadable(const std::string input)
+    {
+    typedef std::map<std::string,std::string> TypeMapType;
+    TypeMapType cnvtMap;
+    cnvtMap[typeid(signed char).name()] = "signed int";
+    cnvtMap[typeid(unsigned char).name()] = "unsigned int";
+    cnvtMap[typeid(signed short).name()] = "signed int";
+    cnvtMap[typeid(unsigned short).name()] = "unsigned int";
+    cnvtMap[typeid(signed int).name()] = "signed int";
+    cnvtMap[typeid(unsigned int).name()] = "unsigned int";
+    cnvtMap[typeid(signed long).name()] = "signed int";
+    cnvtMap[typeid(unsigned long).name()] = "unsigned int";
+    cnvtMap[typeid(float).name()] = "float";
+    cnvtMap[typeid(double).name()] = "double";
+    cnvtMap[typeid(std::string).name()] = "std::string";
+    cnvtMap[typeid(char *).name()] = "char *";
+
+    TypeMapType::iterator mi=cnvtMap.find(input);
+    if ( mi == cnvtMap.end() )
+      {
+      return std::string("Unmapped Type");
+      }
+    return mi->second;
+    }
 CommandLineParser
-::CommandLineParser()
+::CommandLineParser():
+  m_LeftDelimiter  ( '[' ),
+  m_RightDelimiter ( ']' )
 {
   this->m_Options.clear();
   this->m_Command.clear();
   this->m_CommandDescription.clear();
   this->m_UnknownOptions.clear();
-
-  this->m_LeftDelimiter = '[';
-  this->m_RightDelimiter = ']';
 }
 
 void
@@ -79,7 +103,10 @@ CommandLineParser
   unsigned int n = 0;
   unsigned int order = 0;
 
-  this->m_Command = arguments[n++];
+  if ( arguments.size() > 1 )
+    {
+    this->m_Command = arguments[n++];
+    }
 
   while( n < arguments.size() )
     {
@@ -208,7 +235,7 @@ CommandLineParser
       std::size_t leftDelimiterPosition = a.find( this->m_LeftDelimiter );
       if( leftDelimiterPosition != std::string::npos )
         {
-        itkExceptionMacro( "Incorrect command line specification. Missing leftDelimiterPosition? " << a);
+        itkExceptionMacro( "Incorrect command line specification. Missing leftDelimiterPosition? " << a );
         }
 
       std::size_t rightDelimiterPosition = a.find( this->m_RightDelimiter );
@@ -216,7 +243,7 @@ CommandLineParser
         {
         if( rightDelimiterPosition < a.length() - 1 )
           {
-          itkExceptionMacro( "Incorrect command line specification. Missing rightDelimiterPosition? " << a  );
+          itkExceptionMacro( "Incorrect command line specification. Missing rightDelimiterPosition? " << a );
           }
         else
           {

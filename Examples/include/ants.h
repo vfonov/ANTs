@@ -7,6 +7,8 @@
 
 #include "antsApplyTransformsToPoints.h"
 
+#include "antsTransformInfo.h"
+
 #include "ANTSConformalMapping.h"
 
 #include "ANTS_.h"
@@ -21,7 +23,13 @@
 
 #include "antsMotionCorr.h"
 
+#include "antsMotionCorrStats.h"
+
+#include "antsMotionCorrDiffusionDirection.h"
+
 #include "antsRegistration.h"
+
+#include "antsSurf.h"
 
 #include "ANTSUseDeformationFieldToGetAffineTransform.h"
 
@@ -30,8 +38,6 @@
 #include "ANTSUseLandmarkImagesToGetBSplineDisplacementField.h"
 
 #include "Atropos.h"
-
-#include "AtroposMin.h"
 
 #include "AverageAffineTransform.h"
 
@@ -55,6 +61,8 @@
 
 #include "ConvertImagePixelType.h"
 
+#include "ConvertInputImagePixelTypeToFloat.h"
+
 #include "ConvertScalarImageToRGB.h"
 
 #include "ConvertToJpg.h"
@@ -71,7 +79,11 @@
 
 #include "CreateJacobianDeterminantImage.h"
 
+#include "CreateTiledMosaic.h"
+
 #include "CreateWarpedGridImage.h"
+
+#include "DeNrrd.h"
 
 #include "ExtractRegionFromImageByMask.h"
 

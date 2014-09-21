@@ -7,7 +7,7 @@
 #include "itkTransformFactory.h"
 #include "itkTransformFileReader.h"
 #include "itkVectorNearestNeighborInterpolateImageFunction.h"
-#include "ReadWriteImage.h"
+#include "ReadWriteData.h"
 #include "itkWarpImageMultiTransformFilter.h"
 #include "itkExtractImageFilter.h"
 
@@ -643,7 +643,7 @@ void WarpImageMultiTransform(char *moving_image_filename, char *output_image_fil
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int WarpTimeSeriesImageMultiTransform( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int WarpTimeSeriesImageMultiTransform( std::vector<std::string> args, std::ostream* /*out_stream = NULL */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;

@@ -1,7 +1,7 @@
 #include "antsUtilities.h"
 #include "antsAllocImage.h"
 #include "itkantsRegistrationHelper.h"
-#include "ReadWriteImage.h"
+#include "ReadWriteData.h"
 
 #include "itkImageFileReader.h"
 #include "itkImageFileWriter.h"
@@ -15,7 +15,7 @@
 #include "itkMatrixOffsetTransformBase.h"
 #include "itkTransformFactory.h"
 #include "itkTransformFileWriter.h"
-#include "itkTransformToDisplacementFieldSource.h"
+#include "itkTransformToDisplacementFieldFilter.h"
 
 #include "itkBSplineInterpolateImageFunction.h"
 #include "itkLinearInterpolateImageFunction.h"
@@ -32,7 +32,7 @@ int antsAlignOriginImplementation( itk::ants::CommandLineParser::Pointer & parse
 {
   if( inputImageType != 0 )
     {
-    std::cout << "inputImageType is not used, therefore only mode 0 is supported at the momemnt." << std::endl;
+    std::cerr << "inputImageType is not used, therefore only mode 0 is supported at the momemnt." << std::endl;
     return EXIT_FAILURE;
     }
   typedef double                           RealType;
@@ -55,7 +55,7 @@ int antsAlignOriginImplementation( itk::ants::CommandLineParser::Pointer & parse
     if( inputOption->GetFunction()->GetNumberOfParameters() > 1 &&
         parser->Convert<unsigned int>( outputOption->GetFunction( 0 )->GetParameter( 1 ) ) == 0 )
       {
-      std::cout << "An input image is required." << std::endl;
+      std::cerr << "An input image is required." << std::endl;
       return EXIT_FAILURE;
       }
 
@@ -114,7 +114,7 @@ int antsAlignOriginImplementation( itk::ants::CommandLineParser::Pointer & parse
     }
   else
     {
-    std::cout << "Error:  No reference image specified." << std::endl;
+    std::cerr << "Error:  No reference image specified." << std::endl;
     return EXIT_FAILURE;
     }
 
@@ -219,7 +219,7 @@ static void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int antsAlignOrigin( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int antsAlignOrigin( std::vector<std::string> args, std::ostream* /*out_stream = NULL */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -312,7 +312,7 @@ private:
     }
   else
     {
-    std::cout << "No reference image was specified." << std::endl;
+    std::cerr << "No reference image was specified." << std::endl;
     return EXIT_FAILURE;
     }
 
@@ -348,11 +348,11 @@ private:
           }
         else if( !std::strcmp( inputImageType.c_str(), "tensor" ) || !std::strcmp( inputImageType.c_str(), "2" ) )
           {
-          std::cout << "antsApplyTransforms is not implemented for 2-D tensor images." << std::endl;
+          std::cerr << "antsApplyTransforms is not implemented for 2-D tensor images." << std::endl;
           }
         else
           {
-          std::cout << "Unrecognized input image type (cf --input-image-type option)." << std::endl;
+          std::cerr << "Unrecognized input image type (cf --input-image-type option)." << std::endl;
           return EXIT_FAILURE;
           }
         }
@@ -382,7 +382,7 @@ private:
           }
         else
           {
-          std::cout << "Unrecognized input image type (cf --input-image-type option)." << std::endl;
+          std::cerr << "Unrecognized input image type (cf --input-image-type option)." << std::endl;
           return EXIT_FAILURE;
           }
         }
@@ -408,11 +408,11 @@ private:
           }
         else if( !std::strcmp( inputImageType.c_str(), "tensor" ) || !std::strcmp( inputImageType.c_str(), "2" ) )
           {
-          std::cout << "antsApplyTransforms is not implemented for 4-D tensor images." << std::endl;
+          std::cerr << "antsApplyTransforms is not implemented for 4-D tensor images." << std::endl;
           }
         else
           {
-          std::cout << "Unrecognized input image type (cf --input-image-type option)." << std::endl;
+          std::cerr << "Unrecognized input image type (cf --input-image-type option)." << std::endl;
           return EXIT_FAILURE;
           }
         }
@@ -423,7 +423,7 @@ private:
       }
       break;
     default:
-      std::cout << "Unsupported dimension" << std::endl;
+      std::cerr << "Unsupported dimension" << std::endl;
       return EXIT_FAILURE;
     }
   return EXIT_SUCCESS;

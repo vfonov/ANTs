@@ -9,7 +9,9 @@
 
 #include <math.h>
 #include <time.h>
-
+#include "itkVTKPolyDataWriter.h"
+#include "vtkSTLWriter.h"
+#include "vtkXMLPolyDataWriter.h"
 #include "itkImage.h"
 
 #include "itkImageFileReader.h"
@@ -46,8 +48,7 @@
 #include <vtkWindowToImageFilter.h>
 #include <vtkPNGWriter.h>
 #include <vtkGraphicsFactory.h>
-#include <vtkImagingFactory.h>
-#include "ReadWriteImage.h"
+#include "ReadWriteData.h"
 #include "itkRescaleIntensityImageFilter.h"
 #include "vtkDelaunay2D.h"
 #include "vtkFloatArray.h"
@@ -74,53 +75,32 @@
 
 #include "vtkSmoothPolyDataFilter.h"
 #include "vtkSTLWriter.h"
-#include "vtkUnstructuredGridToPolyDataFilter.h"
 #include "itkSurfaceImageCurvature.h"
 #include "itkImageRegionConstIterator.h"
 #include "itkImageRegionConstIteratorWithIndex.h"
 #include "itkImageRegionIterator.h"
 #include "itkPointSet.h"
+#include <vtkLookupTable.h>
+#include <vtkScalarBarActor.h>
+
 
 namespace ants
 {
-float ComputeGenus(vtkPolyData* pd1)
-{
-  vtkExtractEdges* edgeex = vtkExtractEdges::New();
-
-  edgeex->SetInput(pd1);
-  edgeex->Update();
-  vtkPolyData* edg1 = edgeex->GetOutput();
-
-  vtkIdType nedg = edg1->GetNumberOfCells();
-  vtkIdType vers = pd1->GetNumberOfPoints();
-  int       nfac = pd1->GetNumberOfPolys();
-
-  float g = 0.5 * (2.0 - vers + nedg - nfac);
-  std::cout << " Genus " << g << std::endl;
-
-  std::cout << " face " << nfac << " edg " << nedg <<  " vert " << vers << std::endl;
-
-  return g;
-}
 
 void Display(vtkUnstructuredGrid* vtkgrid, std::string offscreen, bool secondwin = false, bool delinter = true )
 {
 
   vtkSmartPointer<vtkPolyDataNormals> normalGenerator = vtkSmartPointer<vtkPolyDataNormals>::New();
-  normalGenerator->SetInput(vtkgrid);
+  normalGenerator->SetInputData(vtkgrid);
   normalGenerator->ComputePointNormalsOn();
   normalGenerator->ComputeCellNormalsOff();
   normalGenerator->Update();
 
-  vtkSmartPointer<vtkGraphicsFactory> graphics_factory = 
+  vtkSmartPointer<vtkGraphicsFactory> graphics_factory =
     vtkSmartPointer<vtkGraphicsFactory>::New();
   if ( offscreen.length() > 4 ) graphics_factory->SetOffScreenOnlyMode( 1);
   graphics_factory->SetUseMesaClasses( 1 );
- 
-  vtkSmartPointer<vtkImagingFactory> imaging_factory = 
-    vtkSmartPointer<vtkImagingFactory>::New();
-  imaging_factory->SetUseMesaClasses( 1 ); 
- 
+
   vtkRenderer*     ren1 = vtkRenderer::New();
   vtkRenderer*     ren2 = vtkRenderer::New();
   vtkRenderWindow* renWin = vtkRenderWindow::New();
@@ -135,14 +115,53 @@ void Display(vtkUnstructuredGrid* vtkgrid, std::string offscreen, bool secondwin
   ren1->AddObserver(vtkCommand::KeyPressEvent, cbc);
 
   vtkDataSetMapper* mapper = vtkDataSetMapper::New();
-  mapper->SetInput(  normalGenerator->GetOutput() );
-  mapper->SetScalarRange(0, 255);
+  mapper->SetInputData(  normalGenerator->GetOutput() );
+
+ // Create a lookup table to map cell data to colors
+  vtkSmartPointer<vtkLookupTable> lut =
+    vtkSmartPointer<vtkLookupTable>::New();
+  int tableSize = std::max( 10, 10);
+  lut->SetNumberOfTableValues(tableSize);
+  lut->Build();
+  lut->SetTableRange( 0 , 1 );
+  lut->SetTableValue(0     , 1     , 1     , 1, 1);  //Black
+  lut->SetTableValue(1, 0.8900, 0.8100, 0.3400, 1); // Banana
+  lut->SetTableValue(2, 1.0000, 0.3882, 0.2784, 1); // Tomato
+  lut->SetTableValue(3, 0.9608, 0.8706, 0.7020, 1); // Wheat
+  lut->SetTableValue(4, 0.9020, 0.9020, 0.9804, 1); // Lavender
+  lut->SetTableValue(5, 1.0000, 0.4900, 0.2500, 1); // Flesh
+  lut->SetTableValue(6, 0.5300, 0.1500, 0.3400, 1); // Raspberry
+  lut->SetTableValue(7, 0.9804, 0.5020, 0.4471, 1); // Salmon
+  lut->SetTableValue(8, 0.7400, 0.9900, 0.7900, 1); // Mint
+  lut->SetTableValue(9, 0.2000, 0.6300, 0.7900, 1); // Peacock
+  mapper->SetLookupTable(lut);
+  mapper->ScalarVisibilityOn();
+  mapper->SetScalarRange(0, 1);
+  //  mapper->SetScalarModeToUsePointData();
+  //  mapper->SetColorModeToMapScalars();
+
   vtkActor* actor = vtkActor::New();
   actor->SetMapper(mapper);
+  vtkSmartPointer<vtkScalarBarActor> scalarBar =
+    vtkSmartPointer<vtkScalarBarActor>::New();
+  scalarBar->SetLookupTable(mapper->GetLookupTable());
+  scalarBar->SetTitle("F(x)");
+  scalarBar->SetNumberOfLabels(4);
+// Create a lookup table to share between the mapper and the scalarbar
+  vtkSmartPointer<vtkLookupTable> hueLut =
+    vtkSmartPointer<vtkLookupTable>::New();
+  hueLut->SetTableRange (0, 1);
+  hueLut->SetHueRange (0, 1);
+  hueLut->SetSaturationRange (1, 1);
+  hueLut->SetValueRange (1, 1);
+  hueLut->Build();
+
+  //  mapper->SetLookupTable( hueLut );
+  scalarBar->SetLookupTable( lut );
   vtkDataSetMapper* mapper2 = vtkDataSetMapper::New();
   if( secondwin )
     {
-    mapper2->SetInput(vtkgrid);
+    mapper2->SetInputData(vtkgrid);
     }
   if( secondwin )
     {
@@ -173,17 +192,18 @@ void Display(vtkUnstructuredGrid* vtkgrid, std::string offscreen, bool secondwin
   actor->GetProperty()->ShadingOff();
   ren1->AddActor(actor);
   ren1->SetBackground(1,1,1); // Background color
+  ren1->AddActor2D(scalarBar);
   renWin->Render();
 
-  if ( offscreen.length() > 4 ) 
+  if ( offscreen.length() > 4 )
     {
-    vtkSmartPointer<vtkWindowToImageFilter> windowToImageFilter = 
+    vtkSmartPointer<vtkWindowToImageFilter> windowToImageFilter =
     vtkSmartPointer<vtkWindowToImageFilter>::New();
     windowToImageFilter->SetInput(renWin);
     windowToImageFilter->SetMagnification( 4 );
     windowToImageFilter->Update();
- 
-    vtkSmartPointer<vtkPNGWriter> writer = 
+
+    vtkSmartPointer<vtkPNGWriter> writer =
       vtkSmartPointer<vtkPNGWriter>::New();
     writer->SetFileName( offscreen.c_str()  );
     writer->SetInputConnection(windowToImageFilter->GetOutputPort());
@@ -202,6 +222,27 @@ void Display(vtkUnstructuredGrid* vtkgrid, std::string offscreen, bool secondwin
     inter->Delete();
     }
 }
+
+float ComputeGenus(vtkPolyData* pd1)
+{
+  vtkExtractEdges* edgeex = vtkExtractEdges::New();
+
+  edgeex->SetInputData(pd1);
+  edgeex->Update();
+  vtkPolyData* edg1 = edgeex->GetOutput();
+
+  vtkIdType nedg = edg1->GetNumberOfCells();
+  vtkIdType vers = pd1->GetNumberOfPoints();
+  int       nfac = pd1->GetNumberOfPolys();
+
+  float g = 0.5 * (2.0 - vers + nedg - nfac);
+  std::cout << " Genus " << g << std::endl;
+
+  std::cout << " face " << nfac << " edg " << nedg <<  " vert " << vers << std::endl;
+
+  return g;
+}
+
 
 float vtkComputeTopology(vtkPolyData* pd)
 {
@@ -222,21 +263,17 @@ float vtkComputeTopology(vtkPolyData* pd)
 
   con->SetExtractionModeToLargestRegion();
 //    con->SetInput(marchingCubes->GetOutput());
-  con->SetInput(pd);
+  con->SetInputData(pd);
   con->Update();
   float g = ComputeGenus(con->GetOutput() );
   return g;
-//    vtkUnstructuredGridToPolyDataFilter* gp = vtkUnstructuredGridToPolyDataFilter::New();
-//    gp->SetInput(con->GetOutput());
-
-//    marchingCubes->Delete();
 #if 0
   int inputNumberOfPoints = con->GetOutput()->GetNumberOfPoints();
   int inputNumberOfPolys = con->GetOutput()->GetNumberOfPolys();
 
   vtkPolyDataConnectivityFilter *polyDataConnectivityFilter =
     vtkPolyDataConnectivityFilter::New();
-  polyDataConnectivityFilter->SetInput( con->GetOutput() );
+  polyDataConnectivityFilter->SetInputData( con->GetOutput() );
   polyDataConnectivityFilter->SetExtractionModeToAllRegions();
   polyDataConnectivityFilter->SetExtractionModeToLargestRegion();
   polyDataConnectivityFilter->Update();
@@ -247,7 +284,7 @@ float vtkComputeTopology(vtkPolyData* pd)
   polyDataConnectivityFilter->Delete();
 
   vtkExtractEdges *extractEdges = vtkExtractEdges::New();
-  extractEdges->SetInput( con->GetOutput() );
+  extractEdges->SetInputData( con->GetOutput() );
   extractEdges->Update();
 
   int extractNumberOfLines = extractEdges->GetOutput()->GetNumberOfLines();
@@ -282,14 +319,15 @@ void GetValueMesh(typename TImage::Pointer image, typename TImage::Pointer image
   fltMesh->SetInput( image );
   fltMesh->SetAntiAliasMaxRMSError( aaParm ); // to do nothing, set negative
   fltMesh->SetSmoothingIterations( 0 );
+  fltMesh->SetDecimateFactor( 0.0 );
   fltMesh->Update();
   vtkPolyData* vtkmesh = fltMesh->GetMesh();
 // assign scalars to the original surface mesh
-//  Display((vtkUnstructuredGrid*)vtkmesh);
-
+//  std::string offsc=std::string("");
+//  Display((vtkUnstructuredGrid*)vtkmesh, offsc );
   vtkSmartPointer<vtkWindowedSincPolyDataFilter> smoother =
     vtkSmartPointer<vtkWindowedSincPolyDataFilter>::New();
-  smoother->SetInput(vtkmesh);
+  smoother->SetInputData(vtkmesh);
   smoother->SetNumberOfIterations(25);
   smoother->BoundarySmoothingOff();
   smoother->FeatureEdgeSmoothingOff();
@@ -329,16 +367,17 @@ void GetValueMesh(typename TImage::Pointer image, typename TImage::Pointer image
   meank /= numPoints;
 //  mx=1.3;
 //  mx=2.0;
-
+  float localscaledata = scaledata;
+  localscaledata = 1;
   // while (!done)
     {
     vtkFloatArray* param = vtkFloatArray::New();
     param->SetName(paramname);
-    float dif = (mx - mn) * scaledata;
+    float dif = (mx - mn) * localscaledata;
     const float mx2 = meank + dif;
     const float mn2 = meank - dif;
     dif = mx2 - mn2;
-    for( int i = 0; i < numPoints; i++ )
+    for( int i = 0; i < (numPoints); i++ )
       {
       typename ImageType::IndexType index;
       typename ImageType::PointType point;
@@ -358,6 +397,7 @@ void GetValueMesh(typename TImage::Pointer image, typename TImage::Pointer image
 
       temp = fabs(temp);
       float vvv = (temp - mn2) * 255. / dif;
+      vvv = (temp - mn) / dif;
       /*
       if (vvv > 128)
         {
@@ -376,7 +416,7 @@ void GetValueMesh(typename TImage::Pointer image, typename TImage::Pointer image
   std::cout <<" Now display to " << offscreen << std::endl;
   vtkSmartPointer<vtkWindowedSincPolyDataFilter> inflater =
     vtkSmartPointer<vtkWindowedSincPolyDataFilter>::New();
-  inflater->SetInput(vtkmesh);
+  inflater->SetInputData(vtkmesh);
   inflater->SetNumberOfIterations( inflate );
   inflater->BoundarySmoothingOn();
   inflater->FeatureEdgeSmoothingOff();
@@ -391,13 +431,22 @@ void GetValueMesh(typename TImage::Pointer image, typename TImage::Pointer image
   }
   if ( offscreen.length() > 2 ) Display((vtkUnstructuredGrid*)vtkmesh, offscreen );
   std::cout << " done with mesh map ";
-  vtkPolyDataWriter *writer = vtkPolyDataWriter::New();
-  writer->SetInput(vtkmesh);
-  std::cout << " writing " << outfn << std::endl;
-  writer->SetFileName(outfn.c_str() );
-  writer->SetFileTypeToBinary();
+  /*
+  typedef itk::VTKPolyDataWriter<MeshType> WriterType;
+  WriterType::Pointer writer = WriterType::New();
+  writer->SetInputData( vtkmesh );
+  writer->SetFileName( outfn.c_str() );
   writer->Update();
+  */
+  vtkSTLWriter *writer = vtkSTLWriter::New();
+  writer->SetInputData( vtkmesh );
+  std::cout << " writing " << outfn << std::endl;
+  writer->SetFileName( outfn.c_str() );
+  writer->Write();
   std::cout << " done writing ";
+  inflater->Delete();
+  smoother->Delete();
+  std::cout << " done writing2 ";
   return;
 }
 
@@ -426,7 +475,7 @@ float GetImageTopology(typename TImage::Pointer image)
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int GetMeshAndTopology( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int GetMeshAndTopology( std::vector<std::string> args, std::ostream*  )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -538,6 +587,6 @@ private:
     }
   GetValueMesh<ImageType>(image, image2, outfn, paramname, scaledata, aaParm, offscreen, inflate );
   //  GetImageTopology<ImageType>(image);
-  return 0;
+  return EXIT_SUCCESS;
 }
 } // namespace ants

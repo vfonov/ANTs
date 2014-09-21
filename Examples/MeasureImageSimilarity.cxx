@@ -20,7 +20,7 @@
 #include "antsAllocImage.h"
 #include <algorithm>
 
-#include "ReadWriteImage.h"
+#include "ReadWriteData.h"
 #include "itkDiscreteGaussianImageFilter.h"
 #include "itkAvantsMutualInformationRegistrationFunction.h"
 #include "itkSpatialMutualInformationRegistrationFunction.h"
@@ -299,7 +299,7 @@ int MeasureImageSimilarity(unsigned int argc, char *argv[])
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int MeasureImageSimilarity( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int MeasureImageSimilarity( std::vector<std::string> args, std::ostream* /*out_stream = NULL */ )
 {
   try
     {

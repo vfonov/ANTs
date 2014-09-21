@@ -17,52 +17,6 @@
 
 namespace ants
 {
-template <class TValue>
-TValue Convert( std::string optionString )
-{
-  TValue             value;
-  std::istringstream iss( optionString );
-
-  iss >> value;
-  return value;
-}
-
-template <class TValue>
-std::vector<TValue> ConvertVector( std::string optionString )
-{
-  std::vector<TValue>    values;
-  std::string::size_type crosspos = optionString.find( 'x', 0 );
-
-  if( crosspos == std::string::npos )
-    {
-    values.push_back( Convert<TValue>( optionString ) );
-    }
-  else
-    {
-    std::string        element = optionString.substr( 0, crosspos );
-    TValue             value;
-    std::istringstream iss( element );
-    iss >> value;
-    values.push_back( value );
-    while( crosspos != std::string::npos )
-      {
-      std::string::size_type crossposfrom = crosspos;
-      crosspos = optionString.find( 'x', crossposfrom + 1 );
-      if( crosspos == std::string::npos )
-        {
-        element = optionString.substr( crossposfrom + 1, optionString.length() );
-        }
-      else
-        {
-        element = optionString.substr( crossposfrom + 1, crosspos );
-        }
-      std::istringstream iss2( element );
-      iss2 >> value;
-      values.push_back( value );
-      }
-    }
-  return values;
-}
 
 template <unsigned int ImageDimension>
 int ExtractRegionFromImage( int argc, char *argv[] )
@@ -131,7 +85,7 @@ int ExtractRegionFromImage( int argc, char *argv[] )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ExtractRegionFromImage( std::vector<std::string> args, std::ostream* out_stream = NULL )
+int ExtractRegionFromImage( std::vector<std::string> args, std::ostream* /*out_stream = NULL */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
