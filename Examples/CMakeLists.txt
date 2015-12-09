@@ -127,7 +127,7 @@ set(MORE_ANTS_APPS
     simpleSynRegistration
     CompositeTransformUtil
     antsMotionCorrDiffusionDirection
-    antsSliceRegularizedRegistration
+#    antsSliceRegularizedRegistration
     CreateDisplacementField
     ANTSIntegrateVectorField
     ANTSIntegrateVelocityField
