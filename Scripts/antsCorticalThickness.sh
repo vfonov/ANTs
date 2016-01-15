@@ -141,6 +141,14 @@ Optional arguments:
                                                 during brain extraction, brain segmentation, and (optional) normalization
                                                 to a template.  Otherwise use antsRegistrationSyN.sh (default = 0).
      -x:                                        Number of iterations within Atropos (default 5).
+     -y:                                        Which stage of ACT to run (default = 0, run all).  Tries to split in 2 hour chunks.
+                                                Will produce OutputNameACTStageNComplete.txt for each completed stage.
+                                                1: brain extraction
+                                                2: template registration
+                                                3: tissue segmentation
+                                                4: template registration (improved, optional)
+                                                5: DiReCT cortical thickness
+                                                6: qc, quality control and summary measurements
      -z:  Test / debug mode                     If > 0, runs a faster version of the script. Only for testing. Implies -u 0.
                                                 Requires single thread computation for complete reproducibility.
 USAGE
@@ -243,6 +251,8 @@ PARAMETERS
 # Echos a command to stdout, then runs it
 # Will immediately exit on error unless you set debug flag here
 DEBUG_MODE=0
+
+ACT_STAGE=0 # run all stages
 
 function logCmd() {
   cmd="$*"
@@ -359,7 +369,7 @@ if [[ $# -lt 3 ]] ; then
   Usage >&2
   exit 1
 else
-  while getopts "a:b:c:d:e:f:g:h:i:j:k:l:m:n:o:p:q:r:s:t:u:v:w:x:z:" OPT
+  while getopts "a:b:c:d:e:f:g:h:i:j:k:l:m:n:o:p:q:r:s:t:u:v:w:x:y:z:" OPT
     do
       case $OPT in
           a) #anatomical t1 image
@@ -440,6 +450,9 @@ else
        ;;
           w) #atropos prior weight
        ATROPOS_SEGMENTATION_PRIOR_WEIGHT=$OPTARG
+       ;;
+          y) #which stage
+       ACT_STAGE=$OPTARG
        ;;
           z) #debug mode
        DEBUG_MODE=$OPTARG
@@ -666,7 +679,11 @@ CORTICAL_THICKNESS_IMAGE=${OUTPUT_PREFIX}CorticalThickness.${OUTPUT_SUFFIX}
 # Brain extraction
 #
 ################################################################################
-
+EXTRACTED_SEGMENTATION_BRAIN=${OUTPUT_PREFIX}BrainExtractionBrain.${OUTPUT_SUFFIX}
+EXTRACTION_GENERIC_AFFINE=${OUTPUT_PREFIX}BrainExtractionPrior0GenericAffine.mat
+EXTRACTED_BRAIN_TEMPLATE=${OUTPUT_PREFIX}ExtractedTemplateBrain.${OUTPUT_SUFFIX}
+if [[ ! -s ${OUTPUT_PREFIX}ACTStage1Complete.txt ]]; then
+if [[ ${ACT_STAGE} -eq 0 ]] || [[ ${ACT_STAGE} -eq 1  ]] ; then # BAStages bxt
 if [[ ! -f ${BRAIN_EXTRACTION_MASK} ]];
   then
 
@@ -713,35 +730,34 @@ if [[ ! -f ${BRAIN_EXTRACTION_MASK} ]];
 
   fi
 
-EXTRACTED_SEGMENTATION_BRAIN=${OUTPUT_PREFIX}BrainExtractionBrain.${OUTPUT_SUFFIX}
 if [[ ! -f ${EXTRACTED_SEGMENTATION_BRAIN} ]];
   then
     logCmd ${ANTSPATH}/ImageMath ${DIMENSION} ${EXTRACTED_SEGMENTATION_BRAIN} m ${ANATOMICAL_IMAGES[0]} ${BRAIN_EXTRACTION_MASK}
   fi
 
-EXTRACTION_GENERIC_AFFINE=${OUTPUT_PREFIX}BrainExtractionPrior0GenericAffine.mat
-EXTRACTED_BRAIN_TEMPLATE=${OUTPUT_PREFIX}ExtractedTemplateBrain.${OUTPUT_SUFFIX}
 if [[ -f ${BRAIN_TEMPLATE} ]] && [[ ! -f ${EXTRACTED_BRAIN_TEMPLATE} ]];
   then
     logCmd ${ANTSPATH}/ThresholdImage ${DIMENSION} ${EXTRACTION_PRIOR} ${EXTRACTED_BRAIN_TEMPLATE} 0.1 1.01 1 0
     logCmd ${ANTSPATH}/ImageMath ${DIMENSION} ${EXTRACTED_BRAIN_TEMPLATE} m ${BRAIN_TEMPLATE} ${EXTRACTED_BRAIN_TEMPLATE}
   fi
+echo ${OUTPUT_PREFIX}ACTStage1Complete.txt > ${OUTPUT_PREFIX}ACTStage1Complete.txt
+fi # BAStages
+fi # check completion
 
 ################################################################################
 #
 # Brain segmentation
 #
 ################################################################################
-
 SEGMENTATION_WARP=${SEGMENTATION_WARP_OUTPUT_PREFIX}1Warp.nii.gz
 SEGMENTATION_INVERSE_WARP=${SEGMENTATION_WARP_OUTPUT_PREFIX}1InverseWarp.nii.gz
 SEGMENTATION_GENERIC_AFFINE=${SEGMENTATION_WARP_OUTPUT_PREFIX}0GenericAffine.mat
 SEGMENTATION_MASK_DILATED=${BRAIN_SEGMENTATION_OUTPUT}MaskDilated.nii.gz
 SEGMENTATION_CONVERGENCE_FILE=${BRAIN_SEGMENTATION_OUTPUT}Convergence.txt
 
-if [[ ! -f ${BRAIN_SEGMENTATION} ]];
-  then
-
+if [[ ! -s ${OUTPUT_PREFIX}ACTStage2Complete.txt ]]  && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage1Complete.txt ]]; then
+  if [[ ${ACT_STAGE} -eq 0 ]] || [[ ${ACT_STAGE} -eq 2  ]] ; then # BAStages reg
     echo
     echo "--------------------------------------------------------------------------------------"
     echo " Brain segmentation using the following steps:"
@@ -751,7 +767,7 @@ if [[ ! -f ${BRAIN_SEGMENTATION} ]];
     echo "--------------------------------------------------------------------------------------"
     echo
 
-    time_start_brain_segmentation=`date +%s`
+    time_start_brain_registration=`date +%s`
 
     # Check to see if the warped priors exist.  If so, we don't need to warp
     # the template and priors to the individual subject.
@@ -776,12 +792,21 @@ if [[ ! -f ${BRAIN_SEGMENTATION} ]];
         then
           echo "The segmentation template doesn't exist:"
           echo "   ${EXTRACTED_BRAIN_TEMPLATE}"
+          rm ${OUTPUT_PREFIX}ACTStage1Complete.txt
           exit 1
         fi
       if [[ ! -f ${EXTRACTED_SEGMENTATION_BRAIN} ]];
         then
           echo "The extracted brain doesn't exist:"
           echo "   ${EXTRACTED_SEGMENTATION_BRAIN}"
+          rm ${OUTPUT_PREFIX}ACTStage1Complete.txt
+          exit 1
+        fi
+      if [[ ! -f ${BRAIN_EXTRACTION_MASK} ]];
+        then
+          echo "The brain extraction mask does not exist:"
+          echo "   ${BRAIN_EXTRACTION_MASK}"
+          rm ${OUTPUT_PREFIX}ACTStage1Complete.txt
           exit 1
         fi
 
@@ -862,11 +887,25 @@ if [[ ! -f ${BRAIN_SEGMENTATION} ]];
             logCmd $exe_brain_segmentation_2
           done
       fi
+      echo ${OUTPUT_PREFIX}ACTStage2Complete.txt > ${OUTPUT_PREFIX}ACTStage2Complete.txt
+      time_end_brain_registration=`date +%s`
+      time_elapsed_brain_registration=$((time_end_brain_registration - time_start_brain_registration))
+      echo
+      echo "--------------------------------------------------------------------------------------"
+      echo " Done with brain registration:  $(( time_elapsed_brain_segmentation / 3600 ))h $(( time_elapsed_brain_registration %3600 / 60 ))m $(( time_elapsed_brain_registration % 60 ))s"
+      echo "--------------------------------------------------------------------------------------"
+      echo
+    fi # BAStages check reg
+  fi # BAStages check reg
 
-    # We do two stages of antsAtroposN4.  The first stage is to get a good N4
-    # bias corrected image(s).  This bias corrected image(s) is used as input to the
-    # second stage where we only do 2 iterations.
-
+# We do two stages of antsAtroposN4.  The first stage is to get a good N4
+# bias corrected image(s).  This bias corrected image(s) is used as input to the
+# second stage where we only do 2 iterations.
+if [[ ! -s ${OUTPUT_PREFIX}ACTStage3Complete.txt ]] && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage2Complete.txt ]] && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage1Complete.txt ]] ; then
+  if [[ ${ACT_STAGE} -eq 0 ]] || [[ ${ACT_STAGE} -eq 3  ]] ; then # BAStages seg
+    time_start_brain_segmentation=`date +%s`
     ATROPOS_ANATOMICAL_IMAGES_COMMAND_LINE='';
     for (( j = 0; j < ${#ANATOMICAL_IMAGES[@]}; j++ ))
       do
@@ -962,8 +1001,9 @@ if [[ ! -f ${BRAIN_SEGMENTATION} ]];
     echo "--------------------------------------------------------------------------------------"
     echo
 
-   fi
-
+   echo ${OUTPUT_PREFIX}ACTStage3Complete.txt > ${OUTPUT_PREFIX}ACTStage3Complete.txt
+  fi
+fi # BAStages seg
 
 ################################################################################
 #
@@ -983,21 +1023,26 @@ REGISTRATION_SUBJECT_OUTPUT_PREFIX=${OUTPUT_PREFIX}TemplateToSubject
 REGISTRATION_SUBJECT_GENERIC_AFFINE=${REGISTRATION_SUBJECT_OUTPUT_PREFIX}1GenericAffine.mat
 REGISTRATION_SUBJECT_WARP=${REGISTRATION_SUBJECT_OUTPUT_PREFIX}0Warp.${OUTPUT_SUFFIX}
 
+# Use first N4 corrected segmentation image, which we assume to be T1
+HEAD_N4_IMAGE=${OUTPUT_PREFIX}BrainSegmentation0N4.${OUTPUT_SUFFIX}
+EXTRACTED_SEGMENTATION_BRAIN_N4_IMAGE=${OUTPUT_PREFIX}ExtractedBrain0N4.nii.gz
+
+if [[ ! -s ${OUTPUT_PREFIX}ACTStage4Complete.txt ]] && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage3Complete.txt ]] && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage2Complete.txt ]] && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage1Complete.txt ]] ; then
+if [[ ${ACT_STAGE} -eq 0 ]] || [[ ${ACT_STAGE} -eq 4 ]] ; then # BAStages reg
+
 if [[ -f ${REGISTRATION_TEMPLATE} ]] && [[ ! -f $REGISTRATION_LOG_JACOBIAN ]];
   then
 
     TMP_FILES=()
-
-    # Use first N4 corrected segmentation image, which we assume to be T1
-    HEAD_N4_IMAGE=${OUTPUT_PREFIX}BrainSegmentation0N4.${OUTPUT_SUFFIX}
 
     echo
     echo "--------------------------------------------------------------------------------------"
     echo " Registration brain masked ${HEAD_N4_IMAGE} to ${REGISTRATION_TEMPLATE} "
     echo "--------------------------------------------------------------------------------------"
     echo
-
-    EXTRACTED_SEGMENTATION_BRAIN_N4_IMAGE=${OUTPUT_PREFIX}ExtractedBrain0N4.nii.gz
 
     logCmd ${ANTSPATH}/ImageMath ${DIMENSION} ${EXTRACTED_SEGMENTATION_BRAIN_N4_IMAGE} m ${HEAD_N4_IMAGE} ${BRAIN_EXTRACTION_MASK}
 
@@ -1077,10 +1122,13 @@ if [[ -f ${REGISTRATION_TEMPLATE} ]] && [[ ! -f $REGISTRATION_LOG_JACOBIAN ]];
             fi
         done
       fi
+  logCmd ${ANTSPATH}/CreateJacobianDeterminantImage ${DIMENSION} ${REGISTRATION_TEMPLATE_WARP} ${REGISTRATION_LOG_JACOBIAN} 1 1
   fi # if registration template & jacobian check
-
-
-
+  if [[ -s ${REGISTRATION_LOG_JACOBIAN} ]] ; then
+    echo ${OUTPUT_PREFIX}ACTStage4Complete.txt > ${OUTPUT_PREFIX}ACTStage4Complete.txt
+  fi
+fi # BAStages
+fi # check completion
 
 ################################################################################
 #
@@ -1098,6 +1146,11 @@ CORTICAL_THICKNESS_SEGMENTATION=${OUTPUT_PREFIX}CorticalThicknessSegmentation.${
 CORTICAL_THICKNESS_GM_SEGMENTATION=${OUTPUT_PREFIX}CorticalThicknessGMSegmentation.${OUTPUT_SUFFIX}
 CORTICAL_LABEL_THICKNESS_PRIOR=${OUTPUT_PREFIX}CorticalLabelThicknessPrior.${OUTPUT_SUFFIX}
 
+if [[ ! -s ${OUTPUT_PREFIX}ACTStage5Complete.txt ]] && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage3Complete.txt ]] && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage2Complete.txt ]] && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage1Complete.txt ]] ; then
+if [[ ${ACT_STAGE} -eq 0 ]] || [[ ${ACT_STAGE} -eq 5  ]] ; then # BAStages thk
 if [[ ! -f ${CORTICAL_THICKNESS_IMAGE} ]];
   then
 
@@ -1221,16 +1274,23 @@ if [[ ! -f ${CORTICAL_THICKNESS_IMAGE} ]];
     echo
 
   fi
-
+  echo ${OUTPUT_PREFIX}ACTStage5Complete.txt > ${OUTPUT_PREFIX}ACTStage5Complete.txt
+fi # BAStages
+fi # check completion
 
 #### BA Edits Begin ####
+if [[ ! -s ${OUTPUT_PREFIX}ACTStage6Complete.txt ]] && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage4Complete.txt ]] && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage3Complete.txt ]] && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage2Complete.txt ]] && \
+   [[   -s ${OUTPUT_PREFIX}ACTStage1Complete.txt ]] ; then
+if [[ ${ACT_STAGE} -eq 0 ]] || [[ ${ACT_STAGE} -eq 6  ]] ; then # BAStages qc
 echo "--------------------------------------------------------------------------------------"
 echo "Compute summary measurements"
 echo "--------------------------------------------------------------------------------------"
 
 if [[ -f ${REGISTRATION_TEMPLATE_WARP} ]];
   then
-    logCmd ${ANTSPATH}/CreateJacobianDeterminantImage ${DIMENSION} ${REGISTRATION_TEMPLATE_WARP} ${REGISTRATION_LOG_JACOBIAN} 1 1
     exe_template_registration_3="${WARP} -d ${DIMENSION} -i ${CORTICAL_THICKNESS_IMAGE} -o ${OUTPUT_PREFIX}CorticalThicknessNormalizedToTemplate.${OUTPUT_SUFFIX} -r ${REGISTRATION_TEMPLATE} -n Gaussian  -t ${REGISTRATION_TEMPLATE_WARP}  -t ${REGISTRATION_TEMPLATE_GENERIC_AFFINE} --float ${USE_FLOAT_PRECISION} --verbose 1"
     logCmd $exe_template_registration_3
 
@@ -1361,21 +1421,25 @@ if [[ ! -f ${CORTICAL_THICKNESS_MOSAIC} || ! -f ${BRAIN_SEGMENTATION_MOSAIC} ]];
         done
       fi
   fi
-
+  echo ${OUTPUT_PREFIX}ACTStage6Complete.txt > ${OUTPUT_PREFIX}ACTStage6Complete.txt
+fi # BAStages
+fi # check completion
 ################################################################################
 #
 # End of main routine
 #
 ################################################################################
 
-logCmd checkOutputExists
+if [[ ${ACT_STAGE} -eq 0 ]] || [[ ${ACT_STAGE} -ge 5  ]] ; then
+  logCmd checkOutputExists
+fi
 
 time_end=`date +%s`
 time_elapsed=$((time_end - time_start))
 
 echo
 echo "--------------------------------------------------------------------------------------"
-echo " Done with ANTs processing pipeline"
+echo " Done with ANTs processing pipeline: stage $ACT_STAGE"
 echo " Script executed in $time_elapsed seconds"
 echo " $(( time_elapsed / 3600 ))h $(( time_elapsed %3600 / 60 ))m $(( time_elapsed % 60 ))s"
 echo "--------------------------------------------------------------------------------------"
