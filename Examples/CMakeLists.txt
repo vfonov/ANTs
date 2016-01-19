@@ -122,7 +122,6 @@ set(MORE_ANTS_APPS
     antsAlignOrigin
     antsMotionCorrDiffusionDirection
 #    antsSliceRegularizedRegistration
-    CreateDisplacementField
     ANTSIntegrateVectorField
     ANTSIntegrateVelocityField
     antsTransformInfo
