@@ -503,6 +503,43 @@ iMathHelperAll(int argc, char **argv)
 
     return EXIT_SUCCESS;
     }
+  else if( operation == "HistogramEqualization" )
+    {
+    typedef itk::Image<float,DIM> ImageType;
+    typename ImageType::Pointer input = NULL;
+    typename ImageType::Pointer output = NULL;
+    float alpha = 0;
+    float beta  = 1;
+    if ( argc >= 6 )
+      {
+      alpha = atof(argv[5]);
+      }
+    if ( argc >= 7 )
+      {
+      beta = atof(argv[6]);
+      }
+
+    ReadImage<ImageType>( input, inName.c_str() );
+    if ( input.IsNull() )
+      {
+      return EXIT_FAILURE;
+      }
+
+    try
+      {
+      std::cout << " a " << alpha << " b " << beta << std::endl;
+      output = iMathHistogramEqualization<ImageType>(input, alpha, beta, 1 );
+      }
+    catch( itk::ExceptionObject & excep )
+      {
+      std::cout << "HistogramEqualization: exception caught !" << std::endl;
+      std::cout << excep << std::endl;
+      }
+
+    WriteImage<ImageType>( output, outName.c_str() );
+
+    return EXIT_SUCCESS;
+    }
   else if( operation == "Laplacian" )
     {
     double sigma = iMathLaplacianSigma;

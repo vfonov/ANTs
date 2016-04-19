@@ -44,7 +44,8 @@ namespace itk {
  */
 
 template<typename TInputImage,
-  class TOutputImage = TInputImage>
+  class TOutputImage = TInputImage,
+  typename TMaskImage = Image<unsigned char, TInputImage::ImageDimension> >
 class AdaptiveNonLocalMeansDenoisingImageFilter :
   public ImageToImageFilter<TInputImage, TOutputImage>
 {
@@ -71,12 +72,16 @@ public:
   typedef TOutputImage                                   OutputImageType;
   typedef typename InputImageType::RegionType            RegionType;
 
-  typedef float                             RealType;
-  typedef Image<RealType, ImageDimension>   RealImageType;
-  typedef typename RealImageType::Pointer   RealImagePointer;
-  typedef typename RealImageType::IndexType IndexType;
+  typedef TMaskImage                                     MaskImageType;
+  typedef typename MaskImageType::PixelType              MaskPixelType;
+  typedef typename MaskImageType::PixelType              LabelType;
 
-  typedef GaussianOperator<RealType>        ModifiedBesselCalculatorType;
+  typedef float                                          RealType;
+  typedef Image<RealType, ImageDimension>                RealImageType;
+  typedef typename RealImageType::Pointer                RealImagePointer;
+  typedef typename RealImageType::IndexType              IndexType;
+
+  typedef GaussianOperator<RealType>                     ModifiedBesselCalculatorType;
 
   typedef ConstNeighborhoodIterator<RealImageType>             ConstNeighborhoodIteratorType;
   typedef typename ConstNeighborhoodIteratorType::RadiusType   NeighborhoodRadiusType;
@@ -86,6 +91,25 @@ public:
    * The image expected for input for noise correction.
    */
   void SetInput1( const InputImageType *image ) { this->SetInput( image ); }
+
+  /**
+   * Set mask image function.  If a binary mask image is specified, only
+   * those input image voxels corresponding with the mask image.
+   */
+  void SetMaskImage( const MaskImageType *mask )
+    {
+    this->SetNthInput( 1, const_cast<MaskImageType *>( mask ) );
+    }
+  void SetInput2( const MaskImageType *mask ) { this->SetMaskImage( mask ); }
+
+  /**
+   * Get mask image function.  If a binary mask image is specified, only
+   * those input image voxels corresponding with the mask image.
+   */
+  const MaskImageType* GetMaskImage() const
+    {
+    return static_cast<const MaskImageType*>( this->ProcessObject::GetInput( 1 ) );
+    }
 
   /**
    * Employ Rician noise model.  Otherwise use a Gaussian noise model.
@@ -136,18 +160,18 @@ public:
   itkGetConstMacro( NeighborhoodRadiusForLocalMeanAndVariance, NeighborhoodRadiusType );
 
   /**
-   * Neighborhood radius 2.
-   * Default = 1x1x...
+   * Neighborhood search radius.
+   * Default = 3x3x...
    */
-  itkSetMacro( NeighborhoodRadius2, NeighborhoodRadiusType );
-  itkGetConstMacro( NeighborhoodRadius2, NeighborhoodRadiusType );
+  itkSetMacro( NeighborhoodSearchRadius, NeighborhoodRadiusType );
+  itkGetConstMacro( NeighborhoodSearchRadius, NeighborhoodRadiusType );
 
   /**
-   * Block neighborhood radius.
+   * Neighborhood block radius.
    * Default = 1x1x...
    */
-  itkSetMacro( BlockNeighborhoodRadius, NeighborhoodRadiusType );
-  itkGetConstMacro( BlockNeighborhoodRadius, NeighborhoodRadiusType );
+  itkSetMacro( NeighborhoodBlockRadius, NeighborhoodRadiusType );
+  itkGetConstMacro( NeighborhoodBlockRadius, NeighborhoodRadiusType );
 
 protected:
   AdaptiveNonLocalMeansDenoisingImageFilter();
@@ -163,10 +187,8 @@ protected:
 
 private:
 
-  AdaptiveNonLocalMeansDenoisingImageFilter( const Self& ); //purposely not
-                                                             // implemented
-  void operator=( const Self& );                      //purposely not
-                                                      // implemented
+  AdaptiveNonLocalMeansDenoisingImageFilter( const Self& ) ITK_DELETE_FUNCTION;
+  void operator=( const Self& ) ITK_DELETE_FUNCTION;
 
   RealType CalculateCorrectionFactor( RealType );
 
@@ -190,8 +212,8 @@ private:
   RealImagePointer                  m_IntensitySquaredDistanceImage;
 
   NeighborhoodRadiusType            m_NeighborhoodRadiusForLocalMeanAndVariance;
-  NeighborhoodRadiusType            m_NeighborhoodRadius2;
-  NeighborhoodRadiusType            m_BlockNeighborhoodRadius;
+  NeighborhoodRadiusType            m_NeighborhoodSearchRadius;
+  NeighborhoodRadiusType            m_NeighborhoodBlockRadius;
 
   std::vector<NeighborhoodOffsetType>  m_NeighborhoodOffsetList;
 };

@@ -26,7 +26,7 @@ set(ANTS_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 ######################################################################################################
 # BA - add this stuff to help installation of ANTsR
 # SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
-# SET(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE) 
+# SET(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 # SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 # SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 # LIST(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
@@ -34,9 +34,6 @@ set(ANTS_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 #   SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 # ENDIF("${isSystemDir}" STREQUAL "-1")
 #####################################################################################################
-
-option(BUILD_EXTERNAL_APPLICATIONS "Build applications that are bundled with ANTs for convenience." ON)
-set(BUILD_EXTERNAL_APPLICATIONS ${BUILD_EXTERNAL_APPLICATIONS})
 
 set(USE_ITKv4 ON)
 set(ITK_VERSION_MAJOR 4 CACHE STRING "Choose the expected ITK major version to build ANTS only version 4 allowed.")
@@ -113,6 +110,8 @@ if(NOT COMMAND SETIFEMPTY)
 endif()
 
 SETIFEMPTY(LIB_INSTALL_DIR lib${LIB_SUFFIX})
+SETIFEMPTY(BIN_INSTALL_DIR bin)
+SETIFEMPTY(SCRIPTS_INSTALL_DIR ${BIN_INSTALL_DIR})
 
 #-----------------------------------------------------------------------------
 SETIFEMPTY(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
@@ -122,7 +121,7 @@ SETIFEMPTY(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 #-----------------------------------------------------------------------------
 SETIFEMPTY(CMAKE_INSTALL_LIBRARY_DESTINATION ${LIB_INSTALL_DIR})
 SETIFEMPTY(CMAKE_INSTALL_ARCHIVE_DESTINATION ${LIB_INSTALL_DIR})
-SETIFEMPTY(CMAKE_INSTALL_RUNTIME_DESTINATION bin)
+SETIFEMPTY(CMAKE_INSTALL_RUNTIME_DESTINATION ${BIN_INSTALL_DIR})
 
 #-------------------------------------------------------------------------
 SETIFEMPTY(ANTs_CLI_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})

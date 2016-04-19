@@ -64,8 +64,8 @@ int AverageImages1(unsigned int argc, char *argv[])
   const bool  normalizei = atoi(argv[3]);
   const float numberofimages = (float)argc - 4.;
 
-  typename ImageType::SizeType size;
-  size.Fill(0);
+  typename ImageType::SizeType maxSize;
+  maxSize.Fill( 0 );
   unsigned int bigimage = 0;
   for( unsigned int j = 4; j < argc; j++ )
     {
@@ -75,17 +75,19 @@ int AverageImages1(unsigned int argc, char *argv[])
       itk::ImageIOFactory::CreateImageIO(fn.c_str(), itk::ImageIOFactory::ReadMode);
     imageIO->SetFileName(fn.c_str() );
     imageIO->ReadImageInformation();
-    for( unsigned int i = 0; i < imageIO->GetNumberOfDimensions(); i++ )
+
+    for( unsigned int i = 0; i < ImageType::ImageDimension; i++ )
       {
-      if( imageIO->GetDimensions(i) > size[i] )
+      itk::SizeValueType currentDimensionSize = imageIO->GetDimensions( i );
+
+      if( currentDimensionSize > maxSize[i] )
         {
-        size[i] = imageIO->GetDimensions(i);
+        maxSize[i] = currentDimensionSize;
         bigimage = j;
         }
       }
-    std::cout << " fn " << fn << std::endl;
-    std::cout << " bigimage " << bigimage << " curr_image " << j << " size " << size << std::endl;
     }
+  std::cout << " bigimage " << bigimage << " maxSize " << maxSize << std::endl;
 
   typename ImageFileReader::Pointer reader = ImageFileReader::New();
   reader->SetFileName(argv[bigimage]);
@@ -181,7 +183,10 @@ int AverageImages(unsigned int argc, char *argv[])
   typename ImageType::Pointer image2 = ITK_NULLPTR;
 
   typename ImageType::SizeType size;
-  size.Fill(0);
+  size.Fill( 0 );
+  typename ImageType::SizeType maxSize;
+  maxSize.Fill( 0 );
+
   unsigned int bigimage = 4;
   for( unsigned int j = 4; j < argc; j++ )
     {
@@ -192,11 +197,17 @@ int AverageImages(unsigned int argc, char *argv[])
       itk::ImageIOFactory::CreateImageIO(fn.c_str(), itk::ImageIOFactory::ReadMode);
     imageIO->SetFileName( fn.c_str() );
     imageIO->ReadImageInformation();
+
     for( unsigned int i = 0; i < imageIO->GetNumberOfDimensions(); i++ )
       {
-      if( imageIO->GetDimensions(i) > size[i] )
+      size[i] = imageIO->GetDimensions( i );
+      }
+
+    for( unsigned int i = 0; i < imageIO->GetNumberOfDimensions(); i++ )
+      {
+      if( size[i] > maxSize[i] )
         {
-        size[i] = imageIO->GetDimensions(i);
+        maxSize[i] = size[i];
         bigimage = j;
         std::cout << " bigimage " << j << " size " << size << std::endl;
         }
@@ -290,7 +301,7 @@ private:
 
   // antscout->set_stream( out_stream );
 
-  if( argc < 3 )
+  if( argc < 5 )
     {
     std::cout << "\n" << std::endl;
     std::cout << "Usage: \n" << std::endl;

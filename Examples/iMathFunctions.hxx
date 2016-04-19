@@ -15,6 +15,7 @@
 #include "ReadWriteData.h"
 #include "antsUtilities.h"
 
+#include "itkAdaptiveHistogramEqualizationImageFilter.h"
 #include "itkBinaryBallStructuringElement.h"
 #include "itkBinaryErodeImageFilter.h"
 #include "itkBinaryDilateImageFilter.h"
@@ -58,8 +59,8 @@ BlobCorrespondence( typename ImageType::Pointer image, unsigned int nBlobs,
   // sensitive parameters are set here - begin
   //RealType     gradsig = 1.0;      // sigma for gradient filter
   unsigned int stepsperoctave = 10; // number of steps between doubling of scale
-  RealType     minscale = vcl_pow( 1.0, 1.0 );
-  RealType     maxscale = vcl_pow( 2.0, 10.0 );
+  RealType     minscale = std::pow( 1.0, 1.0 );
+  RealType     maxscale = std::pow( 2.0, 10.0 );
   //RealType     uniqfeat_thresh = 0.01;
   //RealType     smallval = 1.e-2; // assumes images are normalizes in [ 0, 1 ]
   //bool         dosinkhorn = false;
@@ -78,8 +79,8 @@ iMathBlobDetector( typename ImageType::Pointer image, unsigned int nBlobs )
   typedef float RealType;
 
   unsigned int stepsperoctave = 10; // number of steps between doubling of scale
-  RealType     minscale = vcl_pow( 1.0, 1.0 );
-  RealType     maxscale = vcl_pow( 2.0, 10.0 );
+  RealType     minscale = std::pow( 1.0, 1.0 );
+  RealType     maxscale = std::pow( 2.0, 10.0 );
 
   typedef itk::MultiScaleLaplacianBlobDetectorImageFilter<ImageType> BlobFilterType;
   typename BlobFilterType::Pointer blobFilter = BlobFilterType::New();
@@ -545,6 +546,29 @@ iMathGrad(typename ImageType::Pointer image, double sigma, bool normalize )
 
 template <class ImageType>
 typename ImageType::Pointer
+iMathHistogramEqualization( typename ImageType::Pointer image, double alpha, double beta, unsigned int r )
+{
+
+  if ( image->GetNumberOfComponentsPerPixel() != 1 )
+    {
+    // NOPE
+    }
+
+  typedef itk::AdaptiveHistogramEqualizationImageFilter< ImageType > AdaptiveHistogramEqualizationImageFilterType;
+  typename AdaptiveHistogramEqualizationImageFilterType::Pointer adaptiveHistogramEqualizationImageFilter = AdaptiveHistogramEqualizationImageFilterType::New();
+  adaptiveHistogramEqualizationImageFilter->SetInput( image );
+  typename AdaptiveHistogramEqualizationImageFilterType::RadiusType radius;
+  radius.Fill( r );
+  adaptiveHistogramEqualizationImageFilter->SetRadius(radius);
+  adaptiveHistogramEqualizationImageFilter->SetAlpha(alpha);
+  adaptiveHistogramEqualizationImageFilter->SetBeta(beta);
+  adaptiveHistogramEqualizationImageFilter->Update( );
+
+  return adaptiveHistogramEqualizationImageFilter->GetOutput();
+}
+
+template <class ImageType>
+typename ImageType::Pointer
 iMathLaplacian(typename ImageType::Pointer image, double sigma, bool normalize )
 {
 
@@ -729,37 +753,79 @@ iMathNormalize( typename ImageType::Pointer image )
 
 template <class ImageType>
 typename ImageType::Pointer
-iMathPad( typename ImageType::Pointer image, int padding )
+iMathPad( typename ImageType::Pointer image1, int padvalue )
 {
-  typename ImageType::PointType origin = image->GetOrigin();
+  typedef itk::ImageRegionIteratorWithIndex<ImageType>                    Iterator;
+  typename ImageType::SizeType size = image1->GetLargestPossibleRegion().GetSize();
+  typename ImageType::PointType origin2 = image1->GetOrigin();
+  typename ImageType::SizeType newsize = image1->GetLargestPossibleRegion().GetSize();
+  typename ImageType::RegionType newregion;
+  // determine new image size
+  for( unsigned int i = 0; i < ImageType::ImageDimension; i++ )
+      {
+      float dimsz = (float)size[i];
+      newsize[i] = (unsigned int)(dimsz + padvalue * 2);
+      }
+  newregion.SetSize(newsize);
+  newregion.SetIndex(image1->GetLargestPossibleRegion().GetIndex() );
+  typename ImageType::Pointer padimage =
+      AllocImage<ImageType>(newregion,
+                            image1->GetSpacing(),
+                            origin2,
+                            image1->GetDirection(), 0);
 
-  typename ImageType::SizeType size = image->GetLargestPossibleRegion().GetSize();
-  for (unsigned int i=0; i<ImageType::ImageDimension; i++)
-    {
-    size[i] += 2*padding;
-    origin[i] -= (padding * image->GetSpacing()[i]);
-    }
+  typename ImageType::IndexType index;
+  typename ImageType::IndexType index2;
+  if( padvalue > 0 )
+      {
+      index.Fill(0);
+      index2.Fill( (unsigned int)fabs( static_cast<float>( padvalue ) ) );
+      }
+  else
+      {
+      index2.Fill(0);
+      index.Fill( (unsigned int)fabs( static_cast<float>( padvalue ) ) );
+      }
 
-  typedef itk::IdentityTransform<double,ImageType::ImageDimension> TransformType;
-  typename TransformType::Pointer id = TransformType::New();
-  id->SetIdentity();
+  typename ImageType::PointType point1, pointpad;
+  image1->TransformIndexToPhysicalPoint(index, point1);
+  padimage->TransformIndexToPhysicalPoint(index2, pointpad);
 
-  typedef itk::NearestNeighborInterpolateImageFunction<ImageType> InterpType;
-  typename InterpType::Pointer interp = InterpType::New();
+  for( unsigned int i = 0; i < ImageType::ImageDimension; i++ )
+      {
+      origin2[i] += (point1[i] - pointpad[i]);
+      }
 
-  typedef itk::ResampleImageFilter<ImageType,ImageType> FilterType;
-  typename FilterType::Pointer filter = FilterType::New();
-  filter->SetInput( image );
-  filter->SetOutputSpacing( image->GetSpacing() );
-  filter->SetOutputOrigin( origin );
-  filter->SetOutputDirection( image->GetDirection() );
-  filter->SetDefaultPixelValue( 0 );
-  filter->SetSize( size );
-  filter->SetTransform( id );
-  filter->SetInterpolator( interp );
-  filter->Update();
+  padimage->SetOrigin(origin2);
 
-  return filter->GetOutput();
+  Iterator iter( image1,  image1->GetLargestPossibleRegion() );
+  for(  iter.GoToBegin(); !iter.IsAtEnd(); ++iter )
+      {
+      typename ImageType::IndexType oindex = iter.GetIndex();
+      typename ImageType::IndexType padindex = iter.GetIndex();
+
+      bool isinside = true;
+      for( unsigned int i = 0; i < ImageType::ImageDimension; i++ )
+        {
+        float shifted = ( (float)oindex[i] + padvalue);
+        if( shifted < 0 || shifted > newsize[i] - 1 )
+          {
+          isinside = false;
+          }
+        //      if (shifted < 0) shifted=0;
+        // padindex[i]=
+        }
+      if( isinside )
+        {
+        for( unsigned int i = 0; i < ImageType::ImageDimension; i++ )
+          {
+          float shifted = ( (float)oindex[i] + padvalue);
+          padindex[i] = (unsigned int)shifted;
+          }
+        padimage->SetPixel(padindex, iter.Get() );
+        }
+      }
+return padimage;
 }
 
 
@@ -788,8 +854,8 @@ iMathPeronaMalik( typename ImageType::Pointer image, unsigned long nIterations,
 
   // FIXME - cite reason for this step
   double dimPlusOne = ImageType::ImageDimension + 1;
-  TimeStepType mytimestep = spacingsize / vcl_pow( 2.0 , dimPlusOne );
-  TimeStepType reftimestep = 0.4 / vcl_pow( 2.0 , dimPlusOne );
+  TimeStepType mytimestep = spacingsize / std::pow( 2.0 , dimPlusOne );
+  TimeStepType reftimestep = 0.4 / std::pow( 2.0 , dimPlusOne );
   if ( mytimestep > reftimestep )
     {
     mytimestep = reftimestep;

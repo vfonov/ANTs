@@ -108,7 +108,7 @@ set(PICSL_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/Utilities
   ${CMAKE_CURRENT_SOURCE_DIR}/ImageRegistration
   ${CMAKE_CURRENT_SOURCE_DIR}/ImageSegmentation
-  ${CMAKE_CURRENT_SOURCE_DIR}/GraphTheory
+#  ${CMAKE_CURRENT_SOURCE_DIR}/GraphTheory
   ${CMAKE_CURRENT_SOURCE_DIR}/Tensor
   ${CMAKE_CURRENT_SOURCE_DIR}/Temporary
   ${CMAKE_CURRENT_SOURCE_DIR}/Examples
@@ -120,6 +120,3 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/ANTsVersionConfig.h.in"
                "${CMAKE_CURRENT_BINARY_DIR}/ANTsVersionConfig.h" @ONLY IMMEDIATE)
 
 add_subdirectory(Examples)
-if(BUILD_EXTERNAL_APPLICATIONS)
-  add_subdirectory(ExternalApplications)
-endif()

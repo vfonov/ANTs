@@ -88,12 +88,6 @@ int Denoise( itk::ants::CommandLineParser *parser )
 {
   typedef float RealType;
 
-  typedef itk::Image<RealType, ImageDimension> ImageType;
-  typename ImageType::Pointer inputImage = ITK_NULLPTR;
-
-  typedef itk::Image<RealType, ImageDimension> MaskImageType;
-  typename MaskImageType::Pointer maskImage = ITK_NULLPTR;
-
   bool verbose = false;
   typename itk::ants::CommandLineParser::OptionType::Pointer verboseOption =
     parser->GetOption( "verbose" );
@@ -107,6 +101,12 @@ int Denoise( itk::ants::CommandLineParser *parser )
     std::cout << std::endl << "Running for "
              << ImageDimension << "-dimensional images." << std::endl << std::endl;
     }
+
+  typedef itk::Image<RealType, ImageDimension> ImageType;
+  typename ImageType::Pointer inputImage = ITK_NULLPTR;
+
+  //typedef itk::Image<RealType, ImageDimension> MaskImageType;
+  //typename MaskImageType::Pointer maskImage = ITK_NULLPTR;
 
   typename itk::ants::CommandLineParser::OptionType::Pointer inputImageOption =
     parser->GetOption( "input-image" );
@@ -179,6 +179,21 @@ int Denoise( itk::ants::CommandLineParser *parser )
     }
 
   /**
+   * handle the mask image
+   */
+  typedef typename DenoiserType::MaskImageType MaskImageType;
+  typename MaskImageType::Pointer maskImage = ITK_NULLPTR;
+
+  typename itk::ants::CommandLineParser::OptionType::Pointer maskImageOption =
+    parser->GetOption( "mask-image" );
+  if( maskImageOption && maskImageOption->GetNumberOfFunctions() )
+    {
+    std::string inputFile = maskImageOption->GetFunction( 0 )->GetName();
+    ReadImage<MaskImageType>( maskImage, inputFile.c_str() );
+    }
+  denoiser->SetMaskImage( maskImage );
+
+  /**
    * The parameters below are the default parameters taken from Jose's original
    *   code.  I don't have a good handle on them so I'm hiding them from the
    *   user for now.
@@ -190,17 +205,17 @@ int Denoise( itk::ants::CommandLineParser *parser )
   denoiser->SetSmoothingFactor( 1.0 );
   denoiser->SetSmoothingVariance( 2.0 );
 
-  typename DenoiserType::NeighborhoodRadiusType blockNeighborhoodRadius;
+  typename DenoiserType::NeighborhoodRadiusType neighborhoodBlockRadius;
   typename DenoiserType::NeighborhoodRadiusType neighborhoodRadiusForLocalMeanAndVariance;
-  typename DenoiserType::NeighborhoodRadiusType neighborhoodRadius2;
+  typename DenoiserType::NeighborhoodRadiusType neighborhoodSearchRadius;
 
   neighborhoodRadiusForLocalMeanAndVariance.Fill( 1 );
-  neighborhoodRadius2.Fill( 3 );
-  blockNeighborhoodRadius.Fill( 1 );
+  neighborhoodSearchRadius.Fill( 3 );
+  neighborhoodBlockRadius.Fill( 1 );
 
   denoiser->SetNeighborhoodRadiusForLocalMeanAndVariance( neighborhoodRadiusForLocalMeanAndVariance );
-  denoiser->SetNeighborhoodRadius2( neighborhoodRadius2 );
-  denoiser->SetBlockNeighborhoodRadius( blockNeighborhoodRadius );
+  denoiser->SetNeighborhoodSearchRadius( neighborhoodSearchRadius );
+  denoiser->SetNeighborhoodBlockRadius( neighborhoodBlockRadius );
 
   itk::TimeProbe timer;
   timer.Start();
@@ -253,18 +268,20 @@ int Denoise( itk::ants::CommandLineParser *parser )
     subtracter->SetInput1( denoiser->GetInput() );
     subtracter->SetInput2( denoiser->GetOutput() );
 
-    typedef itk::IdentityTransform<RealType, ImageDimension> TransformType;
-    typename TransformType::Pointer transform = TransformType::New();
-    transform->SetIdentity();
-
-    typedef itk::LinearInterpolateImageFunction<ImageType, RealType> LinearInterpolatorType;
-    typename LinearInterpolatorType::Pointer interpolator = LinearInterpolatorType::New();
-    interpolator->SetInputImage( subtracter->GetOutput() );
-
     typedef itk::ResampleImageFilter<ImageType, ImageType, RealType> ResamplerType;
     typename ResamplerType::Pointer resampler = ResamplerType::New();
-    resampler->SetTransform( transform );
-    resampler->SetInterpolator( interpolator );
+    {
+      typedef itk::IdentityTransform<RealType, ImageDimension> TransformType;
+      typename TransformType::Pointer transform = TransformType::New();
+      transform->SetIdentity();
+      resampler->SetTransform( transform );
+    }
+    {
+      typedef itk::LinearInterpolateImageFunction<ImageType, RealType> LinearInterpolatorType;
+      typename LinearInterpolatorType::Pointer interpolator = LinearInterpolatorType::New();
+      interpolator->SetInputImage( subtracter->GetOutput() );
+      resampler->SetInterpolator( interpolator );
+    }
     resampler->SetOutputParametersFromImage( inputImage );
     resampler->UseReferenceImageOn();
     resampler->SetInput( subtracter->GetOutput() );
@@ -337,6 +354,18 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   parser->AddOption( option );
   }
 
+  {
+  std::string description =
+    std::string( "If a mask image is specified, denoising is " )
+    + std::string( "only performed in the mask region.  " );
+
+  OptionType::Pointer option = OptionType::New();
+  option->SetLongName( "mask-image" );
+  option->SetShortName( 'x' );
+  option->SetUsageOption( 0, "maskImageFilename" );
+  option->SetDescription( description );
+  parser->AddOption( option );
+  }
 
   {
   std::string description =

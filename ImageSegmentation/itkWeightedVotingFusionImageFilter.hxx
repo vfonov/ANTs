@@ -46,7 +46,6 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
   m_ConstrainSolutionToNonnegativeWeights( false )
 {
   this->m_MaskImage = ITK_NULLPTR;
-  this->m_MaskLabel = NumericTraits<LabelType>::OneValue();
 
   this->m_CountImage = ITK_NULLPTR;
 
@@ -245,7 +244,8 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
       this->m_AtlasSegmentations[i], this->m_AtlasSegmentations[i]->GetRequestedRegion() );
     for( It.GoToBegin(); !It.IsAtEnd(); ++It )
       {
-      if( !this->m_MaskImage || this->m_MaskImage->GetPixel( It.GetIndex() ) == this->m_MaskLabel )
+      if( !this->m_MaskImage ||
+          this->m_MaskImage->GetPixel( It.GetIndex() ) != NumericTraits<LabelType>::ZeroValue() )
         {
         this->m_LabelSet.insert( It.Get() );
         }
@@ -462,7 +462,8 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
 
     IndexType currentCenterIndex = ItN.GetIndex();
 
-    if( this->m_MaskImage && this->m_MaskImage->GetPixel( currentCenterIndex ) != this->m_MaskLabel )
+    if( this->m_MaskImage &&
+        this->m_MaskImage->GetPixel( currentCenterIndex ) == NumericTraits<LabelType>::ZeroValue() )
       {
       continue;
       }
@@ -659,7 +660,8 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
           continue;
           }
 
-        if( this->m_MaskImage && this->m_MaskImage->GetPixel( neighborhoodIndex ) != this->m_MaskLabel )
+        if( this->m_MaskImage &&
+            this->m_MaskImage->GetPixel( neighborhoodIndex ) == NumericTraits<LabelType>::ZeroValue() )
           {
           continue;
           }
@@ -744,7 +746,8 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
     {
     IndexType index = It.GetIndex();
 
-    if( this->m_MaskImage && this->m_MaskImage->GetPixel( It.GetIndex() ) != this->m_MaskLabel )
+    if( this->m_MaskImage &&
+        this->m_MaskImage->GetPixel( It.GetIndex() ) == NumericTraits<LabelType>::ZeroValue() )
       {
       continue;
       }
@@ -1004,6 +1007,12 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
   SizeValueType m = A.rows();
   SizeValueType n = A.cols();
 
+  // This fortran implementation sets a maximum iteration number of 3 times the
+  // number of columns:
+  //    http://www.netlib.org/lawson-hanson/all
+
+  const SizeValueType maximumNumberOfIterations = 3 * n;
+
   // Initialization
 
   VectorType P( n, 0 );
@@ -1025,7 +1034,10 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
     }
 
   // Outer loop
-  while( R.sum() > 0 && wMaxValue > tolerance )
+
+  SizeValueType numberOfIterations = 0;
+  while( R.sum() > 0 && wMaxValue > tolerance &&
+    numberOfIterations++ < maximumNumberOfIterations )
     {
     P[maxIndex] = 1;
     R[maxIndex] = 0;
@@ -1157,6 +1169,10 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
   else if( this->m_SimilarityMetric == MEAN_SQUARES )
     {
     os << "Using mean squares to measure the patch similarity." << std::endl;
+    }
+  if( this->m_ConstrainSolutionToNonnegativeWeights )
+    {
+    os << "Constrain solution to positive weights using NNLS." << std::endl;
     }
 
   os << "Label set: ";
