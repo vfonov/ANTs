@@ -427,26 +427,16 @@ for (( g = $WHICHMODALITY; g < ${#IMAGESETARRAY[@]}; g+=$NUMBEROFMODALITIES ))
 }
 
 cleanup()
-# example cleanup function
 {
-
-  cd ${currentdir}/
-
   echo "\n*** Performing cleanup, please wait ***\n"
 
-# 1st attempt to kill all remaining processes
-# put all related processes in array
-runningANTSpids=( `ps -C antsRegistration -C N4BiasFieldCorrection -C ImageMath| awk '{ printf "%s\n", $1 ; }'` )
+    runningANTSpids=$( ps --ppid $$ -o pid= )
 
-# debug only
-  #echo list 1: ${runningANTSpids[@]}
-
-# kill these processes, skip the first since it is text and not a PID
-for ((i = 1; i < ${#runningANTSpids[@]} ; i++))
+  for thePID in $runningANTSpids
   do
-  echo "killing:  ${runningANTSpids[${i}]}"
-  kill ${runningANTSpids[${i}]}
-done
+      echo "killing:  ${thePID}"
+      kill ${thePID}
+  done
 
   return $?
 }
@@ -1365,19 +1355,18 @@ while [[ $i -lt ${ITERATIONLIMIT} ]];
         exebase=$exe
         pexebase=$pexe
 
-        if [[ $DOLINEAR -ne 0 ]];
+        if [[ $DOLINEAR -eq 0 ]];
           then
-            exe="$exe ${basecall} ${stage0} ${stage1} ${stage2} ${stage3}\n"
-            pexe="$pexe ${basecall} ${stage0} ${stage1} ${stage2} ${stage3} >> ${outdir}/job_${count}_metriclog.txt\n"
-          else
             exe="$exe ${basecall} ${stageId} ${stage3}\n"
             pexe="$pexe ${basecall} ${stageId} ${stage3} >> ${outdir}/job_${count}_metriclog.txt\n"
+          elif [[ $NOWARP -eq 1 ]];
+            then
+              exe="$exebase ${basecall} ${stage0} ${stage1} ${stage2}\n";
+              pexe="$pexebase ${basecall} ${stage0} ${stage1} ${stage2} >> ${outdir}/job_${count}_metriclog.txt\n"
+          else
+            exe="$exe ${basecall} ${stage0} ${stage1} ${stage2} ${stage3}\n"
+            pexe="$pexe ${basecall} ${stage0} ${stage1} ${stage2} ${stage3} >> ${outdir}/job_${count}_metriclog.txt\n"
           fi
-        if [[ $NOWARP -eq 0 ]];
-          then
-           exe="$exebase ${basecall} ${stage0} ${stage1} ${stage2} ${stage3}\n";
-           pexe="$pexebase ${basecall} ${stage0} ${stage1} ${stage2} ${stage3} >> ${outdir}/job_${count}_metriclog.txt\n"
-        fi
 
         exe="$exe $warpexe"
         pexe="$pexe $warppexe"
@@ -1388,7 +1377,7 @@ while [[ $i -lt ${ITERATIONLIMIT} ]];
         # 6 submit to SGE (DOQSUB=1), PBS (DOQSUB=4), PEXEC (DOQSUB=2), XGrid (DOQSUB=3), SLURM (DOQSUB=5) or else run locally (DOQSUB=0)
         if [[ $DOQSUB -eq 1 ]];
           then
-			echo "$SCRIPTPREPEND" > $qscript
+            echo "$SCRIPTPREPEND" > $qscript
             echo -e "$exe" >> $qscript
             id=`qsub -cwd -N antsBuildTemplate_deformable_${i} -S /bin/bash -v ANTSPATH=$ANTSPATH $QSUBOPTS $qscript | awk '{print $3}'`
             jobIDs="$jobIDs $id"
