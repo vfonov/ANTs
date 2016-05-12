@@ -821,7 +821,6 @@ template <unsigned int ImageDimension>
 int SetTimeSpacingWarp(int argc, char *argv[])
 {
   typedef float                                              RealType;
-  typedef itk::Image<RealType, ImageDimension>               RealImageType;
   typedef itk::Vector<RealType, ImageDimension>              VectorType;
   typedef itk::Image<VectorType, ImageDimension>             ImageType;
 
@@ -908,7 +907,7 @@ int TruncateImageIntensity( unsigned int argc, char *argv[] )
     {
     std::cout << " need more args -- see usage   " << std::endl
               <<
-      " ImageMath 3 outimage.nii.gz  TruncateImageIntensity inputImage  {lowerQuantile=0.025} {upperQuantile=0.975}  {numberOfBins=65}  {binary-maskImage} "
+      " ImageMath 3 outimage.nii.gz  TruncateImageIntensity inputImage  {lowerQuantile=0.025} {upperQuantile=0.975}  {numberOfBins=65}  {binary-maskImage} {copy-image-space-from-input-to-mask}"
               << std::endl;  throw std::exception();
     }
 
@@ -958,14 +957,23 @@ int TruncateImageIntensity( unsigned int argc, char *argv[] )
       // std::cout << " can't read mask " << std::endl;
       mask = ITK_NULLPTR;
       }
-    ;
     }
-  // std::cout << " Mask " << std::endl;
+  argct++;
+  bool copyInputSpaceToMask = false;
+  if( argc > argct ) copyInputSpaceToMask = true;
+
+
   if( mask.IsNull() )
     {
     mask = AllocImage<ImageType>( image, itk::NumericTraits<PixelType>::OneValue());
     }
-
+  if ( copyInputSpaceToMask )
+    {
+    mask->CopyInformation( image );
+    mask->SetOrigin( image->GetOrigin() );
+    mask->SetSpacing( image->GetSpacing() );
+    mask->SetDirection( image->GetDirection() );
+    }
   // std::cout << " iterate " << std::endl;
 
   itk::ImageRegionIterator<RealImageType> ItI( image,
@@ -1054,9 +1062,13 @@ int TileImages(unsigned int argc, char *argv[])
 
   typename ImageType::Pointer averageimage = ITK_NULLPTR;
   typename ImageType::Pointer image2 = ITK_NULLPTR;
+
   typename ImageType::SizeType size;
+  size.Fill( 0 );
+  typename ImageType::SizeType maxSize;
+  maxSize.Fill( 0 );
+
   double meanval = 1;
-  size.Fill(0);
   unsigned int bigimage = 0;
   for( unsigned int j = argct; j < argc; j++ )
     {
@@ -1067,24 +1079,28 @@ int TileImages(unsigned int argc, char *argv[])
       itk::ImageIOFactory::CreateImageIO(fn.c_str(), itk::ImageIOFactory::ReadMode);
     imageIO->SetFileName(fn.c_str() );
     imageIO->ReadImageInformation();
-    for( unsigned int i = 0; i < imageIO->GetNumberOfDimensions(); i++ )
+
+    for( unsigned int i = 0; i < ImageType::ImageDimension; i++ )
       {
-      if( imageIO->GetDimensions(i) > size[i] )
+      itk::SizeValueType currentDimensionSize = imageIO->GetDimensions( i );
+      size[i] = currentDimensionSize;
+
+      if( currentDimensionSize > maxSize[i] )
         {
-        size[i] = imageIO->GetDimensions(i);
+        maxSize[i] = currentDimensionSize;
         bigimage = j;
-        // std::cout << " bigimage " << j << " size " << size << std::endl;
         }
       }
     }
+  std::cout << " bigimage " << bigimage << " size " << maxSize << std::endl;
 
   ReadImage<ImageType>(image2, argv[bigimage]);
 
   // std::cout << " largest image " << size << std::endl;
 
 /** declare the tiled image */
-  unsigned int xsize = size[0];
-  unsigned int ysize = size[1];
+  unsigned int xsize = maxSize[0];
+  unsigned int ysize = maxSize[1];
   typename ImageType::SizeType tilesize;
   unsigned int ny = (unsigned int)( (float)numberofimages / (float)nx + 0.5);
   if( nx * ny < numberofimages )
@@ -1649,30 +1665,37 @@ int HistogramMatching(int argc, char * argv[])
   long        bins = 255;
   if( argc > argct )
     {
-    bins = atoi(argv[argct]);
+    bins = atoi( argv[argct] );
     }
   argct++;
   long points = 64;
   if( argc > argct )
     {
-    points = atoi(argv[argct]);
+    points = atoi( argv[argct] );
+    }
+  argct++;
+  bool useThresholdAtMeanIntensity = false;
+  if( argc > argct )
+    {
+    useThresholdAtMeanIntensity = static_cast<bool>( atoi( argv[argct] ) );
     }
   argct++;
 
   typename ImageType::Pointer source;
-  ReadImage<ImageType>(source, fn1.c_str() );
+  ReadImage<ImageType>( source, fn1.c_str() );
 
   typename ImageType::Pointer reference;
-  ReadImage<ImageType>(reference, fn2.c_str() );
+  ReadImage<ImageType>( reference, fn2.c_str() );
 
   typename MatchingFilterType::Pointer match = MatchingFilterType::New();
-  match->SetSourceImage(source);
-  match->SetReferenceImage(reference);
-  match->SetNumberOfHistogramLevels(bins);
-  match->SetNumberOfMatchPoints(points);
+  match->SetSourceImage( source );
+  match->SetReferenceImage( reference );
+  match->SetNumberOfHistogramLevels( bins );
+  match->SetThresholdAtMeanIntensity( useThresholdAtMeanIntensity );
+  match->SetNumberOfMatchPoints( points );
   match->Update();
 
-  WriteImage<ImageType>(match->GetOutput(), outname.c_str() );
+  WriteImage<ImageType>( match->GetOutput(), outname.c_str() );
   return 0;
 }
 
@@ -4625,7 +4648,6 @@ int StackImage(int argc, char *argv[])
   typedef float                                          PixelType;
   typedef itk::Image<PixelType, ImageDimension>          ImageType;
   typedef itk::ImageRegionIteratorWithIndex<ImageType>   Iterator;
-  typedef itk::ImageFileReader<ImageType>                ReaderType;
 
   int               argct = 2;
   const std::string outname = std::string(argv[argct]);
@@ -4636,41 +4658,50 @@ int StackImage(int argc, char *argv[])
   //unsigned int nImages = argc - argct;
   //// std::cout << "Stacking " << nImages << " images" << std::endl;
 
+  // Reference image is the first image passed
+  // All other input images must match in all dimensions except the stack dimension
+  typename ImageType::Pointer refImage = ITK_NULLPTR;
+
+  // Re-used image pointer for all images to be stacked
   typename ImageType::Pointer image1 = ITK_NULLPTR;
 
-  typename ReaderType::Pointer reader = ReaderType::New();
-  reader->SetFileName( fn1.c_str() );
-  reader->Update();
+  ReadImage<ImageType>(refImage, fn1.c_str());
 
-  typename ImageType::SpacingType refSpacing = reader->GetOutput()->GetSpacing();
-  typename ImageType::DirectionType refDirection = reader->GetOutput()->GetDirection();
-  typename ImageType::PointType refOrigin = reader->GetOutput()->GetOrigin();
-  typename ImageType::SizeType refSize;
+  typename ImageType::SpacingType refSpacing = refImage->GetSpacing();
+  typename ImageType::DirectionType refDirection = refImage->GetDirection();
+  typename ImageType::PointType refOrigin = refImage->GetOrigin();
+  typename ImageType::SizeType refSize = refImage->GetLargestPossibleRegion().GetSize();
 
-  itk::ImageIOBase::Pointer imageIO =
-    itk::ImageIOFactory::CreateImageIO(fn1.c_str(), itk::ImageIOFactory::ReadMode);
-  imageIO->SetFileName(fn1.c_str() );
-  imageIO->ReadImageInformation();
+  unsigned int nDims = refImage->GetImageDimension();
 
-  unsigned int nDims = imageIO->GetNumberOfDimensions();
+
   if ( nDims != ImageDimension )
   {
     // std::cout << "Image dimensions not consistent with passed parameters" << std::endl;
     return EXIT_FAILURE;
   }
-  for (unsigned int i=0; i<nDims; i++)
-  {
-    refSize[i] = imageIO->GetDimensions(i);
-  }
 
   unsigned int stackLength = refSize[nDims-1];
 
+  // Check headers align to within this tolerance. Set eps relatively large, aims to catch gross errors
+  // without getting hung up on floating point precision issues, which can be sizeable when dealing with
+  // nifti I/O
+  float eps = 1E-4;
+
   for ( int i=(argct+1); i<argc; i++)
   {
-    imageIO->SetFileName( argv[i] );
-    imageIO->ReadImageInformation();
 
-    if ( imageIO->GetNumberOfDimensions() != nDims )
+    std::string fn2 = std::string(argv[i]);
+
+    ReadImage<ImageType>(image1, fn2.c_str());
+
+    typename ImageType::SpacingType im1Spacing = image1->GetSpacing();
+    typename ImageType::DirectionType im1Direction = image1->GetDirection();
+    typename ImageType::PointType im1Origin = image1->GetOrigin();
+    typename ImageType::SizeType im1Size = image1->GetLargestPossibleRegion().GetSize();
+
+
+    if ( image1->GetImageDimension() != nDims )
     {
       // std::cout << "Inconsistent image dimension in " << argv[i] << std::endl;
       return EXIT_FAILURE;
@@ -4679,7 +4710,7 @@ int StackImage(int argc, char *argv[])
     // Check input images
     for ( unsigned int d=0; d<nDims; d++)
     {
-      if ( imageIO->GetSpacing(d) != refSpacing[d] )
+      if ( fabs(im1Spacing[d] - refSpacing[d]) > eps )
       {
         // std::cout << "Inconsistent image spacing not allowed" << std::endl;
         return EXIT_FAILURE;
@@ -4687,22 +4718,26 @@ int StackImage(int argc, char *argv[])
 
       for ( unsigned int d2=0; d2<nDims; d2++)
       {
-        if ( imageIO->GetDirection(d)[d2] != refDirection(d,d2) )
+        if ( fabs(im1Direction(d,d2) - refDirection(d,d2)) > eps )
         {
           // std::cout << "Inconsistent image direction not allowed" << std::endl;
           return EXIT_FAILURE;
         }
       }
 
+      // Only check origin and size up to nDims - 1
+      // Thus we allow stacked images to have different origins and dimension along
+      // the stack dimension. For example, allow stacking of two time series with
+      // 100 volumes and 50 volumes respectively
       if ( d < (nDims-1) )
       {
-        if ( imageIO->GetOrigin(d) != refOrigin[d] )
+        if ( fabs(im1Origin[d] - refOrigin[d]) > eps )
         {
           // std::cout << "Inconsistent image origins not allowed" << std::endl;
           return EXIT_FAILURE;
         }
 
-        if ( imageIO->GetDimensions(d) != refSize[d] )
+        if ( im1Size[d] != refSize[d] )
         {
           // std::cout << "Size variation in stacking dimension only" << std::endl;
           return EXIT_FAILURE;
@@ -4712,13 +4747,13 @@ int StackImage(int argc, char *argv[])
 
     }
 
-    stackLength += imageIO->GetDimensions(nDims-1);
+    stackLength += im1Size[nDims-1];
   }
 
   typename ImageType::SizeType stackSize  = refSize;
   stackSize[nDims-1] = stackLength;
 
-  typename ImageType::RegionType region = reader->GetOutput()->GetLargestPossibleRegion();
+  typename ImageType::RegionType region = refImage->GetLargestPossibleRegion();
   region.SetSize( stackSize );
   typename ImageType::Pointer stackImage = ImageType::New();
   stackImage->SetRegions( region );
@@ -4913,9 +4948,6 @@ int LabelSurfaceArea(int argc, char *argv[])
 {
   typedef float                                        PixelType;
   typedef itk::Image<PixelType, ImageDimension>        ImageType;
-  typedef itk::Image<PixelType, ImageDimension - 1>    OutImageType;
-  typedef typename OutImageType::IndexType             OutIndexType;
-  typedef typename ImageType::IndexType                IndexType;
 
   typedef double                                            Scalar;
   int               argct = 2;
@@ -4935,7 +4967,7 @@ int LabelSurfaceArea(int argc, char *argv[])
   voxspc = voxspc / static_cast<Scalar>( ImageDimension );
   Scalar voxspc2 = voxspc * voxspc;
   Scalar dm1 = static_cast<Scalar>( ImageDimension - 1 );
-  Scalar refarea = vcl_pow( static_cast<Scalar>( rad[1] ) , dm1 );
+  Scalar refarea = std::pow( static_cast<Scalar>( rad[1] ) , dm1 );
   iteratorType GHood(rad, input, input->GetLargestPossibleRegion() );
   GHood.GoToBegin();
   while( !GHood.IsAtEnd() )
@@ -5129,7 +5161,7 @@ int FitSphere(int argc, char *argv[])
         }
       cmdist=sqrt(cmdist);
       //          // std::cout << " GMT " << gmtotal << " WMT " << wmtotal << " dist " << cmdist << std::endl;
-  float gmrad=vcl_pow( 3.*gvol/(4.*pi) , 1./3.);
+  float gmrad=std::pow( 3.*gvol/(4.*pi) , 1./3.);
   float gwrat=0,gvrat=0;
   if (warea > 0) gwrat=garea/warea;
   if (wvol > 0) gvrat=gvol/wvol;
@@ -5371,7 +5403,7 @@ int ImageMath(int argc, char *argv[])
       }
     else if( strcmp(operation.c_str(), "^") == 0 )
       {
-      result = vcl_pow(pix1, pix2);
+      result = std::pow(pix1, pix2);
       }
     else if( strcmp(operation.c_str(), "exp") == 0 )
       {
@@ -5419,11 +5451,11 @@ int ImageMath(int argc, char *argv[])
     }
   if( strcmp(operation.c_str(), "total") == 0 )
     {
-    // std::cout << "total: " << result << " total-volume: " << result * volumeelement << std::endl;
+    std::cout << "total: " << result << " total-volume: " << result * volumeelement << std::endl;
     }
   else if( strcmp(operation.c_str(), "mean") == 0 )
     {
-    // std::cout << result / ct << std::endl;
+    std::cout << result / ct << std::endl;
     }
   else
     {
@@ -5605,7 +5637,7 @@ int VImageMath(int argc, char *argv[])
     }
   if( strcmp(operation.c_str(), "vtotal") == 0 )
     {
-    // std::cout << "total: " << result << " total-volume: " << result * volumeelement << std::endl;
+    std::cout << "total: " << result << " total-volume: " << result * volumeelement << std::endl;
     }
   else
     {
@@ -8373,60 +8405,103 @@ int NormalizeImage(int argc, char *argv[])
 {
   typedef float                                                           PixelType;
   typedef itk::Image<PixelType, ImageDimension>                           ImageType;
-  typedef itk::ImageRegionIteratorWithIndex<ImageType>                    Iterator;
 
   int               argct = 2;
   const std::string outname = std::string(argv[argct]);
   argct += 2;
   std::string fn1 = std::string(argv[argct]);   argct++;
   float       option = 0;
+
+  bool useMaskImage = false;
+  typename ImageType::Pointer maskImage = ITK_NULLPTR;
   if( argc > argct )
     {
-    option = atof(argv[argct]);
-    }
 
-  typename ImageType::Pointer image = ITK_NULLPTR;
-  ReadImage<ImageType>(image, fn1.c_str() );
-
-  float         max = 0;
-  float         min = 1.e9;
-  float         mean = 0.0;
-  unsigned long ct = 0;
-  typedef itk::ImageRegionIteratorWithIndex<ImageType> Iterator;
-  Iterator iter( image,  image->GetLargestPossibleRegion() );
-  for(  iter.GoToBegin(); !iter.IsAtEnd(); ++iter )
-    {
-    float pix = iter.Get();
-    //      if (option == 0) if (pix < 0) pix=0;
-    mean += pix;
-    ct++;
-    if( pix > max )
+    std::string maskFileName = std::string( argv[argct] );
+    ReadImage<ImageType>( maskImage, maskFileName.c_str() );
+    if( maskImage.IsNotNull() )
       {
-      max = pix;
-      }
-    if( pix < min )
-      {
-      min = pix;
-      }
-    }
-  mean /= (float)ct;
-  for(  iter.GoToBegin(); !iter.IsAtEnd(); ++iter )
-    {
-    float pix = iter.Get();
-    if( option == 0 )
-      {
-      pix = (pix - min) / (max - min);
-      iter.Set(pix);
+      useMaskImage = true;
       }
     else
       {
-      iter.Set(pix / mean);
+      option = atof( argv[argct] );
       }
     }
+  typename ImageType::Pointer image = ITK_NULLPTR;
+  ReadImage<ImageType>(image, fn1.c_str() );
 
-  if( outname.length() > 3 )
+  if( useMaskImage )
     {
-    WriteImage<ImageType>( image, outname.c_str() );
+    itk::ImageRegionIterator<ImageType> It( maskImage,
+      maskImage->GetLargestPossibleRegion() );
+    itk::ImageRegionIterator<ImageType> It2( image,
+      image->GetLargestPossibleRegion() );
+
+    float roiMean = 0.0;
+    float count = 0.0;
+    for( It.GoToBegin(), It2.GoToBegin(); !It.IsAtEnd(); ++It, ++It2 )
+      {
+      if( It.Get() != 0 )
+        {
+        roiMean += It2.Get();
+        count += 1.0;
+        }
+      }
+    roiMean /= count;
+
+    for( It2.GoToBegin(); !It2.IsAtEnd(); ++It2 )
+      {
+      It2.Set( It2.Get() / roiMean );
+      }
+
+    if( outname.length() > 3 )
+      {
+      WriteImage<ImageType>( image, outname.c_str() );
+      }
+    }
+  else
+    {
+    float         max = 0;
+    float         min = 1.e9;
+    float         mean = 0.0;
+    unsigned long ct = 0;
+    typedef itk::ImageRegionIteratorWithIndex<ImageType> Iterator;
+    Iterator iter( image,  image->GetLargestPossibleRegion() );
+    for(  iter.GoToBegin(); !iter.IsAtEnd(); ++iter )
+      {
+      float pix = iter.Get();
+      //      if (option == 0) if (pix < 0) pix=0;
+      mean += pix;
+      ct++;
+      if( pix > max )
+        {
+        max = pix;
+        }
+      if( pix < min )
+        {
+        min = pix;
+        }
+      }
+    mean /= (float)ct;
+    for(  iter.GoToBegin(); !iter.IsAtEnd(); ++iter )
+      {
+      float pix = iter.Get();
+      if( option == 0 )
+        {
+        pix = (pix - min) / (max - min);
+        iter.Set(pix);
+        }
+      else
+        {
+        iter.Set(pix / mean);
+        }
+      }
+
+    if( outname.length() > 3 )
+      {
+      WriteImage<ImageType>( image, outname.c_str() );
+      }
     }
 
   return 0;
@@ -8631,7 +8706,6 @@ int CannyImage(      int argc, char *argv[])
 
   typename ImageType::Pointer image = ITK_NULLPTR;
   ReadImage<ImageType>(image, fn1.c_str() );
-  typedef itk::RescaleIntensityImageFilter<ImageType, ImageType> RescaleFilterType;
   typedef itk::CannyEdgeDetectionImageFilter< ImageType, ImageType >
   FilterType;
   typename FilterType::Pointer filter = FilterType::New();
@@ -10256,7 +10330,7 @@ int LabelThickness(      int argc, char *argv[])
     {
     volumeelement *= spacing[i];
     }
-  volumeelement = vcl_pow( static_cast<double>(  volumeelement ), static_cast<double>( 0.3333 ) );
+  volumeelement = std::pow( static_cast<double>(  volumeelement ), static_cast<double>( 0.3333 ) );
 
   vnl_vector<double> surface(maxlab + 1, 0);
   vnl_vector<double> volume(maxlab + 1, 0);
@@ -11854,8 +11928,8 @@ int CorrelationVoting( int argc, char *argv[] )
         targetVar /= (k - 1);
         imageVar /= (k - 1);
         float pearson =
-          ( product - k * targetMean * imageMean ) / ( (k - 1) * vcl_sqrt(targetVar) * vcl_sqrt(imageVar) );
-        weights.SetElement( i, vcl_fabs(pearson) );
+          ( product - k * targetMean * imageMean ) / ( (k - 1) * std::sqrt(targetVar) * std::sqrt(imageVar) );
+        weights.SetElement( i, std::fabs(pearson) );
         } // i >= nImages
       for( int i = 0; i < nImages; i++ )
         {
@@ -12022,7 +12096,7 @@ int ImageMetrics( int argc, char *argv[] )
     value = metric->GetValue();
     }
 
-  // std::cout << value << std::endl;
+  std::cout << value << std::endl;
 
   return 0;
 }
@@ -12099,7 +12173,7 @@ int PearsonCorrelation( int argc, char *argv[] )
   var1 /= (k - 1);
   var2 /= (k - 1);
 
-  float pearson = ( product - k * mean1 * mean2 ) / ( (k - 1) * vcl_sqrt(var1) * vcl_sqrt(var2) );
+  float pearson = ( product - k * mean1 * mean2 ) / ( (k - 1) * std::sqrt(var1) * std::sqrt(var2) );
   std::cout << pearson << std::endl;
 
   return 0;
@@ -12521,14 +12595,54 @@ int PMSmoothImage(int argc, char *argv[])
   typename FilterType::Pointer filter = FilterType::New();
   filter->SetInput( image1 );
   filter->SetNumberOfIterations( sigma );
-  PixelType mytimestep = spacingsize / vcl_pow( 2.0 , static_cast<double>(ImageDimension+1) );
-  PixelType reftimestep = 0.4 / vcl_pow( 2.0 , static_cast<double>(ImageDimension+1) );
+  PixelType mytimestep = spacingsize / std::pow( 2.0 , static_cast<double>(ImageDimension+1) );
+  PixelType reftimestep = 0.4 / std::pow( 2.0 , static_cast<double>(ImageDimension+1) );
   if ( mytimestep > reftimestep ) mytimestep = reftimestep;
   filter->SetTimeStep( mytimestep );
   filter->SetConductanceParameter( conductance ); // might need to change this
   filter->Update();
   varimage = filter->GetOutput();
   WriteImage<ImageType>( varimage, outname.c_str() );
+  return EXIT_SUCCESS;
+}
+
+template <unsigned int ImageDimension>
+int ConvolveImage( int argc, char *argv[] )
+{
+  typedef float                                  PixelType;
+  typedef itk::Image<PixelType, ImageDimension>  ImageType;
+
+  int argct = 2;
+  const std::string outputFileName = std::string( argv[argct] );
+  argct += 2;
+
+  std::string inputFileName = std::string( argv[argct] );   argct++;
+  std::string kernelFileName = std::string( argv[argct] );  argct++;
+
+  bool normalize = true;
+  if( argc > argct )
+    {
+    normalize = static_cast<bool>( atoi( argv[argct] ) );
+    }
+
+  typename ImageType::Pointer inputImage = ITK_NULLPTR;
+  typename ImageType::Pointer kernelImage = ITK_NULLPTR;
+
+  ReadImage<ImageType>( inputImage, inputFileName.c_str() );
+  ReadImage<ImageType>( kernelImage, kernelFileName.c_str() );
+
+  typedef itk::ConvolutionImageFilter<ImageType> FilterType;
+  typename FilterType::Pointer convoluter = FilterType::New();
+  convoluter->SetInput( inputImage );
+  convoluter->SetKernelImage( kernelImage );
+  convoluter->SetNormalize( normalize );
+  convoluter->Update();
+
+  typename ImageType::Pointer outputImage = convoluter->GetOutput();
+  outputImage->Update();
+  outputImage->DisconnectPipeline();
+
+  WriteImage<ImageType>( outputImage, outputFileName.c_str() );
   return EXIT_SUCCESS;
 }
 
@@ -12586,7 +12700,7 @@ int InPaint(int argc, char *argv[])
   locPoint.Fill( 0 );
   while(!imageIterator.IsAtEnd())
     {
-    if ( ct == static_cast<unsigned int>( vcl_floor( (PixelType) kernelsize / 2.0 ) ) )
+    if ( ct == static_cast<unsigned int>( std::floor( (PixelType) kernelsize / 2.0 ) ) )
       {
       kernel->TransformIndexToPhysicalPoint(  imageIterator.GetIndex(), centerPoint );
       }
@@ -12612,7 +12726,7 @@ int InPaint(int argc, char *argv[])
       imageIterator.Set( 1.0 / val );
       totalval += imageIterator.Get( );
       }
-    if ( ct2 == static_cast<unsigned int>( vcl_floor( (PixelType) ct / 2.0 ) ) ) imageIterator.Set( 1.e-8 );
+    if ( ct2 == static_cast<unsigned int>( std::floor( (PixelType) ct / 2.0 ) ) ) imageIterator.Set( 1.e-8 );
     ++ct2;
     ++imageIterator;
     }
@@ -12700,7 +12814,7 @@ int InPaint2(int argc, char *argv[])
   typename ImageType::PointType locPoint;
   while(!imageIterator.IsAtEnd())
     {
-    if ( ct == static_cast<unsigned int>( vcl_floor( (PixelType) kernelsize / 2.0 ) ) )
+    if ( ct == static_cast<unsigned int>( std::floor( (PixelType) kernelsize / 2.0 ) ) )
       {
       kernel->TransformIndexToPhysicalPoint(  imageIterator.GetIndex(), centerPoint );
       }
@@ -12726,7 +12840,7 @@ int InPaint2(int argc, char *argv[])
       imageIterator.Set( 1.0 / val );
       totalval += imageIterator.Get( );
       }
-    if ( ct2 == static_cast<unsigned int>( vcl_floor( (PixelType) ct / 2.0 ) ) ) imageIterator.Set( 1.e-8 );
+    if ( ct2 == static_cast<unsigned int>( std::floor( (PixelType) ct / 2.0 ) ) ) imageIterator.Set( 1.e-8 );
     ++ct2;
     ++imageIterator;
     }
@@ -13114,8 +13228,8 @@ int BlobDetector( int argc, char *argv[] )
   // sensitive parameters are set here - begin
   RealType     gradsig = 1.0;      // sigma for gradient filter
   unsigned int stepsperoctave = 10; // number of steps between doubling of scale
-  RealType     minscale = vcl_pow( 1.0, 1.0 );
-  RealType     maxscale = vcl_pow( 2.0, 10.0 );
+  RealType     minscale = std::pow( 1.0, 1.0 );
+  RealType     maxscale = std::pow( 2.0, 10.0 );
   RealType     uniqfeat_thresh = 0.01;
   RealType     smallval = 1.e-2; // assumes images are normalizes in [ 0, 1 ]
   bool         dosinkhorn = false;
@@ -14008,6 +14122,11 @@ ImageMathHelperAll(int argc, char **argv)
     SmoothImage<DIM>(argc, argv);
     return EXIT_SUCCESS;
     }
+  if( operation == "Convolve")
+    {
+    ConvolveImage<DIM>(argc, argv);
+    return EXIT_SUCCESS;
+    }
   if( operation == "PeronaMalik")
     {
     PMSmoothImage<DIM>(argc, argv);
@@ -14873,6 +14992,9 @@ private:
     std::cout << "\n  PeronaMalik       : anisotropic diffusion w/varying conductance param (0.25 in example below)" << std::endl;
     std::cout << "      Usage        : PeronaMalik image #iterations conductance " << std::endl;
 
+    std::cout << "\n  Convolve       : convolve input image with kernel image" << std::endl;
+    std::cout << "      Usage        : Convolve inputImage kernelImage {normalize=1} " << std::endl;
+
     std::cout << "  Finite            : replace non-finite values with finite-value (default = 0)" << std::endl;
     std::cout << "      Usage        : Finite Image.exdt {replace-value=0}" << std::endl;
 
@@ -14893,7 +15015,7 @@ private:
     std::cout << "\n  HistogramMatch    : " << std::endl;
     std::cout
       <<
-      "      Usage        : HistogramMatch SourceImage ReferenceImage {NumberBins-Default=255} {NumberPoints-Default=64}"
+      "      Usage        : HistogramMatch SourceImage ReferenceImage {NumberBins-Default=255} {NumberPoints-Default=64} {useThresholdAtMeanIntensity=false}"
       << std::endl;
 
     std::cout << "\n  RescaleImage    : " << std::endl;
@@ -14965,7 +15087,7 @@ private:
       << std::endl;
     std::cout << "      Usage        : MTR M0Image M1Image [MaskImage];" << std::endl;
 
-    std::cout << "\n  Normalize        : Normalize to [0,1]. Option instead divides by average value" << std::endl;
+    std::cout << "\n  Normalize        : Normalize to [0,1]. Option instead divides by average value.  If opt is a mask image, then we normalize by mean intensity in the mask ROI." << std::endl;
     std::cout << "      Usage        : Normalize Image.ext opt" << std::endl;
 
     std::cout << "\n  PadImage       : If Pad-Number is negative, de-Padding occurs" << std::endl;

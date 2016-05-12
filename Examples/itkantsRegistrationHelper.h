@@ -869,7 +869,7 @@ private:
           {
           optimizerWeights[d] = this->m_RestrictDeformationOptimizerWeights[currentStageNumber][d];
           }
-        optimizer->SetWeights( optimizerWeights );
+        registrationMethod->SetOptimizerWeights( optimizerWeights );
         }
       }
 
@@ -899,8 +899,9 @@ private:
 
         if( this->InitializeWithPreviousLinearTransform<RegistrationMethodTransformType>( compositeTransform, t.c_str(), currentTransform ) )
           {
+          this->Logger() << "Registration process is run using direct initialization!" << std::endl;
           compositeTransform->RemoveTransform(); // Remove previous initial transform,
-                                                         // since it is included in current results.
+                                                 // since it is included in current results.
           registrationMethod->SetInitialTransform( currentTransform );
           }
         }

@@ -25,15 +25,19 @@
 #include "itkImageRegionConstIterator.h"
 #include "itkImageRegionIterator.h"
 #include "itkImageRegionIteratorWithIndex.h"
+#include "itkMath.h"
 #include "itkMeanImageFilter.h"
 #include "itkNeighborhoodIterator.h"
+#include "itkProgressReporter.h"
 #include "itkStatisticsImageFilter.h"
 #include "itkVarianceImageFilter.h"
 
+#include <numeric>
+
 namespace itk {
 
-template <typename TInputImage, typename TOutputImage>
-AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
+template <typename TInputImage, typename TOutputImage, typename TMaskImage>
+AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
 ::AdaptiveNonLocalMeansDenoisingImageFilter() :
   m_UseRicianNoiseModel( true ),
   m_Epsilon( 0.00001 ),
@@ -41,7 +45,8 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
   m_VarianceThreshold( 0.5 ),
   m_SmoothingFactor( 1.0 ),
   m_SmoothingVariance( 2.0 ),
-  m_MaximumInputPixelIntensity( NumericTraits<RealType>::NonpositiveMin() )
+  m_MaximumInputPixelIntensity( NumericTraits<RealType>::NonpositiveMin() ),
+  m_MinimumInputPixelIntensity( NumericTraits<RealType>::max() )
 {
   this->SetNumberOfRequiredInputs( 1 );
 
@@ -52,14 +57,14 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
 
   this->m_RicianBiasImage = ITK_NULLPTR;
 
-  this->m_BlockNeighborhoodRadius.Fill( 1 );
-  this->m_NeighborhoodRadius1.Fill( 1 );
-  this->m_NeighborhoodRadius2.Fill( 3 );
+  this->m_NeighborhoodBlockRadius.Fill( 1 );
+  this->m_NeighborhoodRadiusForLocalMeanAndVariance.Fill( 1 );
+  this->m_NeighborhoodSearchRadius.Fill( 3 );
 }
 
-template<typename TInputImage, typename TOutputImage>
+template<typename TInputImage, typename TOutputImage, typename TMaskImage>
 void
-AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
+AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
 ::BeforeThreadedGenerateData()
 {
   const InputImageType *inputImage = this->GetInput();
@@ -67,7 +72,7 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
   typedef MeanImageFilter<InputImageType, RealImageType> MeanImageFilterType;
   typename MeanImageFilterType::Pointer meanImageFilter = MeanImageFilterType::New();
   meanImageFilter->SetInput( inputImage );
-  meanImageFilter->SetRadius( this->GetNeighborhoodRadius1() );
+  meanImageFilter->SetRadius( this->GetNeighborhoodRadiusForLocalMeanAndVariance() );
 
   this->m_MeanImage = meanImageFilter->GetOutput();
   this->m_MeanImage->Update();
@@ -76,7 +81,7 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
   typedef VarianceImageFilter<InputImageType, RealImageType> VarianceImageFilterType;
   typename VarianceImageFilterType::Pointer varianceImageFilter = VarianceImageFilterType::New();
   varianceImageFilter->SetInput( inputImage );
-  varianceImageFilter->SetRadius( this->GetNeighborhoodRadius1() );
+  varianceImageFilter->SetRadius( this->GetNeighborhoodRadiusForLocalMeanAndVariance() );
 
   this->m_VarianceImage = varianceImageFilter->GetOutput();
   this->m_VarianceImage->Update();
@@ -88,59 +93,64 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
   statsFilter->Update();
 
   this->m_MaximumInputPixelIntensity = static_cast<RealType>( statsFilter->GetMaximum() );
+  this->m_MinimumInputPixelIntensity = static_cast<RealType>( statsFilter->GetMinimum() );
 
   this->m_ThreadContributionCountImage = RealImageType::New();
   this->m_ThreadContributionCountImage->CopyInformation( inputImage );
   this->m_ThreadContributionCountImage->SetRegions( inputImage->GetRequestedRegion() );
-  this->m_ThreadContributionCountImage->Allocate();
-  this->m_ThreadContributionCountImage->FillBuffer( 0.0 );
+  this->m_ThreadContributionCountImage->Allocate(0.0);
+  //this->m_ThreadContributionCountImage->FillBuffer( 0.0 );
 
   if( this->m_UseRicianNoiseModel )
     {
     this->m_RicianBiasImage = RealImageType::New();
     this->m_RicianBiasImage->CopyInformation( inputImage );
     this->m_RicianBiasImage->SetRegions( inputImage->GetRequestedRegion() );
-    this->m_RicianBiasImage->Allocate();
-    this->m_RicianBiasImage->FillBuffer( 0.0 );
+    this->m_RicianBiasImage->Allocate(0.0);
+    //this->m_RicianBiasImage->FillBuffer( 0.0 );
     }
 
-  ConstNeighborhoodIterator<InputImageType> ItBI( this->m_BlockNeighborhoodRadius,
+  ConstNeighborhoodIterator<InputImageType> ItBI( this->m_NeighborhoodBlockRadius,
     this->GetInput(), this->GetInput()->GetRequestedRegion() );
 
   this->m_NeighborhoodOffsetList.clear();
 
-  unsigned int neighborhoodBlockSize = ( ItBI.GetNeighborhood() ).Size();
+  const unsigned int neighborhoodBlockSize = ( ItBI.GetNeighborhood() ).Size();
   for( unsigned int n = 0; n < neighborhoodBlockSize; n++ )
     {
     this->m_NeighborhoodOffsetList.push_back( ( ItBI.GetNeighborhood() ).GetOffset( n ) );
     }
 
   this->AllocateOutputs();
+  //Output buffer needs to be zero initialized
+  this->GetOutput()->FillBuffer( 0.0 );
 }
 
-template<typename TInputImage, typename TOutputImage>
+template<typename TInputImage, typename TOutputImage, typename TMaskImage>
 void
-AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
-::ThreadedGenerateData( const RegionType &region, ThreadIdType itkNotUsed( threadId ) )
+AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
+::ThreadedGenerateData( const RegionType &region, ThreadIdType threadId )
 {
+  ProgressReporter progress( this, threadId, region.GetNumberOfPixels(), 100 );
+
   const InputImageType *inputImage = this->GetInput();
+  const MaskImageType *maskImage = this->GetMaskImage();
 
   OutputImageType *outputImage = this->GetOutput();
 
-  ConstNeighborhoodIterator<RealImageType> ItV( this->m_NeighborhoodRadius2, this->m_VarianceImage, region );
-  ConstNeighborhoodIterator<RealImageType> ItM( this->m_NeighborhoodRadius2, this->m_MeanImage, region );
+  ConstNeighborhoodIterator<RealImageType> ItV( this->m_NeighborhoodSearchRadius, this->m_VarianceImage, region );
+  ConstNeighborhoodIterator<RealImageType> ItM( this->m_NeighborhoodSearchRadius, this->m_MeanImage, region );
 
-  ConstNeighborhoodIterator<InputImageType> ItBI( this->m_BlockNeighborhoodRadius, inputImage, region );
-  ConstNeighborhoodIterator<RealImageType> ItBM( this->m_BlockNeighborhoodRadius, this->m_MeanImage, region );
+  ConstNeighborhoodIterator<InputImageType> ItBI( this->m_NeighborhoodBlockRadius, inputImage, region );
+  ConstNeighborhoodIterator<RealImageType> ItBM( this->m_NeighborhoodBlockRadius, this->m_MeanImage, region );
 
-  NeighborhoodIterator<InputImageType> ItBO( this->m_BlockNeighborhoodRadius, outputImage, region );
-  NeighborhoodIterator<RealImageType> ItBL( this->m_BlockNeighborhoodRadius, this->m_ThreadContributionCountImage, region );
+  NeighborhoodIterator<InputImageType> ItBO( this->m_NeighborhoodBlockRadius, outputImage, region );
+  NeighborhoodIterator<RealImageType> ItBL( this->m_NeighborhoodBlockRadius, this->m_ThreadContributionCountImage, region );
 
-  unsigned int neighborhoodSize = ( ItM.GetNeighborhood() ).Size();
-  unsigned int neighborhoodBlockSize = ( ItBM.GetNeighborhood() ).Size();
+  const unsigned int neighborhoodSearchSize = ( ItM.GetNeighborhood() ).Size();
+  const unsigned int neighborhoodBlockSize = ( ItBM.GetNeighborhood() ).Size();
 
   Array<RealType> weightedAverageIntensities( neighborhoodBlockSize );
-
 
   ItM.GoToBegin();
   ItV.GoToBegin();
@@ -151,6 +161,8 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
 
   while( !ItM.IsAtEnd() )
     {
+    typename InputImageType::PixelType inputCenterPixel = ItBI.GetCenterPixel();
+
     RealType meanCenterPixel = ItM.GetCenterPixel();
     RealType varianceCenterPixel = ItV.GetCenterPixel();
 
@@ -162,35 +174,38 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
     RealType meanNeighborhoodPixel = NumericTraits<RealType>::ZeroValue();
     RealType varianceNeighborhoodPixel = NumericTraits<RealType>::ZeroValue();
 
-    if( meanCenterPixel > this->m_Epsilon && varianceCenterPixel > this->m_Epsilon )
+    if( inputCenterPixel > 0 && meanCenterPixel > this->m_Epsilon && varianceCenterPixel > this->m_Epsilon &&
+        ( !maskImage || maskImage->GetPixel( ItM.GetIndex() ) != NumericTraits<MaskPixelType>::ZeroValue() ) )
       {
+      // Calculate the minimum distance
+
       RealType minimumDistance = NumericTraits<RealType>::max();
-      for( unsigned int m = 0; m < neighborhoodSize; m++ )
+      for( unsigned int m = 0; m < neighborhoodSearchSize; m++ )
         {
-        if( ! ItM.IndexInBounds( m ) || m == static_cast<unsigned int>( 0.5 * neighborhoodSize ) )
+        if( ! ItM.IndexInBounds( m ) || m == static_cast<unsigned int>( 0.5 * neighborhoodSearchSize ) )
           {
           continue;
           }
 
         meanNeighborhoodPixel = ItM.GetPixel( m );
         varianceNeighborhoodPixel = ItV.GetPixel( m );
+        IndexType neighborhoodIndex = ItM.GetIndex( m );
 
-        if( meanNeighborhoodPixel < this->m_Epsilon || varianceNeighborhoodPixel < this->m_Epsilon )
+        if( inputImage->GetPixel( neighborhoodIndex ) <= 0 || meanNeighborhoodPixel <= this->m_Epsilon || varianceNeighborhoodPixel <= this->m_Epsilon )
           {
           continue;
           }
 
-        RealType meanRatio = meanCenterPixel / meanNeighborhoodPixel;
-        RealType meanRatioInverse = ( this->m_MaximumInputPixelIntensity - meanCenterPixel ) /
+        const RealType meanRatio = meanCenterPixel / meanNeighborhoodPixel;
+        const RealType meanRatioInverse = ( this->m_MaximumInputPixelIntensity - meanCenterPixel ) /
           ( this->m_MaximumInputPixelIntensity - meanNeighborhoodPixel );
 
-        RealType varianceRatio = varianceCenterPixel / varianceNeighborhoodPixel;
+        const RealType varianceRatio = varianceCenterPixel / varianceNeighborhoodPixel;
 
         if( ( ( meanRatio > this->m_MeanThreshold && meanRatio < 1.0 / this->m_MeanThreshold ) ||
             ( meanRatioInverse > this->m_MeanThreshold && meanRatioInverse < 1.0 / this->m_MeanThreshold ) ) &&
             varianceRatio > this->m_VarianceThreshold && varianceRatio < 1.0 / this->m_VarianceThreshold )
           {
-          IndexType neighborhoodIndex = ItM.GetIndex( m );
 
           RealType averageDistance = 0.0;
           RealType count = 0.0;
@@ -213,6 +228,13 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
           }
         }
 
+      if( itk::Math::AlmostEquals( minimumDistance, NumericTraits<RealType>::ZeroValue() ) )
+        {
+        minimumDistance = NumericTraits<RealType>::OneValue();
+        }
+
+      // Rician correction
+
       if( this->m_UseRicianNoiseModel )
         {
         for( unsigned int n = 0; n < neighborhoodBlockSize; n++ )
@@ -221,49 +243,46 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
             {
             continue;
             }
-          if(  minimumDistance == NumericTraits<RealType>::max() )
+
+          if( itk::Math::AlmostEquals( minimumDistance, NumericTraits<RealType>::max() ) )
             {
-            this->m_RicianBiasImage->SetPixel( ItBM.GetIndex(), 0.0 );
+            this->m_RicianBiasImage->SetPixel( ItBM.GetIndex( n ), 0.0 );
             }
           else
             {
-            this->m_RicianBiasImage->SetPixel( ItBM.GetIndex(), minimumDistance );
+            this->m_RicianBiasImage->SetPixel( ItBM.GetIndex( n ), minimumDistance );
             }
           }
         }
 
-      minimumDistance *= this->m_SmoothingFactor;
-      if( minimumDistance == 0.0 )
-        {
-        minimumDistance = 0.00000000000001;
-        }
+      // Block filtering
 
-      for( unsigned int m = 0; m < neighborhoodSize; m++ )
+      for( unsigned int m = 0; m < neighborhoodSearchSize; m++ )
         {
-        if( ! ItM.IndexInBounds( m ) || m == static_cast<unsigned int>( 0.5 * neighborhoodSize ) )
+        if( ! ItM.IndexInBounds( m ) || m == static_cast<unsigned int>( 0.5 * neighborhoodSearchSize ) )
           {
           continue;
           }
 
         meanNeighborhoodPixel = ItM.GetPixel( m );
         varianceNeighborhoodPixel = ItV.GetPixel( m );
+        IndexType neighborhoodIndex = ItM.GetIndex( m );
 
-        if( meanNeighborhoodPixel < this->m_Epsilon || varianceNeighborhoodPixel < this->m_Epsilon )
+        if( inputImage->GetPixel( neighborhoodIndex ) <= 0 || meanNeighborhoodPixel < this->m_Epsilon || varianceNeighborhoodPixel < this->m_Epsilon )
           {
           continue;
           }
 
-        RealType meanRatio = meanCenterPixel / meanNeighborhoodPixel;
-        RealType meanRatioInverse = ( this->m_MaximumInputPixelIntensity - meanCenterPixel ) /
+        const RealType meanRatio = meanCenterPixel / meanNeighborhoodPixel;
+        const RealType meanRatioInverse = ( this->m_MaximumInputPixelIntensity - meanCenterPixel ) /
           ( this->m_MaximumInputPixelIntensity - meanNeighborhoodPixel );
 
-        RealType varianceRatio = varianceCenterPixel / varianceNeighborhoodPixel;
+        const RealType varianceRatio = varianceCenterPixel / varianceNeighborhoodPixel;
 
         if( ( ( meanRatio > this->m_MeanThreshold && meanRatio < 1.0 / this->m_MeanThreshold ) ||
             ( meanRatioInverse > this->m_MeanThreshold && meanRatioInverse < 1.0 / this->m_MeanThreshold ) ) &&
             varianceRatio > this->m_VarianceThreshold && varianceRatio < 1.0 / this->m_VarianceThreshold )
           {
-          IndexType neighborhoodIndex = ItM.GetIndex( m );
 
           RealType averageDistance = 0.0;
           RealType count = 0.0;
@@ -289,7 +308,7 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
             maxWeight = weight;
             }
 
-          if( weight > 0.0 && weight <= 1.0 )
+          if( weight > 0.0 )
             {
             for( unsigned int n = 0; n < neighborhoodBlockSize; n++ )
               {
@@ -312,64 +331,35 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
           }
         }
 
-      if( maxWeight == 0.0 )
+      if( itk::Math::AlmostEquals( maxWeight, NumericTraits<RealType>::ZeroValue() ) )
         {
-        maxWeight = 1.0;
-        }
-
-      for( unsigned int n = 0; n < neighborhoodBlockSize; n++ )
-        {
-        if( ! ItBM.IndexInBounds( n ) )
-          {
-          continue;
-          }
-        if( this->m_UseRicianNoiseModel )
-          {
-          weightedAverageIntensities[n] += maxWeight * vnl_math_sqr( ItBI.GetPixel( n ) );
-          }
-        else
-          {
-          weightedAverageIntensities[n] += maxWeight * ItBI.GetPixel( n );
-          }
-        }
-      sumOfWeights += maxWeight;
-
-      if( sumOfWeights > 0.0 )
-        {
-        for( unsigned int n = 0; n < neighborhoodBlockSize; n++ )
-          {
-          if( ! ItBO.IndexInBounds( n ) )
-            {
-            continue;
-            }
-          typename OutputImageType::PixelType estimate = ItBO.GetPixel( n );
-          estimate += ( weightedAverageIntensities[n] / sumOfWeights );
-
-          ItBO.SetPixel( n, estimate );
-          }
+        maxWeight = NumericTraits<RealType>::OneValue();
         }
       }
     else
       {
-      maxWeight = 1.0;
+      maxWeight = NumericTraits<RealType>::OneValue();
+      }
 
-      for( unsigned int n = 0; n < neighborhoodBlockSize; n++ )
+    for( unsigned int n = 0; n < neighborhoodBlockSize; n++ )
+      {
+      if( ! ItBM.IndexInBounds( n ) )
         {
-        if( ! ItBM.IndexInBounds( n ) )
-          {
-          continue;
-          }
-        if( this->m_UseRicianNoiseModel )
-          {
-          weightedAverageIntensities[n] += maxWeight * vnl_math_sqr( ItBI.GetPixel( n ) );
-          }
-        else
-          {
-          weightedAverageIntensities[n] += maxWeight * ItBI.GetPixel( n );
-          }
+        continue;
         }
-      sumOfWeights += maxWeight;
+      if( this->m_UseRicianNoiseModel )
+        {
+        weightedAverageIntensities[n] += maxWeight * vnl_math_sqr( ItBI.GetPixel( n ) );
+        }
+      else
+        {
+        weightedAverageIntensities[n] += maxWeight * ItBI.GetPixel( n );
+        }
+      }
+    sumOfWeights += maxWeight;
 
+    if( sumOfWeights > 0.0 )
+      {
       for( unsigned int n = 0; n < neighborhoodBlockSize; n++ )
         {
         if( ! ItBO.IndexInBounds( n ) )
@@ -390,52 +380,69 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
     ++ItBL;
     ++ItBM;
     ++ItBO;
+
+    progress.CompletedPixel();
     }
 }
 
-template<typename TInputImage, typename TOutputImage>
+template<typename TInputImage, typename TOutputImage, typename TMaskImage>
 void
-AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
+AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
 ::AfterThreadedGenerateData()
 {
+  const MaskImageType * maskImage = this->GetMaskImage();
+
   if( this->m_UseRicianNoiseModel )
     {
     typedef DiscreteGaussianImageFilter<RealImageType, RealImageType> SmootherType;
     typename SmootherType::Pointer smoother = SmootherType::New();
     smoother->SetInput( this->m_RicianBiasImage );
+    smoother->SetVariance( this->m_SmoothingVariance );
     smoother->SetUseImageSpacingOn();
     smoother->Update();
 
     ImageRegionConstIterator<RealImageType> ItS( smoother->GetOutput(), smoother->GetOutput()->GetRequestedRegion() );
-    ImageRegionConstIterator<RealImageType> ItM( this->m_MeanImage, this->m_MeanImage->GetRequestedRegion() );
+    ImageRegionConstIteratorWithIndex<RealImageType> ItM( this->m_MeanImage, this->m_MeanImage->GetRequestedRegion() );
     ImageRegionIterator<RealImageType> ItB( this->m_RicianBiasImage, this->m_RicianBiasImage->GetRequestedRegion() );
+    ItS.GoToBegin();
+    ItM.GoToBegin();
+    ItB.GoToBegin();
 
-    for( ItB.GoToBegin(), ItS.GoToBegin(), ItM.GoToBegin(); !ItS.IsAtEnd(); ++ItS, ++ItB, ++ItM )
+    while( !ItS.IsAtEnd() )
       {
-      RealType snr = ItM.Get() / std::sqrt( ItS.Get() );
-
-      RealType bias = 2.0 * ItS.Get() / this->CalculateCorrectionFactor( snr );
-
-      if( vnl_math_isnan( bias ) )
+      if( ItS.Get() > 0.0 && ( !maskImage || maskImage->GetPixel( ItM.GetIndex() ) != NumericTraits<MaskPixelType>::ZeroValue() ) )
         {
-        bias = 0.0;
+        const RealType snr = ItM.Get() / std::sqrt( ItS.Get() );
+
+        RealType bias = 2.0 * ItS.Get() / this->CalculateCorrectionFactor( snr );
+
+        if( vnl_math_isnan( bias ) || vnl_math_isinf( bias ) )
+          {
+          bias = 0.0;
+          }
+        ItB.Set( bias );
         }
-      ItB.Set( bias );
+
+      ++ItS;
+      ++ItM;
+      ++ItB;
       }
     }
 
-  ImageRegionIteratorWithIndex<OutputImageType> ItO( this->GetOutput(), this->GetOutput()->GetRequestedRegion() );
+  ImageRegionIteratorWithIndex<OutputImageType> ItO( this->GetOutput(),
+    this->GetOutput()->GetRequestedRegion() );
   ImageRegionConstIterator<RealImageType> ItL( this->m_ThreadContributionCountImage,
     this->m_ThreadContributionCountImage->GetRequestedRegion() );
 
-  for( ItO.GoToBegin(); !ItO.IsAtEnd(); ++ItO )
+  for( ItO.GoToBegin(), ItL.GoToBegin(); !ItO.IsAtEnd(); ++ItO, ++ItL )
     {
+    RealType estimate = ItO.Get();
+
     if( ItL.Get() == 0.0 )
       {
       continue;
       }
 
-    RealType estimate = ItO.Get();
     estimate /= ItL.Get();
 
     if( this->m_UseRicianNoiseModel )
@@ -449,18 +456,19 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
         }
       estimate = std::sqrt( estimate );
       }
+
     ItO.Set( estimate );
     }
 }
 
-template<typename TInputImage, typename TOutputImage>
-typename AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>::RealType
-AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
+template<typename TInputImage, typename TOutputImage, typename TMaskImage>
+typename AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>::RealType
+AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
 ::CalculateCorrectionFactor( RealType snr )
 {
-   RealType snrSquared = vnl_math_sqr( snr );
+   const RealType snrSquared = vnl_math_sqr( snr );
 
-   RealType value = 2.0 + snrSquared - 0.125 * vnl_math::pi * std::exp( -0.5 * snrSquared ) *
+   RealType value = 2.0 + snrSquared - 0.125 * Math::pi * std::exp( -0.5 * snrSquared ) *
      vnl_math_sqr( ( 2.0 + snrSquared ) * this->m_ModifiedBesselCalculator.ModifiedBesselI0( 0.25 * snrSquared ) +
      snrSquared * this->m_ModifiedBesselCalculator.ModifiedBesselI1( 0.25 * snrSquared ) );
 
@@ -471,9 +479,9 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
    return value;
 }
 
-template<typename TInputImage, typename TOutputImage>
+template<typename TInputImage, typename TOutputImage, typename TMaskImage>
 void
-AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
+AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
 ::PrintSelf( std::ostream &os, Indent indent ) const
 {
   Superclass::PrintSelf( os, indent );
@@ -490,12 +498,11 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage>
   os << indent << "Epsilon = " << this->m_Epsilon << std::endl;
   os << indent << "Mean threshold = " << this->m_MeanThreshold << std::endl;
   os << indent << "Variance threshold = " << this->m_VarianceThreshold << std::endl;
-  os << indent << "Smoothing factor = " << this->m_SmoothingFactor << std::endl;
   os << indent << "Smoothing variance = " << this->m_SmoothingVariance << std::endl;
 
-  os << indent << "Neighborhood radius 1 = " << this->m_NeighborhoodRadius1 << std::endl;
-  os << indent << "Neighborhood radius 2 = " << this->m_NeighborhoodRadius2 << std::endl;
-  os << indent << "Block Neighborhood radius = " << this->m_BlockNeighborhoodRadius << std::endl;
+  os << indent << "Neighborhood radius for local mean and variance = " << this->m_NeighborhoodRadiusForLocalMeanAndVariance << std::endl;
+  os << indent << "Neighborhood search radius  = " << this->m_NeighborhoodSearchRadius << std::endl;
+  os << indent << "Neighborhood block radius = " << this->m_NeighborhoodBlockRadius << std::endl;
 }
 
 } // end namespace itk

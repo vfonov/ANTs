@@ -184,8 +184,6 @@ int antsAffineInitializerImp(int argc, char *argv[])
   typedef itk::Image<PixelType, ImageDimension>                           ImageType;
   typedef typename itk::ImageMomentsCalculator<ImageType>                 ImageCalculatorType;
   typedef itk::AffineTransform<RealType, ImageDimension> AffineType;
-  typedef typename SimilarityTransformTraits<RealType,
-    ImageDimension>::TransformType AffineTypeS;
   typedef typename ImageCalculatorType::MatrixType                        MatrixType;
   if( argc < 2 )
     {
@@ -275,7 +273,7 @@ int antsAffineInitializerImp(int argc, char *argv[])
   RealType bestscale =
     calculator2->GetTotalMass() / calculator1->GetTotalMass();
   RealType powlev = 1.0 / static_cast<RealType>(ImageDimension);
-  bestscale = vcl_pow( bestscale , powlev );
+  bestscale = std::pow( bestscale , powlev );
   bestscale=1;
   unsigned int eigind1 = 1;
   unsigned int eigind2 = 1;

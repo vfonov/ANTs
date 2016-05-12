@@ -64,14 +64,21 @@ Optional arguments:
      -n:  Number of threads (default = 1)
 
      -t:  transform type (default = 's')
+        t: translation
         r: rigid
         a: rigid + affine
         s: rigid + affine + deformable syn
+        sr: rigid + deformable syn
+        so: deformable syn only
         b: rigid + affine + deformable b-spline syn
+        br: rigid + deformable b-spline syn
+        bo: deformable b-spline syn only
 
      -r:  radius for cross correlation metric used during SyN stage (default = 4)
 
      -s:  spline distance for deformable B-spline SyN transform (default = 26)
+
+     -x:  mask for the fixed image space
 
      -p:  precision type (default = 'd')
         f: float
@@ -130,14 +137,21 @@ Optional arguments:
      -n:  Number of threads (default = 1)
 
      -t:  transform type (default = 's')
+        t: translation
         r: rigid
         a: rigid + affine
         s: rigid + affine + deformable syn
+        sr: rigid + deformable syn
+        so: deformable syn only
         b: rigid + affine + deformable b-spline syn
+        br: rigid + deformable b-spline syn
+        bo: deformable b-spline syn only
 
      -r:  radius for cross correlation metric used during SyN stage (default = 4)
 
      -s:  spline distance for deformable B-spline SyN transform (default = 26)
+
+     -x:  mask for the fixed image space
 
      -p:  precision type (default = 'd')
         f: float
@@ -204,27 +218,17 @@ REPORTMAPPINGPARAMETERS
 }
 
 cleanup()
-# example cleanup function
 {
-
-  cd ${currentdir}/
-
   echo "\n*** Performing cleanup, please wait ***\n"
-
-# 1st attempt to kill all remaining processes
-# put all related processes in array
-runningANTSpids=( `ps -C antsRegistration | awk '{ printf "%s\n", $1 ; }'` )
-
-# debug only
-  #echo list 1: ${runningANTSpids[@]}
-
-# kill these processes, skip the first since it is text and not a PID
-for (( i = 1; i < ${#runningANTSpids[@]}; i++ ))
+  
+    runningANTSpids=$( ps --ppid $$ -o pid= )
+  
+  for thePID in $runningANTSpids
   do
-    echo "killing:  ${runningANTSpids[${i}]}"
-    kill ${runningANTSpids[${i}]}
-done
-
+      echo "killing:  ${thePID}"
+      kill ${thePID}
+  done
+  
   return $?
 }
 
@@ -258,11 +262,12 @@ NUMBEROFTHREADS=1
 SPLINEDISTANCE=26
 TRANSFORMTYPE='s'
 PRECISIONTYPE='d'
-USEHISTOGRAMMATCHING=0
 CCRADIUS=4
+MASK=0
+USEHISTOGRAMMATCHING=0
 
 # reading command line arguments
-while getopts "d:f:h:j:m:n:o:p:r:s:t:" OPT
+while getopts "d:f:h:m:j:n:o:p:r:s:t:x:" OPT
   do
   case $OPT in
       h) #help
@@ -271,6 +276,9 @@ while getopts "d:f:h:j:m:n:o:p:r:s:t:" OPT
    ;;
       d)  # dimensions
    DIM=$OPTARG
+   ;;
+      x)  # inclusive mask
+   MASK=$OPTARG
    ;;
       f)  # fixed image
    FIXEDIMAGES[${#FIXEDIMAGES[@]}]=$OPTARG
@@ -404,8 +412,14 @@ if [[ $ISLARGEIMAGE -eq 1 ]];
     SYNSMOOTHINGSIGMAS="5x3x2x1x0vox"
   fi
 
-RIGIDSTAGE="--initial-moving-transform [${FIXEDIMAGES[0]},${MOVINGIMAGES[0]},1] \
-            --transform Rigid[0.1] \
+tx=Rigid
+if [[ $TRANSFORMTYPE == 't' ]] ; then
+  tx=Translation
+fi
+
+INITIALSTAGE="--initial-moving-transform [${FIXEDIMAGES[0]},${MOVINGIMAGES[0]},1]"
+
+RIGIDSTAGE="--transform ${tx}[0.1] \
             --metric MI[${FIXEDIMAGES[0]},${MOVINGIMAGES[0]},1,32,Regular,0.25] \
             --convergence $RIGIDCONVERGENCE \
             --shrink-factors $RIGIDSHRINKFACTORS \
@@ -428,12 +442,13 @@ SYNSTAGE="${SYNMETRICS} \
           --shrink-factors $SYNSHRINKFACTORS \
           --smoothing-sigmas $SYNSMOOTHINGSIGMAS"
 
-if [[ $TRANSFORMTYPE == 'b' ]];
+if [[ $TRANSFORMTYPE == 'b' ]] || [[ $TRANSFORMTYPE == 'br' ]] || [[ $TRANSFORMTYPE == 'bo' ]];
   then
     SYNSTAGE="--transform BSplineSyN[0.1,${SPLINEDISTANCE},0,3] \
              $SYNSTAGE"
   fi
-if [[ $TRANSFORMTYPE == 's' ]];
+
+if [[ $TRANSFORMTYPE == 's' ]] || [[ $TRANSFORMTYPE == 'sr' ]] || [[ $TRANSFORMTYPE == 'so' ]];
   then
     SYNSTAGE="--transform SyN[0.1,3,0] \
              $SYNSTAGE"
@@ -441,14 +456,20 @@ if [[ $TRANSFORMTYPE == 's' ]];
 
 STAGES=''
 case "$TRANSFORMTYPE" in
-"r")
-  STAGES="$RIGIDSTAGE"
+"r" | "t")
+  STAGES="$INITIALSTAGE $RIGIDSTAGE"
   ;;
 "a")
-  STAGES="$RIGIDSTAGE $AFFINESTAGE"
+  STAGES="$INITIALSTAGE $RIGIDSTAGE $AFFINESTAGE"
   ;;
 "b" | "s")
-  STAGES="$RIGIDSTAGE $AFFINESTAGE $SYNSTAGE"
+  STAGES="$INITIALSTAGE $RIGIDSTAGE $AFFINESTAGE $SYNSTAGE"
+  ;;
+"br" | "sr")
+  STAGES="$INITIALSTAGE $RIGIDSTAGE  $SYNSTAGE"
+  ;;
+"bo" | "so")
+  STAGES="$INITIALSTAGE $SYNSTAGE"
   ;;
 *)
   echo "Transform type '$TRANSFORMTYPE' is not an option.  See usage: '$0 -h 1'"
@@ -470,12 +491,21 @@ case "$PRECISIONTYPE" in
   ;;
 esac
 
+
+if [[ ${#MASK} -lt 3 ]] ; then
+  MASK=""
+else
+  MASK=" -x $MASK "
+fi
+
+
 COMMAND="${ANTS} --verbose 1 \
                  --dimensionality $DIM $PRECISION \
-                 --output [$OUTPUTNAME,${OUTPUTNAME}Warped.nii.gz] \
+                 --output [$OUTPUTNAME,${OUTPUTNAME}Warped.nii.gz,${OUTPUTNAME}InverseWarped.nii.gz] \
                  --interpolation Linear \
-                 --winsorize-image-intensities [0.005,0.995] \
                  --use-histogram-matching ${USEHISTOGRAMMATCHING} \
+                 --winsorize-image-intensities [0.005,0.995] \
+                 ${MASK} \
                  $STAGES"
 
 echo " antsRegistration call:"

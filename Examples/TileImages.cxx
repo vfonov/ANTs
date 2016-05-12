@@ -94,16 +94,16 @@ int CreateMosaic( unsigned int argc, char *argv[] )
 
   if( numberOfRows <= 0 && numberOfColumns > 0 )
     {
-    numberOfRows = vcl_ceil( static_cast<float>( numberOfSlices ) / static_cast<float>( numberOfColumns ) );
+    numberOfRows = std::ceil( static_cast<float>( numberOfSlices ) / static_cast<float>( numberOfColumns ) );
     }
   else if( numberOfColumns <= 0 && numberOfRows > 0 )
     {
-    numberOfColumns = vcl_ceil( static_cast<float>( numberOfSlices ) / static_cast<float>( numberOfRows ) );
+    numberOfColumns = std::ceil( static_cast<float>( numberOfSlices ) / static_cast<float>( numberOfRows ) );
     }
   else if( numberOfColumns <= 0 && numberOfRows <= 0 )
     {
-    numberOfRows = static_cast<int>( vcl_sqrt( static_cast<float>( numberOfSlices ) ) );
-    numberOfColumns = vcl_ceil( static_cast<float>( numberOfSlices ) / static_cast<float>( numberOfRows ) );
+    numberOfRows = static_cast<int>( std::sqrt( static_cast<float>( numberOfSlices ) ) );
+    numberOfColumns = std::ceil( static_cast<float>( numberOfSlices ) / static_cast<float>( numberOfRows ) );
     }
 
   std::cout << "Slices[" << layout[0] << "]: " << numberOfSlices << std::endl;
@@ -241,17 +241,17 @@ private:
       {
       case 2:
         {
-        TileImages<2>( argc, argv );
+        return TileImages<2>( argc, argv );
         }
         break;
       case 3:
         {
-        TileImages<3>( argc, argv );
+        return TileImages<3>( argc, argv );
         }
         break;
       case 4:
         {
-        TileImages<4>( argc, argv );
+        return TileImages<4>( argc, argv );
         }
         break;
       default:

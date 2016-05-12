@@ -21,15 +21,22 @@
 #include <iostream>
 #include <fstream>
 
+#include "itkArray.h"
 #include "itkExtractImageFilter.h"
 #include "itkImage.h"
 #include "ReadWriteData.h"
 #include "itkImageRegionIteratorWithIndex.h"
+#include "itkKdTreeBasedKmeansEstimator.h"
+#include "itkLabelStatisticsImageFilter.h"
 #include "itkLinearInterpolateImageFunction.h"
+#include "itkListSample.h"
+#include "itkMinimumDecisionRule.h"
 #include "itkMultiplyImageFilter.h"
 #include "itkNeighborhoodIterator.h"
 #include "itkOtsuMultipleThresholdsImageFilter.h"
 #include "itkResampleImageFilter.h"
+#include "itkSampleClassifierFilter.h"
+#include "itkWeightedCentroidKdTreeGenerator.h"
 
 namespace ants
 {
@@ -144,29 +151,284 @@ LabelSurface(typename TImage::PixelType foreground,
   return Image;
 }
 
-template <class TImage>
+template <class TImage, class TMaskImage>
 typename TImage::Pointer OtsuThreshold(
-  int NumberOfThresholds, typename TImage::Pointer input)
+  int NumberOfThresholds, typename TImage::Pointer input, typename TMaskImage::Pointer maskImage )
 {
   std::cout << " Otsu Thresh with " << NumberOfThresholds << " thresholds" << std::endl;
 
-  // Begin Threshold Image
-  typedef itk::OtsuMultipleThresholdsImageFilter<TImage, TImage> InputThresholderType;
-  typename InputThresholderType::Pointer inputThresholder =
-    InputThresholderType::New();
+  if( maskImage.IsNull() )
+    {
+    // Begin Threshold Image
+    typedef itk::OtsuMultipleThresholdsImageFilter<TImage, TImage> InputThresholderType;
+    typename InputThresholderType::Pointer inputThresholder =
+      InputThresholderType::New();
 
-  inputThresholder->SetInput( input );
-  /*
-  inputThresholder->SetInsideValue(  replaceval );
-  int outval=0;
-  if ((float) replaceval == (float) -1) outval=1;
-  inputThresholder->SetOutsideValue( outval );
-  */
-  inputThresholder->SetNumberOfThresholds( NumberOfThresholds );
+    inputThresholder->SetInput( input );
+    /*
+    inputThresholder->SetInsideValue(  replaceval );
+    int outval=0;
+    if ((float) replaceval == (float) -1) outval=1;
+    inputThresholder->SetOutsideValue( outval );
+    */
+    inputThresholder->SetNumberOfThresholds( NumberOfThresholds );
 
-  inputThresholder->Update();
+    inputThresholder->Update();
 
-  return inputThresholder->GetOutput();
+    return inputThresholder->GetOutput();
+    }
+  else
+    {
+    typedef TImage                                    ImageType;
+    typedef TMaskImage                                MaskImageType;
+    typedef float                                     PixelType;
+
+    unsigned int numberOfBins = 200;
+    int maskLabel = 1;
+
+    itk::ImageRegionIterator<ImageType> ItI( input,
+      input->GetLargestPossibleRegion() );
+    itk::ImageRegionIterator<MaskImageType> ItM( maskImage,
+      maskImage->GetLargestPossibleRegion() );
+    PixelType maxValue = itk::NumericTraits<PixelType>::min();
+    PixelType minValue = itk::NumericTraits<PixelType>::max();
+    for ( ItM.GoToBegin(), ItI.GoToBegin(); !ItI.IsAtEnd(); ++ItM, ++ItI )
+      {
+      if ( ItM.Get() == maskLabel )
+        {
+        if ( ItI.Get() < minValue )
+          {
+          minValue = ItI.Get();
+          }
+        else if ( ItI.Get() > maxValue )
+          {
+          maxValue = ItI.Get();
+          }
+        }
+      }
+
+    typedef itk::LabelStatisticsImageFilter<ImageType, MaskImageType> StatsType;
+    typename StatsType::Pointer stats = StatsType::New();
+    stats->SetInput( input );
+    stats->SetLabelInput( maskImage );
+    stats->UseHistogramsOn();
+    stats->SetHistogramParameters( numberOfBins, minValue, maxValue );
+    stats->Update();
+
+    typedef itk::OtsuMultipleThresholdsCalculator<typename StatsType::HistogramType>
+      OtsuType;
+    typename OtsuType::Pointer otsu = OtsuType::New();
+    otsu->SetInputHistogram( stats->GetHistogram( maskLabel ) );
+    otsu->SetNumberOfThresholds( NumberOfThresholds );
+    otsu->Update();
+
+    typename OtsuType::OutputType thresholds = otsu->GetOutput();
+
+    typename ImageType::Pointer output = ImageType::New();
+    output->CopyInformation( maskImage );
+    output->SetRegions( maskImage->GetLargestPossibleRegion() );
+    output->Allocate();
+    output->FillBuffer( 0 );
+
+    itk::ImageRegionIterator<ImageType> ItO( output,
+      output->GetLargestPossibleRegion() );
+    for ( unsigned int i = 0; i < thresholds.size(); i++ )
+      {
+
+      ItI.GoToBegin();
+      ItM.GoToBegin();
+      ItO.GoToBegin();
+      while ( !ItM.IsAtEnd() )
+        {
+        if ( ItM.Get() == maskLabel )
+          {
+          if ( ItO.Get() == 0 && ItI.Get() < thresholds[i] )
+            {
+            ItO.Set( i+1 );
+            }
+          }
+        ++ItI;
+        ++ItM;
+        ++ItO;
+        }
+      }
+
+    ItI.GoToBegin();
+    ItM.GoToBegin();
+    ItO.GoToBegin();
+    while ( !ItM.IsAtEnd() )
+      {
+      if ( ItM.Get() == maskLabel && ItO.Get() == 0 )
+        {
+        ItO.Set( thresholds.size()+1 );
+        }
+      ++ItI;
+      ++ItM;
+      ++ItO;
+      }
+    return output;
+    }
+
+}
+
+template <class TImage, class TMaskImage>
+typename TImage::Pointer KmeansThreshold(
+  int NumberOfThresholds, typename TImage::Pointer input, typename TMaskImage::Pointer maskImage )
+{
+  std::cout << " Kmeans with " << NumberOfThresholds << " thresholds" << std::endl;
+
+  typedef TImage                                    ImageType;
+  typedef TImage                                    LabelImageType;
+  typedef TMaskImage                                MaskImageType;
+  typedef float                                     RealType;
+  typedef int                                       LabelType;
+
+  typedef itk::Array<RealType>                            MeasurementVectorType;
+  typedef typename itk::Statistics::ListSample
+    <MeasurementVectorType>                               SampleType;
+
+  int maskLabel = 1;
+  if( maskImage.IsNull() )
+    {
+    maskImage = AllocImage<MaskImageType>( input, maskLabel );
+    }
+
+  unsigned int numberOfTissueClasses = NumberOfThresholds + 1;
+  typename LabelImageType::Pointer output = AllocImage<LabelImageType>( input, 0 );
+
+  typedef itk::LabelStatisticsImageFilter<ImageType, MaskImageType> StatsType;
+  typename StatsType::Pointer stats = StatsType::New();
+  stats->SetInput( input );
+  stats->SetLabelInput( maskImage );
+  stats->UseHistogramsOff();
+  stats->Update();
+
+  RealType minValue = stats->GetMinimum( maskLabel );
+  RealType maxValue = stats->GetMaximum( maskLabel );
+
+  // The code below can be replaced by itkListSampleToImageFilter when we
+  // migrate over to the Statistics classes current in the Review/ directory.
+  //
+  typename SampleType::Pointer sample = SampleType::New();
+  sample->SetMeasurementVectorSize( 1 );
+
+  itk::ImageRegionConstIteratorWithIndex<ImageType> ItI( input,
+                                                    input->GetRequestedRegion() );
+  for( ItI.GoToBegin(); !ItI.IsAtEnd(); ++ItI )
+    {
+    if( !maskImage || maskImage->GetPixel( ItI.GetIndex() ) == maskLabel )
+      {
+      typename SampleType::MeasurementVectorType measurement;
+      measurement.SetSize( 1 );
+      measurement[0] = ItI.Get();
+      sample->PushBack( measurement );
+      }
+    }
+
+  typedef itk::Statistics::WeightedCentroidKdTreeGenerator<SampleType> TreeGeneratorType;
+  typename TreeGeneratorType::Pointer treeGenerator = TreeGeneratorType::New();
+  treeGenerator->SetSample( sample );
+  treeGenerator->SetBucketSize( 16 );
+  treeGenerator->Update();
+
+  typedef typename TreeGeneratorType::KdTreeType                TreeType;
+  typedef itk::Statistics::KdTreeBasedKmeansEstimator<TreeType> EstimatorType;
+  typename EstimatorType::Pointer estimator = EstimatorType::New();
+  estimator->SetKdTree( treeGenerator->GetOutput() );
+  estimator->SetMaximumIteration( 200 );
+  estimator->SetCentroidPositionChangesThreshold( 0.0 );
+
+  typename EstimatorType::ParametersType initialMeans( numberOfTissueClasses );
+
+  for( unsigned int n = 0; n < numberOfTissueClasses; n++ )
+    {
+    initialMeans[n] = minValue + ( maxValue - minValue )
+      * ( static_cast<RealType>( n ) + 0.5 )
+      / static_cast<RealType>( numberOfTissueClasses );
+    }
+  estimator->SetParameters( initialMeans );
+  estimator->StartOptimization();
+
+  //
+  // Classify the samples
+  //
+  typedef itk::Statistics::MinimumDecisionRule DecisionRuleType;
+  typename DecisionRuleType::Pointer decisionRule = DecisionRuleType::New();
+
+  typedef itk::Statistics::SampleClassifierFilter<SampleType> ClassifierType;
+  typename ClassifierType::Pointer classifier = ClassifierType::New();
+  classifier->SetDecisionRule( decisionRule );
+  classifier->SetInput( sample );
+  classifier->SetNumberOfClasses( numberOfTissueClasses );
+
+  typename ClassifierType::ClassLabelVectorObjectType::Pointer classLabels =
+    ClassifierType::ClassLabelVectorObjectType::New();
+  classifier->SetClassLabels( classLabels );
+  typename ClassifierType::ClassLabelVectorType & classLabelVector =
+    classLabels->Get();
+
+  //
+  // Order the cluster means so that the lowest mean of the input image
+  // corresponds to label '1', the second lowest to label '2', etc.
+  //
+  std::vector<RealType> estimatorParameters;
+  for( unsigned int n = 0; n < numberOfTissueClasses; n++ )
+    {
+    estimatorParameters.push_back( estimator->GetParameters()[n] );
+    }
+  std::sort( estimatorParameters.begin(), estimatorParameters.end() );
+
+  typedef itk::Statistics::DistanceToCentroidMembershipFunction
+    <MeasurementVectorType> MembershipFunctionType;
+  typename ClassifierType::MembershipFunctionVectorObjectType::Pointer
+  membershipFunctions = ClassifierType::MembershipFunctionVectorObjectType::New();
+  typename ClassifierType::MembershipFunctionVectorType & membershipFunctionsVector =
+    membershipFunctions->Get();
+
+  classifier->SetMembershipFunctions( membershipFunctions );
+  for( unsigned int n = 0; n < numberOfTissueClasses; n++ )
+    {
+    typename MembershipFunctionType::Pointer
+    membershipFunction = MembershipFunctionType::New();
+    membershipFunction->SetMeasurementVectorSize(
+      sample->GetMeasurementVectorSize() );
+    typename MembershipFunctionType::CentroidType centroid;
+    itk::NumericTraits<typename MembershipFunctionType::CentroidType>::SetLength(
+      centroid, sample->GetMeasurementVectorSize() );
+    centroid[0] = estimatorParameters[n];
+    membershipFunction->SetCentroid( centroid );
+    membershipFunctionsVector.push_back( membershipFunction.GetPointer() );
+
+    classLabelVector.push_back(
+      static_cast<typename ClassifierType::ClassLabelType>( n + 1 ) );
+    }
+  classifier->Update();
+
+  //
+  // Classify the voxels
+  //
+  typedef typename ClassifierType::MembershipSampleType ClassifierOutputType;
+  typedef typename ClassifierOutputType::ConstIterator  LabelIterator;
+
+  itk::ImageRegionIteratorWithIndex<LabelImageType> ItO( output,
+                                                         output->GetRequestedRegion() );
+  ItO.GoToBegin();
+  LabelIterator it = classifier->GetOutput()->Begin();
+  while( it != classifier->GetOutput()->End() )
+    {
+    if( !maskImage || maskImage->GetPixel( ItO.GetIndex() ) == maskLabel )
+      {
+      ItO.Set( it.GetClassLabel() );
+      ++it;
+      }
+    else
+      {
+      ItO.Set( itk::NumericTraits<LabelType>::ZeroValue() );
+      }
+    ++ItO;
+    }
+
+  return output;
 }
 
 template <unsigned int InImageDimension>
@@ -175,14 +437,27 @@ int ThresholdImage( int argc, char * argv[] )
   //  const     unsigned int   InImageDimension = AvantsImageDimension;
   typedef   float                                   PixelType;
   typedef   itk::Image<PixelType, InImageDimension> FixedImageType;
+  typedef   int                                     LabelType;
+  typedef   itk::Image<LabelType, InImageDimension> MaskImageType;
+
   typename FixedImageType::Pointer fixed;
   ReadImage<FixedImageType>( fixed, argv[2] );
+
+  typename MaskImageType::Pointer maskImage = ITK_NULLPTR;
+  if( argc > 6 )
+    {
+    ReadImage<MaskImageType>( maskImage, argv[6] );
+    }
   // Label the surface of the image
   typename FixedImageType::Pointer thresh;
   std::string threshtype = std::string(argv[4]);
   if( strcmp(threshtype.c_str(), "Otsu") == 0 )
     {
-    thresh = OtsuThreshold<FixedImageType>(atoi(argv[5]), fixed );
+    thresh = OtsuThreshold<FixedImageType, MaskImageType>( atoi( argv[5] ), fixed, maskImage );
+    }
+  else if( strcmp(threshtype.c_str(), "Kmeans") == 0 )
+    {
+    thresh = KmeansThreshold<FixedImageType, MaskImageType>( atoi( argv[5] ), fixed, maskImage );
     }
   else
     {
@@ -257,7 +532,8 @@ private:
     std::cout << "Usage: " << argv[0];
     std::cout << "   ImageDimension ImageIn.ext outImage.ext  threshlo threshhi <insideValue> <outsideValue>"
              << std::endl;
-    std::cout << "   ImageDimension ImageIn.ext outImage.ext  Otsu NumberofThresholds " << std::endl;
+    std::cout << "   ImageDimension ImageIn.ext outImage.ext  Otsu NumberofThresholds <maskImage.ext>" << std::endl;
+    std::cout << "   ImageDimension ImageIn.ext outImage.ext  Kmeans NumberofThresholds <maskImage.ext>" << std::endl;
 
     std::cout << " Inclusive thresholds " << std::endl;
     if( argc >= 2 &&
@@ -274,17 +550,17 @@ private:
     {
     case 2:
       {
-      ThresholdImage<2>(argc, argv);
+      return ThresholdImage<2>(argc, argv);
       }
       break;
     case 3:
       {
-      ThresholdImage<3>(argc, argv);
+      return ThresholdImage<3>(argc, argv);
       }
       break;
     case 4:
       {
-      ThresholdImage<4>(argc, argv);
+      return ThresholdImage<4>(argc, argv);
       }
       break;
     default:
@@ -292,6 +568,6 @@ private:
       return EXIT_FAILURE;
     }
 
-  return 0;
+  return EXIT_SUCCESS;
 }
 } // namespace ants

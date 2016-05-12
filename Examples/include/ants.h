@@ -23,6 +23,8 @@
 
 #include "antsJointFusion.h"
 
+#include "antsJointTensorFusion.h"
+
 #include "antsTransformInfo.h"
 
 #include "ANTSConformalMapping.h"
@@ -56,6 +58,8 @@
 #include "ANTSUseLandmarkImagesToGetAffineTransform.h"
 
 #include "ANTSUseLandmarkImagesToGetBSplineDisplacementField.h"
+
+#include "antsLandmarkBasedTransformInitializer.h"
 
 #include "Atropos.h"
 
@@ -187,9 +191,13 @@
 
 #include "SmoothImage.h"
 
+#include "SmoothDisplacementField.h"
+
 #include "StackSlices.h"
 
 #include "StudentsTestOnImages.h"
+
+#include "SuperResolution.h"
 
 #include "SurfaceBasedSmoothing.h"
 

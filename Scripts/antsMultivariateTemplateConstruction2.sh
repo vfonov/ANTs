@@ -42,9 +42,10 @@ PEXEC=${ANTSPATH}/ANTSpexec.sh
 SGE=${ANTSPATH}/waitForSGEQJobs.pl
 PBS=${ANTSPATH}/waitForPBSQJobs.pl
 XGRID=${ANTSPATH}/waitForXGridJobs.pl
+SLURM=${ANTSPATH}/waitForSlurmJobs.pl
 
 fle_error=0
-for FLE in $ANTS $WARP $N4 $PEXEC $SGE $XGRID $PBS
+for FLE in $ANTS $WARP $N4 $PEXEC $SGE $XGRID $PBS $SLURM
   do
     if [[ ! -x $FLE ]];
       then
@@ -104,6 +105,7 @@ Optional arguments:
           2 = use PEXEC (localhost)
           3 = Apple XGrid
           4 = PBS qsub
+          5 = SLURM
 
      -e   use single precision ( default 1 )
 
@@ -161,10 +163,10 @@ Optional arguments:
             TimeVaryingVelocityField = Time-varying velocity field
             TimeVaryingBSplineVelocityField = Time-varying B-spline velocity field
 
-     -u:  Walltime (default = 20:00:00):  Option for PBS qsub specifying requested time
+     -u:  Walltime (default = 20:00:00):  Option for PBS/SLURM qsub specifying requested time
           per pairwise registration.
 
-     -v:  Memory limit (default = 8gb):  Option for PBS qsub specifying requested memory
+     -v:  Memory limit (default = 8gb):  Option for PBS/SLURM qsub specifying requested memory
           per pairwise registration.
 
      -x:  XGrid arguments (e.g., -x "-p password -h controlhost")
@@ -261,10 +263,10 @@ function summarizeimageset() {
 
   case $method in
     0) #mean
-      AverageImages $dim $output 0 ${images[*]}
+      ${ANTSPATH}/AverageImages $dim $output 0 ${images[*]}
       ;;
     1) #mean of normalized images
-      AverageImages $dim $output 1 ${images[*]}
+      ${ANTSPATH}/AverageImages $dim $output 1 ${images[*]}
       ;;
     2) #median
       local image
@@ -273,7 +275,7 @@ function summarizeimageset() {
           echo $image >> ${output}_list.txt
         done
 
-      ImageSetStatistics $dim ${output}_list.txt ${output} 0
+      ${ANTSPATH}/ImageSetStatistics $dim ${output}_list.txt ${output} 0
       rm ${output}_list.txt
       ;;
   esac
@@ -425,26 +427,16 @@ for (( g = $WHICHMODALITY; g < ${#IMAGESETARRAY[@]}; g+=$NUMBEROFMODALITIES ))
 }
 
 cleanup()
-# example cleanup function
 {
-
-  cd ${currentdir}/
-
   echo "\n*** Performing cleanup, please wait ***\n"
 
-# 1st attempt to kill all remaining processes
-# put all related processes in array
-runningANTSpids=( `ps -C antsRegistration -C N4BiasFieldCorrection -C ImageMath| awk '{ printf "%s\n", $1 ; }'` )
+    runningANTSpids=$( ps --ppid $$ -o pid= )
 
-# debug only
-  #echo list 1: ${runningANTSpids[@]}
-
-# kill these processes, skip the first since it is text and not a PID
-for ((i = 1; i < ${#runningANTSpids[@]} ; i++))
+  for thePID in $runningANTSpids
   do
-  echo "killing:  ${runningANTSpids[${i}]}"
-  kill ${runningANTSpids[${i}]}
-done
+      echo "killing:  ${thePID}"
+      kill ${thePID}
+  done
 
   return $?
 }
@@ -488,8 +480,8 @@ TEMPLATES=()
 CURRENTIMAGESET=()
 XGRIDOPTS=""
 SCRIPTPREPEND=""
-PBSWALLTIME="20:00:00"
-PBSMEMORY="8gb"
+WALLTIME="20:00:00"
+MEMORY="8gb"
 # System specific queue options, eg "-q name" to submit to a specific queue
 # It can be set to an empty string if you do not need any special cluster options
 QSUBOPTS="" # EDIT THIS
@@ -533,9 +525,9 @@ while getopts "a:b:c:d:e:f:g:h:i:j:k:l:m:n:o:p:q:s:r:t:u:v:w:x:y:z:" OPT
    ;;
       c) #use SGE cluster
    DOQSUB=$OPTARG
-   if [[ $DOQSUB -gt 4 ]];
+   if [[ $DOQSUB -gt 5 ]];
      then
-       echo " DOQSUB must be an integer value (0=serial, 1=SGE qsub, 2=try pexec, 3=XGrid, 4=PBS qsub ) you passed  -c $DOQSUB "
+       echo " DOQSUB must be an integer value (0=serial, 1=SGE qsub, 2=try pexec, 3=XGrid, 4=PBS qsub, 5=SLURM) you passed  -c $DOQSUB "
        exit 1
      fi
    ;;
@@ -594,10 +586,10 @@ while getopts "a:b:c:d:e:f:g:h:i:j:k:l:m:n:o:p:q:s:r:t:u:v:w:x:y:z:" OPT
    TRANSFORMATIONTYPE=$OPTARG
    ;;
       u)
-   PBSWALLTIME=$OPTARG
+   WALLTIME=$OPTARG
    ;;
       v)
-   PBSMEMORY=$OPTARG
+   MEMORY=$OPTARG
    ;;
       x) #initialization template
    XGRIDOPTS=$OPTARG
@@ -642,6 +634,15 @@ if [[ $DOQSUB -eq 1 || $DOQSUB -eq 4 ]];
     if [[  ${#qq} -lt 1 ]];
       then
         echo "do you have qsub?  if not, then choose another c option ... if so, then check where the qsub alias points ..."
+        exit
+      fi
+  fi
+if [[ $DOQSUB -eq 5 ]];
+  then
+    qq=`which sbatch`
+    if [[ ${#qq} -lt 1 ]];
+      then
+        echo "do you have sbatch?  if not, then choose another c option ... if so, then check where the sbatch alias points ..."
         exit
       fi
   fi
@@ -996,13 +997,21 @@ if [[ "$RIGID" -eq 1 ]];
         exe="${basecall} ${stage1}"
 
         qscript="${outdir}/job_${count}_qsub.sh"
-        echo "$SCRIPTPREPEND" > $qscript
+        rm -f $qscript
+
+        if [[ $DOQSUB -eq 5 ]];
+            then
+            # SLURM job scripts must start with a shebang
+            echo '#!/bin/sh' > $qscript
+            fi
+
+        echo "$SCRIPTPREPEND" >> $qscript
 
         IMGbase=`basename ${IMAGESETARRAY[$i]}`
         BASENAME=` echo ${IMGbase} | cut -d '.' -f 1 `
         RIGID="${outdir}/rigid${i}_0_${IMGbase}"
 
-        echo "$exe" > $qscript
+        echo "$exe" >> $qscript
 
         exe2='';
         pexe2='';
@@ -1029,7 +1038,7 @@ if [[ "$RIGID" -eq 1 ]];
             sleep 0.5
         elif [[ $DOQSUB -eq 4 ]];
           then
-            id=`qsub -N antsrigid -v ANTSPATH=$ANTSPATH $QSUBOPTS -q nopreempt -l nodes=1:ppn=1 -l mem=${PBSMEMORY} -l walltime=${PBSWALLTIME} $qscript | awk '{print $1}'`
+            id=`qsub -N antsrigid -v ANTSPATH=$ANTSPATH $QSUBOPTS -q nopreempt -l nodes=1:ppn=1 -l mem=${MEMORY} -l walltime=${WALLTIME} $qscript | awk '{print $1}'`
             jobIDs="$jobIDs $id"
             sleep 0.5
         elif [[ $DOQSUB -eq 2 ]];
@@ -1042,6 +1051,11 @@ if [[ "$RIGID" -eq 1 ]];
             id=`xgrid $XGRIDOPTS -job submit /bin/bash $qscript | awk '{sub(/;/,"");print $3}' | tr '\n' ' ' | sed 's:  *: :g'`
             #echo "xgrid $XGRIDOPTS -job submit /bin/bash $qscript"
             jobIDs="$jobIDs $id"
+        elif [[ $DOQSUB -eq 5 ]];
+            then
+            id=`sbatch --job-name=antsrigid --export=ANTSPATH=$ANTSPATH $QSUBOPTS --nodes=1 --cpus-per-task=1 --time=${WALLTIME} --mem=${MEMORY} $qscript | rev | cut -f1 -d\ | rev`
+            jobIDs="$jobIDs $id"
+            sleep 0.5
         elif [[ $DOQSUB -eq 0 ]];
           then
             echo $qscript
@@ -1110,6 +1124,22 @@ if [[ "$RIGID" -eq 1 ]];
             exit 1;
           fi
       fi
+    if [[ $DOQSUB -eq 5 ]];
+      then
+        # Run jobs on SLURM and wait to finish
+        echo
+        echo "--------------------------------------------------------------------------------------"
+        echo " Starting ANTS rigid registration on SLURM cluster. Submitted $count jobs "
+        echo "--------------------------------------------------------------------------------------"
+               # now wait for the jobs to finish. Rigid registration is quick, so poll queue every 60 seconds
+        ${ANTSPATH}/waitForSlurmJobs.pl 1 60 $jobIDs
+        # Returns 1 if there are errors
+        if [[ ! $? -eq 0 ]];
+          then
+            echo "SLURM submission failed - jobs went into error state"
+            exit 1;
+          fi
+      fi
 
     for (( j = 0; j < $NUMBEROFMODALITIES; j++ ))
       do
@@ -1156,9 +1186,16 @@ if [[ "$RIGID" -eq 1 ]];
         elif [[ $DOQSUB -eq 3 ]];
           then
             rm -f ${outdir}/job_*_qsub.sh
+        elif [[ $DOQSUB -eq 5 ]];
+          then
+            mv ${outdir}/slurm-*.out ${outdir}/rigid/
+            mv ${outdir}/job*.txt ${outdir}/rigid/
+
+            # Remove submission scripts
+            rm -f ${outdir}/job_${count}_qsub.sh
         fi
       else
-        rm -f  ${outdir}/rigid*.* ${outdir}/job*.txt
+        rm -f  ${outdir}/rigid*.* ${outdir}/job*.txt ${outdir}/slurm-*.out
     fi
 fi # endif RIGID
 
@@ -1266,14 +1303,12 @@ while [[ $i -lt ${ITERATIONLIMIT} ]];
                 indir=`pwd`
               fi
             IMGbase=`basename ${IMAGESETARRAY[$l]}`
-            POO=${OUTPUTNAME}template${k}${IMGbase}
-            OUTFN=${POO%.*.*}
+            OUTFN=${OUTPUTNAME}template${k}${IMGbase%%.*}
             OUTFN=`basename ${OUTFN}`
             DEFORMED="${outdir}/${OUTFN}${l}WarpedToTemplate.nii.gz"
 
             IMGbase=`basename ${IMAGESETARRAY[$j]}`
-            POO=${OUTPUTNAME}${IMGbase}
-            OUTWARPFN=${POO%.*.*}
+            OUTWARPFN=${OUTPUTNAME}${IMGbase%%.*}
             OUTWARPFN=`basename ${OUTWARPFN}`
             OUTWARPFN="${OUTWARPFN}${j}"
 
@@ -1306,8 +1341,7 @@ while [[ $i -lt ${ITERATIONLIMIT} ]];
         done
 
         IMGbase=`basename ${IMAGESETARRAY[$j]}`
-        POO=${OUTPUTNAME}${IMGbase}
-        OUTWARPFN=${POO%.*.*}
+        OUTWARPFN=${OUTPUTNAME}${IMGbase%%.*}
         OUTWARPFN=`basename ${OUTWARPFN}${j}`
 
         stage0="-r [${TEMPLATES[0]},${IMAGESETARRAY[$j]},1]"
@@ -1321,19 +1355,18 @@ while [[ $i -lt ${ITERATIONLIMIT} ]];
         exebase=$exe
         pexebase=$pexe
 
-        if [[ $DOLINEAR -ne 0 ]];
+        if [[ $DOLINEAR -eq 0 ]];
           then
-            exe="$exe ${basecall} ${stage0} ${stage1} ${stage2} ${stage3}\n"
-            pexe="$pexe ${basecall} ${stage0} ${stage1} ${stage2} ${stage3} >> ${outdir}/job_${count}_metriclog.txt\n"
-          else
             exe="$exe ${basecall} ${stageId} ${stage3}\n"
             pexe="$pexe ${basecall} ${stageId} ${stage3} >> ${outdir}/job_${count}_metriclog.txt\n"
+          elif [[ $NOWARP -eq 1 ]];
+            then
+              exe="$exebase ${basecall} ${stage0} ${stage1} ${stage2}\n";
+              pexe="$pexebase ${basecall} ${stage0} ${stage1} ${stage2} >> ${outdir}/job_${count}_metriclog.txt\n"
+          else
+            exe="$exe ${basecall} ${stage0} ${stage1} ${stage2} ${stage3}\n"
+            pexe="$pexe ${basecall} ${stage0} ${stage1} ${stage2} ${stage3} >> ${outdir}/job_${count}_metriclog.txt\n"
           fi
-        if [[ $NOWARP -eq 0 ]];
-          then
-           exe="$exebase ${basecall} ${stage0} ${stage1} ${stage2} ${stage3}\n";
-           pexe="$pexebase ${basecall} ${stage0} ${stage1} ${stage2} ${stage3} >> ${outdir}/job_${count}_metriclog.txt\n"
-        fi
 
         exe="$exe $warpexe"
         pexe="$pexe $warppexe"
@@ -1341,10 +1374,11 @@ while [[ $i -lt ${ITERATIONLIMIT} ]];
         qscript="${outdir}/job_${count}_${i}.sh"
 
         echo -e $exe >> ${outdir}/job_${count}_${i}_metriclog.txt
-        # 6 submit to SGE (DOQSUB=1), PBS (DOQSUB=4), PEXEC (DOQSUB=2), XGrid (DOQSUB=3) or else run locally (DOQSUB=0)
+        # 6 submit to SGE (DOQSUB=1), PBS (DOQSUB=4), PEXEC (DOQSUB=2), XGrid (DOQSUB=3), SLURM (DOQSUB=5) or else run locally (DOQSUB=0)
         if [[ $DOQSUB -eq 1 ]];
           then
-            echo -e "$exe" > $qscript
+            echo "$SCRIPTPREPEND" > $qscript
+            echo -e "$exe" >> $qscript
             id=`qsub -cwd -N antsBuildTemplate_deformable_${i} -S /bin/bash -v ANTSPATH=$ANTSPATH $QSUBOPTS $qscript | awk '{print $3}'`
             jobIDs="$jobIDs $id"
             sleep 0.5
@@ -1352,7 +1386,7 @@ while [[ $i -lt ${ITERATIONLIMIT} ]];
           then
             echo -e "$SCRIPTPREPEND" > $qscript
             echo -e "$exe" >> $qscript
-            id=`qsub -N antsdef${i} -v ANTSPATH=$ANTSPATH -q nopreempt -l nodes=1:ppn=1 -l mem=${PBSMEMORY} -l walltime=${PBSWALLTIME} $QSUBOPTS $qscript | awk '{print $1}'`
+            id=`qsub -N antsdef${i} -v ANTSPATH=$ANTSPATH -q nopreempt -l nodes=1:ppn=1 -l mem=${MEMORY} -l walltime=${WALLTIME} $QSUBOPTS $qscript | awk '{print $1}'`
             jobIDs="$jobIDs $id"
             sleep 0.5
         elif [[ $DOQSUB -eq 2 ]];
@@ -1364,6 +1398,14 @@ while [[ $i -lt ${ITERATIONLIMIT} ]];
             echo -e "$exe" >> $qscript
             id=`xgrid $XGRIDOPTS -job submit /bin/bash $qscript | awk '{sub(/;/,"");print $3}' | tr '\n' ' ' | sed 's:  *: :g'`
             jobIDs="$jobIDs $id"
+        elif [[ $DOQSUB -eq 5 ]];
+          then
+            echo '#!/bin/sh' > $qscript
+            echo -e "$SCRIPTPREPEND" >> $qscript
+            echo -e "$exe" >> $qscript
+            id=`sbatch --job-name=antsdef${i} --export=ANTSPATH=$ANTSPATH --nodes=1 --cpus-per-task=1 --time=${WALLTIME} --mem=${MEMORY} $QSUBOPTS $qscript | rev | cut -f1 -d\ | rev`
+            jobIDs="$jobIDs $id"
+            sleep 0.5
         elif [[ $DOQSUB -eq 0 ]];
           then
             echo -e $exe > $qscript
@@ -1432,6 +1474,22 @@ while [[ $i -lt ${ITERATIONLIMIT} ]];
           fi
       fi
 
+    if [[ $DOQSUB -eq 5 ]];
+      then
+        # Run jobs on SLURM and wait to finish
+        echo
+        echo "--------------------------------------------------------------------------------------"
+        echo " Starting ANTS registration on SLURM cluster. Submitted $count jobs "
+        echo "--------------------------------------------------------------------------------------"
+        # now wait for the stuff to finish - this will take a while so poll queue every 10 mins
+        ${ANTSPATH}/waitForSlurmJobs.pl 1 600 $jobIDs
+        if [[ ! $? -eq 0 ]];
+          then
+            echo "SLURM submission failed - jobs went into error state"
+            exit 1;
+          fi
+      fi
+
     WARPFILES=`ls ${OUTPUTNAME}*Warp.nii.gz | grep -v "InverseWarp"`
     AFFINEFILES=`ls ${OUTPUTNAME}*GenericAffine.mat`
 
@@ -1476,8 +1534,14 @@ while [[ $i -lt ${ITERATIONLIMIT} ]];
         elif [[ $DOQSUB -eq 3 ]];
             then
             rm -f ${outdir}/job_*.sh
+        elif [[ $DOQSUB -eq 5 ]];
+            then
+            mv ${outdir}/slurm-*.out ${outdir}/ANTs_iteration_${i}
+            mv ${outdir}/job*.txt ${outdir}/ANTs_iteration_${i}
         fi
-      fi
+      else
+        rm -f ${outdir}/job*.txt ${outdir}/slurm-*.out
+    fi
     ((i++))
 done
 

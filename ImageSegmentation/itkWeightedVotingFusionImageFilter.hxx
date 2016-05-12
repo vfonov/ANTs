@@ -23,6 +23,9 @@
 #include "itkImageRegionIteratorWithIndex.h"
 #include "itkProgressReporter.h"
 
+#include <algorithm>
+#include <numeric>
+
 #include <vnl/algo/vnl_svd.h>
 #include <vnl/vnl_inverse.h>
 
@@ -43,9 +46,13 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
   m_ConstrainSolutionToNonnegativeWeights( false )
 {
   this->m_MaskImage = ITK_NULLPTR;
-  this->m_MaskLabel = NumericTraits<LabelType>::OneValue();
 
   this->m_CountImage = ITK_NULLPTR;
+
+  this->m_SearchNeighborhoodRadiusImage = ITK_NULLPTR;
+  this->m_SearchNeighborhoodRadius.Fill( 3 );
+
+  this->m_PatchNeighborhoodRadius.Fill( 2 );
 
   this->m_SimilarityMetric = PEARSON_CORRELATION;
 }
@@ -101,11 +108,31 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
 {
   Superclass::GenerateInputRequestedRegion();
 
-// Get the output requested region
+  // Get the output requested region
   RegionType outRegion = this->GetOutput()->GetRequestedRegion();
 
   // Pad this region by the search window and patch size
-  outRegion.PadByRadius( this->m_SearchNeighborhoodRadius );
+  if( this->m_SearchNeighborhoodRadiusImage.IsNull() )
+    {
+    outRegion.PadByRadius( this->m_SearchNeighborhoodRadius );
+    }
+  else
+    {
+    NeighborhoodRadiusType maxSearchNeighborhoodRadius;
+    maxSearchNeighborhoodRadius.Fill( 0 );
+
+    ImageRegionConstIterator<RadiusImageType> ItR( this->m_SearchNeighborhoodRadiusImage,
+      this->m_SearchNeighborhoodRadiusImage->GetRequestedRegion() );
+    for( ItR.GoToBegin(); !ItR.IsAtEnd(); ++ItR )
+      {
+      RadiusValueType localSearchRadius = ItR.Get();
+      if( localSearchRadius > maxSearchNeighborhoodRadius[0] )
+        {
+        maxSearchNeighborhoodRadius.Fill( localSearchRadius );
+        }
+      }
+    outRegion.PadByRadius( maxSearchNeighborhoodRadius );
+    }
   outRegion.PadByRadius( this->m_PatchNeighborhoodRadius );
 
   // Iterate over all the inputs to this filter
@@ -113,6 +140,10 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
   for( SizeValueType i = 0; i < this->m_TargetImage.size(); i++ )
     {
     InputImageType *input = this->m_TargetImage[i];
+    if( i == 0 )
+      {
+      this->m_TargetImageRequestedRegion = input->GetRequestedRegion();
+      }
     RegionType region = outRegion;
     region.Crop( input->GetLargestPossibleRegion() );
     input->SetRequestedRegion( region );
@@ -217,7 +248,8 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
       this->m_AtlasSegmentations[i], this->m_AtlasSegmentations[i]->GetRequestedRegion() );
     for( It.GoToBegin(); !It.IsAtEnd(); ++It )
       {
-      if( !this->m_MaskImage || this->m_MaskImage->GetPixel( It.GetIndex() ) == this->m_MaskLabel )
+      if( !this->m_MaskImage ||
+          this->m_MaskImage->GetPixel( It.GetIndex() ) != NumericTraits<LabelType>::ZeroValue() )
         {
         this->m_LabelSet.insert( It.Get() );
         }
@@ -288,18 +320,89 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
   this->m_CountImage->Allocate();
   this->m_CountImage->FillBuffer( 0 );
 
-  // Determine the offset lists
+  // Determine the search offset list (or map if an search radius image is specified)
 
-  ConstNeighborhoodIterator<InputImageType> It( this->m_SearchNeighborhoodRadius,
-    this->GetInput(), this->GetInput()->GetRequestedRegion() );
+  typename InputImageType::SpacingType spacing = this->m_TargetImage[0]->GetSpacing();
 
   this->m_SearchNeighborhoodOffsetList.clear();
+  this->m_SearchNeighborhoodOffsetSetsMap.clear();
 
-  this->m_SearchNeighborhoodSize = ( It.GetNeighborhood() ).Size();
-  for( unsigned int n = 0; n < this->m_SearchNeighborhoodSize; n++ )
+  if( this->m_SearchNeighborhoodRadiusImage.IsNull() )
     {
-    this->m_SearchNeighborhoodOffsetList.push_back( ( It.GetNeighborhood() ).GetOffset( n ) );
+    ConstNeighborhoodIterator<InputImageType> It( this->m_SearchNeighborhoodRadius,
+      this->GetInput(), this->GetInput()->GetRequestedRegion() );
+
+    SizeValueType searchNeighborhoodSize = ( It.GetNeighborhood() ).Size();
+
+    DistanceIndexVectorType squaredDistances;
+    squaredDistances.resize( searchNeighborhoodSize );
+
+    for( unsigned int n = 0; n < searchNeighborhoodSize; n++ )
+      {
+      NeighborhoodOffsetType offset = ( It.GetNeighborhood() ).GetOffset( n );
+
+      squaredDistances[n].first = n;
+      squaredDistances[n].second = 0.0;
+      for( unsigned int d = 0; d < ImageDimension; d++ )
+        {
+        squaredDistances[n].second += vnl_math_sqr( offset[d] * spacing[d] );
+        }
+      }
+    std::sort( squaredDistances.begin(), squaredDistances.end(), DistanceIndexComparator() );
+
+    for( unsigned int n = 0; n < searchNeighborhoodSize; n++ )
+      {
+      this->m_SearchNeighborhoodOffsetList.push_back( ( It.GetNeighborhood() ).GetOffset( squaredDistances[n].first ) );
+      }
     }
+  else
+    {
+    ImageRegionConstIterator<RadiusImageType> ItR( this->m_SearchNeighborhoodRadiusImage,
+      this->m_SearchNeighborhoodRadiusImage->GetRequestedRegion() );
+
+    for( ItR.GoToBegin(); !ItR.IsAtEnd(); ++ItR )
+      {
+      RadiusValueType localSearchRadius = ItR.Get();
+      if( localSearchRadius > 0 &&
+        this->m_SearchNeighborhoodOffsetSetsMap.find( localSearchRadius ) ==
+          this->m_SearchNeighborhoodOffsetSetsMap.end() )
+        {
+        NeighborhoodRadiusType localSearchNeighborhoodRadius;
+        localSearchNeighborhoodRadius.Fill( localSearchRadius );
+
+        std::vector<NeighborhoodOffsetType> localSearchNeighborhoodOffsetList;
+
+        ConstNeighborhoodIterator<InputImageType> It( localSearchNeighborhoodRadius,
+          this->GetInput(), this->GetInput()->GetRequestedRegion() );
+
+        RadiusValueType localSearchNeighborhoodSize = ( It.GetNeighborhood() ).Size();
+
+        DistanceIndexVectorType squaredDistances;
+        squaredDistances.resize( localSearchNeighborhoodSize );
+
+        for( unsigned int n = 0; n < localSearchNeighborhoodSize; n++ )
+          {
+          NeighborhoodOffsetType offset = ( It.GetNeighborhood() ).GetOffset( n );
+
+          squaredDistances[n].first = n;
+          squaredDistances[n].second = 0.0;
+          for( unsigned int d = 0; d < ImageDimension; d++ )
+            {
+            squaredDistances[n].second += vnl_math_sqr( offset[d] * spacing[d] );
+            }
+          }
+        std::sort( squaredDistances.begin(), squaredDistances.end(), DistanceIndexComparator() );
+
+        for( unsigned int n = 0; n < localSearchNeighborhoodSize; n++ )
+          {
+          localSearchNeighborhoodOffsetList.push_back( ( It.GetNeighborhood() ).GetOffset( squaredDistances[n].first ) );
+          }
+        this->m_SearchNeighborhoodOffsetSetsMap[localSearchRadius] = localSearchNeighborhoodOffsetList;
+        }
+      }
+    }
+
+  // Determine the patch offset list
 
   ConstNeighborhoodIterator<InputImageType> It2( this->m_PatchNeighborhoodRadius,
     this->GetInput(), this->GetInput()->GetRequestedRegion() );
@@ -359,32 +462,55 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
   ConstNeighborhoodIteratorType ItN( this->m_PatchNeighborhoodRadius, this->m_TargetImage[0], region );
   for( ItN.GoToBegin(); !ItN.IsAtEnd(); ++ItN )
     {
+    progress.CompletedPixel();
+
     IndexType currentCenterIndex = ItN.GetIndex();
 
-    if( this->m_MaskImage && this->m_MaskImage->GetPixel( currentCenterIndex ) != this->m_MaskLabel )
+    if( this->m_MaskImage &&
+        this->m_MaskImage->GetPixel( currentCenterIndex ) == NumericTraits<LabelType>::ZeroValue() )
       {
-      progress.CompletedPixel();
       continue;
       }
 
-    // Check to see if there are any non-zero labels
-    if( this->m_NumberOfAtlasSegmentations > 0 )
+    // Do not do the following check from Paul's original code.  Since we're incorporating
+    // joint intensity fusion, we want to calculate at every voxel (except outside of a
+    // possible mask) even if there are no segmentation labels at that voxel.
+
+//     // Check to see if there are any non-zero labels
+//     if( this->m_NumberOfAtlasSegmentations > 0 )
+//       {
+//       bool nonBackgroundLabelExistAtThisVoxel = false;
+//       for( SizeValueType i = 0; i < this->m_NumberOfAtlasSegmentations; i++ )
+//         {
+//         if( this->m_AtlasSegmentations[i]->GetPixel( currentCenterIndex ) > 0 )
+//           {
+//           nonBackgroundLabelExistAtThisVoxel = true;
+//           break;
+//           }
+//         }
+//       if( ! nonBackgroundLabelExistAtThisVoxel )
+//         {
+//         continue;
+//         }
+//       }
+
+    // Determine the search neighborhood offset list for the current center voxel
+    std::vector<NeighborhoodOffsetType> searchNeighborhoodOffsetList;
+    if( this->m_SearchNeighborhoodRadiusImage.IsNull() )
       {
-      bool nonBackgroundLabelExistAtThisVoxel = false;
-      for( SizeValueType i = 0; i < this->m_NumberOfAtlasSegmentations; i++ )
+      searchNeighborhoodOffsetList = this->m_SearchNeighborhoodOffsetList;
+      }
+    else
+      {
+      RadiusValueType localSearchRadius =
+        this->m_SearchNeighborhoodRadiusImage->GetPixel( currentCenterIndex );
+      if( localSearchRadius <= 0 )
         {
-        if( this->m_AtlasSegmentations[i]->GetPixel( currentCenterIndex ) > 0 )
-          {
-          nonBackgroundLabelExistAtThisVoxel = true;
-          break;
-          }
-        }
-      if( ! nonBackgroundLabelExistAtThisVoxel )
-        {
-        progress.CompletedPixel();
         continue;
         }
+      searchNeighborhoodOffsetList = this->m_SearchNeighborhoodOffsetSetsMap[localSearchRadius];
       }
+    SizeValueType searchNeighborhoodSize = searchNeighborhoodOffsetList.size();
 
     InputImagePixelVectorType normalizedTargetPatch =
       this->VectorizeImageListPatch( this->m_TargetImage, currentCenterIndex, true );
@@ -399,9 +525,9 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
       RealType minimumPatchSimilarity = NumericTraits<RealType>::max();
       SizeValueType minimumPatchOffsetIndex = 0;
 
-      for( SizeValueType j = 0; j < this->m_SearchNeighborhoodSize; j++ )
+      for( SizeValueType j = 0; j < searchNeighborhoodSize; j++ )
         {
-        IndexType searchIndex = currentCenterIndex + this->m_SearchNeighborhoodOffsetList[j];
+        IndexType searchIndex = currentCenterIndex + searchNeighborhoodOffsetList[j];
 
         if( !output->GetRequestedRegion().IsInside( searchIndex ) )
           {
@@ -422,7 +548,7 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
       // difference with target patch
 
       IndexType minimumIndex = currentCenterIndex +
-        this->m_SearchNeighborhoodOffsetList[minimumPatchOffsetIndex];
+        searchNeighborhoodOffsetList[minimumPatchOffsetIndex];
       InputImagePixelVectorType normalizedMinimumAtlasPatch;
       if( numberOfTargetModalities == this->m_NumberOfAtlasModalities )
         {
@@ -484,7 +610,7 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
           mxValue = std::pow( mxValue, this->m_Beta );
           }
 
-        if( vnl_math_isnan( mxValue ) || vnl_math_isinf( mxValue ) )
+        if( !std::isfinite( mxValue ) )
           {
           mxValue = 0.0;
           }
@@ -538,7 +664,8 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
           continue;
           }
 
-        if( this->m_MaskImage && this->m_MaskImage->GetPixel( neighborhoodIndex ) != this->m_MaskLabel )
+        if( this->m_MaskImage &&
+            this->m_MaskImage->GetPixel( neighborhoodIndex ) == NumericTraits<LabelType>::ZeroValue() )
           {
           continue;
           }
@@ -547,7 +674,7 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
           estimatedNeighborhoodIntensities[i * this->m_PatchNeighborhoodSize + j] +
           this->m_JointIntensityFusionImage[i]->GetPixel( neighborhoodIndex ) );
 
-        if( vnl_math_isnan( estimatedValue ) || vnl_math_isinf( estimatedValue ) )
+        if( !std::isfinite( estimatedValue ) )
           {
           estimatedValue = 0.0;
           }
@@ -577,7 +704,7 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
           {
           // The segmentation at the corresponding patch location in atlas i
           IndexType minimumIndex = neighborhoodIndex +
-            this->m_SearchNeighborhoodOffsetList[minimumAtlasOffsetIndices[i]];
+            searchNeighborhoodOffsetList[minimumAtlasOffsetIndices[i]];
 
           if( !output->GetRequestedRegion().IsInside( minimumIndex ) )
             {
@@ -605,7 +732,6 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
           }
         }
       }
-    progress.CompletedPixel();
     }
 }
 
@@ -624,7 +750,8 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
     {
     IndexType index = It.GetIndex();
 
-    if( this->m_MaskImage && this->m_MaskImage->GetPixel( It.GetIndex() ) != this->m_MaskLabel )
+    if( this->m_MaskImage &&
+        this->m_MaskImage->GetPixel( It.GetIndex() ) == NumericTraits<LabelType>::ZeroValue() )
       {
       continue;
       }
@@ -707,9 +834,9 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
   for( SizeValueType i = 0; i < this->m_NumberOfAtlasModalities; i++ )
     {
     ImageRegionIterator<InputImageType> ItJ( this->m_JointIntensityFusionImage[i],
-      this->m_JointIntensityFusionImage[i]->GetBufferedRegion() );
+      this->m_JointIntensityFusionImage[i]->GetRequestedRegion() );
     ImageRegionIterator<CountImageType> ItC( this->m_CountImage,
-      this->m_CountImage->GetBufferedRegion() );
+      this->m_CountImage->GetRequestedRegion() );
 
     for( ItJ.GoToBegin(), ItC.GoToBegin(); !ItJ.IsAtEnd(); ++ItJ, ++ItC )
       {
@@ -750,11 +877,15 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
     {
     IndexType neighborhoodIndex = index + this->m_PatchNeighborhoodOffsetList[i];
 
-    bool isInBounds = image->GetBufferedRegion().IsInside( neighborhoodIndex );
+    bool isInBounds = this->m_TargetImageRequestedRegion.IsInside( neighborhoodIndex );
     if( isInBounds )
       {
       InputImagePixelType pixel = image->GetPixel( neighborhoodIndex );
       patchVector[i] = pixel;
+      }
+    else
+      {
+      patchVector[i] = std::numeric_limits<RealType>::quiet_NaN();
       }
     }
 
@@ -764,7 +895,7 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
     RealType standardDeviation = 0.0;
     this->GetMeanAndStandardDeviationOfVectorizedImagePatch( patchVector, mean, standardDeviation );
 
-    standardDeviation = vnl_math_max( standardDeviation, 1.0 );
+    standardDeviation = std::max( standardDeviation, 1.0 );
 
     typename InputImagePixelVectorType::iterator it;
     for( it = patchVector.begin(); it != patchVector.end(); ++it )
@@ -788,9 +919,12 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
   typename InputImagePixelVectorType::const_iterator it;
   for( it = patchVector.begin(); it != patchVector.end(); ++it )
     {
-    sum += *it;
-    sumOfSquares += vnl_math_sqr( *it );
-    count += 1.0;
+    if( std::isfinite( *it ) )
+      {
+      sum += *it;
+      sumOfSquares += vnl_math_sqr( *it );
+      count += 1.0;
+      }
     }
 
   mean = sum / count;
@@ -813,6 +947,7 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
   RealType sumOfSquaresX = 0.0;
   RealType sumOfSquaredDifferencesXY = 0.0;
   RealType sumXY = 0.0;
+  RealType N = 0.0;
 
   SizeValueType count = 0;
   for( SizeValueType i = 0; i < numberOfImagesToUse; i++ )
@@ -821,22 +956,35 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
       {
       IndexType neighborhoodIndex = index + this->m_PatchNeighborhoodOffsetList[j];
 
-      RealType x = static_cast<RealType>( imageList[i]->GetPixel( neighborhoodIndex ) );
-      RealType y = static_cast<RealType>( normalizedPatchVectorY[count++] );
+      bool isInBounds = this->m_TargetImageRequestedRegion.IsInside( neighborhoodIndex );
+      if( isInBounds && std::isfinite( normalizedPatchVectorY[count] ) )
+        {
+        RealType x = static_cast<RealType>( imageList[i]->GetPixel( neighborhoodIndex ) );
+        RealType y = static_cast<RealType>( normalizedPatchVectorY[count] );
 
-      sumX += x;
-      sumOfSquaresX += vnl_math_sqr( x );
-      sumXY += ( x * y );
+        sumX += x;
+        sumOfSquaresX += vnl_math_sqr( x );
+        sumXY += ( x * y );
 
-      sumOfSquaredDifferencesXY += vnl_math_sqr( y - x );
+        sumOfSquaredDifferencesXY += vnl_math_sqr( y - x );
+        N += 1.0;
+        }
+      ++count;
       }
     }
-  RealType N = static_cast<RealType>( normalizedPatchVectorY.size() );
+
+  // If we are on the boundary, a neighborhood patch might not overlap
+  // with the image.  If we have 2 voxels or less for a neighborhood patch
+  // we don't consider it to be a suitable match.
+  if( N < 3.0 )
+    {
+    return NumericTraits<RealType>::max();
+    }
 
   if( this->m_SimilarityMetric == PEARSON_CORRELATION )
     {
     RealType varianceX = sumOfSquaresX - vnl_math_sqr( sumX ) / N;
-    varianceX = vnl_math_max( varianceX, 1.0e-6 );
+    varianceX = std::max( varianceX, 1.0e-6 );
 
     RealType measure = vnl_math_sqr( sumXY ) / varianceX;
     return ( sumXY > 0 ? -measure : measure );
@@ -863,6 +1011,12 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
   SizeValueType m = A.rows();
   SizeValueType n = A.cols();
 
+  // This fortran implementation sets a maximum iteration number of 3 times the
+  // number of columns:
+  //    http://www.netlib.org/lawson-hanson/all
+
+  const SizeValueType maximumNumberOfIterations = 3 * n;
+
   // Initialization
 
   VectorType P( n, 0 );
@@ -884,7 +1038,10 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
     }
 
   // Outer loop
-  while( R.sum() > 0 && wMaxValue > tolerance )
+
+  SizeValueType numberOfIterations = 0;
+  while( R.sum() > 0 && wMaxValue > tolerance &&
+    numberOfIterations++ < maximumNumberOfIterations )
     {
     P[maxIndex] = 1;
     R[maxIndex] = 0;
@@ -1016,6 +1173,10 @@ WeightedVotingFusionImageFilter<TInputImage, TOutputImage>
   else if( this->m_SimilarityMetric == MEAN_SQUARES )
     {
     os << "Using mean squares to measure the patch similarity." << std::endl;
+    }
+  if( this->m_ConstrainSolutionToNonnegativeWeights )
+    {
+    os << "Constrain solution to positive weights using NNLS." << std::endl;
     }
 
   os << "Label set: ";

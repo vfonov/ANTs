@@ -19,60 +19,74 @@ namespace ants
 {
 
 
-// template <class TFilter>
-// class CommandIterationUpdate : public itk::Command
-// {
-// public:
-//   typedef CommandIterationUpdate  Self;
-//   typedef itk::Command            Superclass;
-//   typedef itk::SmartPointer<Self> Pointer;
-//   itkNewMacro( Self );
-// protected:
-//   CommandIterationUpdate()
-//   {
-//   };
-// public:
-//
-//   void Execute(itk::Object *caller, const itk::EventObject & event) ITK_OVERRIDE
-//   {
-//     Execute( (const itk::Object *) caller, event);
-//   }
-//
-//   void Execute(const itk::Object * object, const itk::EventObject & event) ITK_OVERRIDE
-//   {
-//     const TFilter * filter =
-//       dynamic_cast<const TFilter *>( object );
-//
-//     if( typeid( event ) != typeid( itk::IterationEvent ) )
-//       {
-//       return;
-//       }
-//     if( filter->GetElapsedIterations() == 1 )
-//       {
-//       std::cout << "Current level = " << filter->GetCurrentLevel() + 1
-//                << std::endl;
-//       }
-//     std::cout << "  Iteration " << filter->GetElapsedIterations()
-//              << " (of "
-//              << filter->GetMaximumNumberOfIterations()[filter->GetCurrentLevel()]
-//              << ").  ";
-//     std::cout << " Current convergence value = "
-//              << filter->GetCurrentConvergenceMeasurement()
-//              << " (threshold = " << filter->GetConvergenceThreshold()
-//              << ")" << std::endl;
-//   }
-// };
+template <class TFilter>
+class CommandProgressUpdate : public itk::Command
+{
+public:
+  typedef  CommandProgressUpdate                      Self;
+  typedef  itk::Command                               Superclass;
+  typedef  itk::SmartPointer<CommandProgressUpdate>  Pointer;
+  itkNewMacro( CommandProgressUpdate );
+protected:
+
+  CommandProgressUpdate() : m_CurrentProgress( 0 ) {};
+
+  typedef TFilter FilterType;
+
+  unsigned int m_CurrentProgress;
+
+public:
+
+  void Execute(itk::Object *caller, const itk::EventObject & event) ITK_OVERRIDE
+    {
+    itk::ProcessObject *po = dynamic_cast<itk::ProcessObject *>( caller );
+    if (! po) return;
+//    std::cout << po->GetProgress() << std::endl;
+    if( typeid( event ) == typeid ( itk::ProgressEvent )  )
+      {
+      if( this->m_CurrentProgress < 99 )
+        {
+        this->m_CurrentProgress++;
+        if( this->m_CurrentProgress % 10 == 0 )
+          {
+          std::cout << this->m_CurrentProgress << std::flush;
+          }
+        else
+          {
+          std::cout << "*" << std::flush;
+          }
+        }
+      }
+    }
+
+  void Execute(const itk::Object * object, const itk::EventObject & event) ITK_OVERRIDE
+    {
+    itk::ProcessObject *po = dynamic_cast<itk::ProcessObject *>(
+      const_cast<itk::Object *>( object ) );
+    if (! po) return;
+
+    if( typeid( event ) == typeid ( itk::ProgressEvent )  )
+      {
+      if( this->m_CurrentProgress < 99 )
+        {
+        this->m_CurrentProgress++;
+        if( this->m_CurrentProgress % 10 == 0 )
+          {
+          std::cout << this->m_CurrentProgress << std::flush;
+          }
+        else
+          {
+          std::cout << "*" << std::flush;
+          }
+        }
+      }
+    }
+};
 
 template <unsigned int ImageDimension>
 int Denoise( itk::ants::CommandLineParser *parser )
 {
   typedef float RealType;
-
-  typedef itk::Image<RealType, ImageDimension> ImageType;
-  typename ImageType::Pointer inputImage = ITK_NULLPTR;
-
-  typedef itk::Image<RealType, ImageDimension> MaskImageType;
-  typename MaskImageType::Pointer maskImage = ITK_NULLPTR;
 
   bool verbose = false;
   typename itk::ants::CommandLineParser::OptionType::Pointer verboseOption =
@@ -87,6 +101,12 @@ int Denoise( itk::ants::CommandLineParser *parser )
     std::cout << std::endl << "Running for "
              << ImageDimension << "-dimensional images." << std::endl << std::endl;
     }
+
+  typedef itk::Image<RealType, ImageDimension> ImageType;
+  typename ImageType::Pointer inputImage = ITK_NULLPTR;
+
+  //typedef itk::Image<RealType, ImageDimension> MaskImageType;
+  //typename MaskImageType::Pointer maskImage = ITK_NULLPTR;
 
   typename itk::ants::CommandLineParser::OptionType::Pointer inputImageOption =
     parser->GetOption( "input-image" );
@@ -122,10 +142,10 @@ int Denoise( itk::ants::CommandLineParser *parser )
     shrinkFactor = parser->Convert<int>( shrinkFactorOption->GetFunction( 0 )->GetName() );
     }
 
-  if( shrinkFactor != 1 && verbose )
-    {
-    std::cout << "A shrink factor of > 1 doesn't seem to be working.  I'm turning off this option for now." << std::endl;
-    }
+//   if( shrinkFactor != 1 && verbose )
+//     {
+//     std::cout << "A shrink factor of > 1 doesn't seem to be working.  I'm turning off this option for now." << std::endl;
+//     }
 
   shrinker->SetShrinkFactors( shrinkFactor );
   shrinker->Update();
@@ -159,6 +179,21 @@ int Denoise( itk::ants::CommandLineParser *parser )
     }
 
   /**
+   * handle the mask image
+   */
+  typedef typename DenoiserType::MaskImageType MaskImageType;
+  typename MaskImageType::Pointer maskImage = ITK_NULLPTR;
+
+  typename itk::ants::CommandLineParser::OptionType::Pointer maskImageOption =
+    parser->GetOption( "mask-image" );
+  if( maskImageOption && maskImageOption->GetNumberOfFunctions() )
+    {
+    std::string inputFile = maskImageOption->GetFunction( 0 )->GetName();
+    ReadImage<MaskImageType>( maskImage, inputFile.c_str() );
+    }
+  denoiser->SetMaskImage( maskImage );
+
+  /**
    * The parameters below are the default parameters taken from Jose's original
    *   code.  I don't have a good handle on them so I'm hiding them from the
    *   user for now.
@@ -170,27 +205,27 @@ int Denoise( itk::ants::CommandLineParser *parser )
   denoiser->SetSmoothingFactor( 1.0 );
   denoiser->SetSmoothingVariance( 2.0 );
 
-  typename DenoiserType::NeighborhoodRadiusType blockNeighborhoodRadius;
-  typename DenoiserType::NeighborhoodRadiusType neighborhoodRadius1;
-  typename DenoiserType::NeighborhoodRadiusType neighborhoodRadius2;
+  typename DenoiserType::NeighborhoodRadiusType neighborhoodBlockRadius;
+  typename DenoiserType::NeighborhoodRadiusType neighborhoodRadiusForLocalMeanAndVariance;
+  typename DenoiserType::NeighborhoodRadiusType neighborhoodSearchRadius;
 
-  neighborhoodRadius1.Fill( 1 );
-  neighborhoodRadius2.Fill( 3 );
-  blockNeighborhoodRadius.Fill( 1 );
+  neighborhoodRadiusForLocalMeanAndVariance.Fill( 1 );
+  neighborhoodSearchRadius.Fill( 3 );
+  neighborhoodBlockRadius.Fill( 1 );
 
-  denoiser->SetNeighborhoodRadius1( neighborhoodRadius1 );
-  denoiser->SetNeighborhoodRadius2( neighborhoodRadius2 );
-  denoiser->SetBlockNeighborhoodRadius( blockNeighborhoodRadius );
+  denoiser->SetNeighborhoodRadiusForLocalMeanAndVariance( neighborhoodRadiusForLocalMeanAndVariance );
+  denoiser->SetNeighborhoodSearchRadius( neighborhoodSearchRadius );
+  denoiser->SetNeighborhoodBlockRadius( neighborhoodBlockRadius );
 
   itk::TimeProbe timer;
   timer.Start();
 
-//   if( verbose )
-//     {
-//     typedef CommandIterationUpdate<DenoiserType> CommandType;
-//     typename CommandType::Pointer observer = CommandType::New();
-//     denoiser->AddObserver( itk::IterationEvent(), observer );
-//     }
+  if( verbose )
+    {
+    typedef CommandProgressUpdate<DenoiserType> CommandType;
+    typename CommandType::Pointer observer = CommandType::New();
+    denoiser->AddObserver( itk::ProgressEvent(), observer );
+    }
 
   try
     {
@@ -208,6 +243,7 @@ int Denoise( itk::ants::CommandLineParser *parser )
 
   if( verbose )
     {
+    std::cout << std::endl << std::endl;
     denoiser->Print( std::cout, 3 );
     }
 
@@ -232,18 +268,20 @@ int Denoise( itk::ants::CommandLineParser *parser )
     subtracter->SetInput1( denoiser->GetInput() );
     subtracter->SetInput2( denoiser->GetOutput() );
 
-    typedef itk::IdentityTransform<RealType, ImageDimension> TransformType;
-    typename TransformType::Pointer transform = TransformType::New();
-    transform->SetIdentity();
-
-    typedef itk::LinearInterpolateImageFunction<ImageType, RealType> LinearInterpolatorType;
-    typename LinearInterpolatorType::Pointer interpolator = LinearInterpolatorType::New();
-    interpolator->SetInputImage( subtracter->GetOutput() );
-
     typedef itk::ResampleImageFilter<ImageType, ImageType, RealType> ResamplerType;
     typename ResamplerType::Pointer resampler = ResamplerType::New();
-    resampler->SetTransform( transform );
-    resampler->SetInterpolator( interpolator );
+    {
+      typedef itk::IdentityTransform<RealType, ImageDimension> TransformType;
+      typename TransformType::Pointer transform = TransformType::New();
+      transform->SetIdentity();
+      resampler->SetTransform( transform );
+    }
+    {
+      typedef itk::LinearInterpolateImageFunction<ImageType, RealType> LinearInterpolatorType;
+      typename LinearInterpolatorType::Pointer interpolator = LinearInterpolatorType::New();
+      interpolator->SetInputImage( subtracter->GetOutput() );
+      resampler->SetInterpolator( interpolator );
+    }
     resampler->SetOutputParametersFromImage( inputImage );
     resampler->UseReferenceImageOn();
     resampler->SetInput( subtracter->GetOutput() );
@@ -316,6 +354,18 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   parser->AddOption( option );
   }
 
+  {
+  std::string description =
+    std::string( "If a mask image is specified, denoising is " )
+    + std::string( "only performed in the mask region.  " );
+
+  OptionType::Pointer option = OptionType::New();
+  option->SetLongName( "mask-image" );
+  option->SetShortName( 'x' );
+  option->SetUsageOption( 0, "maskImageFilename" );
+  option->SetDescription( description );
+  parser->AddOption( option );
+  }
 
   {
   std::string description =
@@ -521,17 +571,17 @@ private:
     {
     case 2:
       {
-      Denoise<2>( parser );
+      return Denoise<2>( parser );
       }
       break;
     case 3:
       {
-      Denoise<3>( parser );
+      return Denoise<3>( parser );
       }
       break;
     case 4:
       {
-      Denoise<4>( parser );
+      return Denoise<4>( parser );
       }
       break;
     default:

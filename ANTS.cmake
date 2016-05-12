@@ -34,7 +34,7 @@ endif()
 
 option( ${PROJECT_NAME}_BUILD_DISTRIBUTE "Remove '-g#####' from version. ( for official distribution only )" OFF )
 mark_as_advanced( ${PROJECT_NAME}_BUILD_DISTRIBUTE )
-if( NOT ${PROJECT_NAME}_BUILD_DISTRIBUTE )
+if( NOT ${PROJECT_NAME}_BUILD_DISTRIBUTE AND NOT ${PROJECT_NAME}_VERSION_HASH STREQUAL "GITDIR-NOTFOUND")
   set(${PROJECT_NAME}_VERSION "${${PROJECT_NAME}_VERSION}-g${${PROJECT_NAME}_VERSION_HASH}")
 endif()
 
@@ -108,7 +108,7 @@ set(PICSL_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/Utilities
   ${CMAKE_CURRENT_SOURCE_DIR}/ImageRegistration
   ${CMAKE_CURRENT_SOURCE_DIR}/ImageSegmentation
-  ${CMAKE_CURRENT_SOURCE_DIR}/GraphTheory
+#  ${CMAKE_CURRENT_SOURCE_DIR}/GraphTheory
   ${CMAKE_CURRENT_SOURCE_DIR}/Tensor
   ${CMAKE_CURRENT_SOURCE_DIR}/Temporary
   ${CMAKE_CURRENT_SOURCE_DIR}/Examples
@@ -120,6 +120,3 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/ANTsVersionConfig.h.in"
                "${CMAKE_CURRENT_BINARY_DIR}/ANTsVersionConfig.h" @ONLY IMMEDIATE)
 
 add_subdirectory(Examples)
-if(BUILD_EXTERNAL_APPLICATIONS)
-  add_subdirectory(ExternalApplications)
-endif()

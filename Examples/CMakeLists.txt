@@ -12,9 +12,12 @@ add_library(antsUtilities STATIC antsUtilities.cxx
             )
 target_link_libraries(antsUtilities ${ITK_LIBRARIES} )
 install(TARGETS antsUtilities
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION ${BIN_INSTALL_DIR}
+    COMPONENT RUNTIME_antsUtilities
+    LIBRARY DESTINATION ${LIB_INSTALL_DIR}
+    COMPONENT RUNTIME_antsUtilities
+    ARCHIVE DESTINATION ${LIB_INSTALL_DIR}
+    COMPONENT DEVELOPMENT_antsUtilities
   )
 
 macro(STANDARD_ANTS_BUILD ANTS_FUNCTION_NAME EXTRA_LIBS)
@@ -30,9 +33,12 @@ macro(STANDARD_ANTS_BUILD ANTS_FUNCTION_NAME EXTRA_LIBS)
   target_link_libraries( ${ANTS_FUNCTION_NAME} l_${ANTS_FUNCTION_NAME} )
 
   install(TARGETS l_${ANTS_FUNCTION_NAME} ${ANTS_FUNCTION_NAME}
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION ${BIN_INSTALL_DIR}
+    COMPONENT RUNTIME_${ANTS_FUNCTION_NAME}
+    LIBRARY DESTINATION ${LIB_INSTALL_DIR}
+    COMPONENT RUNTIME_${ANTS_FUNCTION_NAME}
+    ARCHIVE DESTINATION ${LIB_INSTALL_DIR}
+    COMPONENT DEVELOPMENT_${ANTS_FUNCTION_NAME}
   )
 
 endmacro()
@@ -59,16 +65,13 @@ set(CORE_ANTS_APPS
   LabelGeometryMeasures
   LabelClustersUniquely
   Atropos
-  AverageImages
-  StackSlices
-  AverageAffineTransform
-  AverageAffineTransformNoRigid
   antsApplyTransformsToPoints
 )
 
 set(MORE_ANTS_APPS
     antsAI
     antsJointFusion
+    antsJointTensorFusion
     ImageMath
     iMath
     ANTS
@@ -78,6 +81,7 @@ set(MORE_ANTS_APPS
     ANTSUseLandmarkImagesToGetAffineTransform
     ANTSUseLandmarkImagesToGetBSplineDisplacementField
     ANTSUseDeformationFieldToGetAffineTransform
+    antsLandmarkBasedTransformInitializer
     LaplacianThickness
     SetOrigin
     SetSpacing
@@ -94,6 +98,7 @@ set(MORE_ANTS_APPS
     AverageTensorImages
     ImageSetStatistics
     MultiplyImages
+    SmoothDisplacementField
     SmoothImage
     ClusterImageStatistics
     LabelOverlapMeasures
@@ -121,23 +126,28 @@ set(MORE_ANTS_APPS
     KellySlater
     CreateDTICohort
     antsAlignOrigin
-    simpleSynRegistration
-    CompositeTransformUtil
     antsMotionCorrDiffusionDirection
-    antsSliceRegularizedRegistration
-    CreateDisplacementField
+#    antsSliceRegularizedRegistration
     ANTSIntegrateVectorField
     ANTSIntegrateVelocityField
+    antsTransformInfo
+    antsUtilitiesTesting
+    AverageAffineTransform
+    AverageAffineTransformNoRigid
+    AverageImages
+    simpleSynRegistration
+    CompositeTransformUtil
+    CreateDisplacementField
     ConvertTransformFile
     compareTwoTransforms
+    SuperResolution
     TimeSCCAN
     TextureCooccurrenceFeatures
     TextureRunLengthFeatures
     ImageIntensityStatistics
     GetConnectedComponentsFeatureImages
     DeNrrd
-    antsTransformInfo
-    antsUtilitiesTesting
+    StackSlices
   )
 
 foreach(ANTS_APP ${CORE_ANTS_APPS})
@@ -145,9 +155,15 @@ foreach(ANTS_APP ${CORE_ANTS_APPS})
 endforeach()
 
 if (BUILD_ALL_ANTS_APPS)
-foreach(ANTS_APP ${MORE_ANTS_APPS})
-  STANDARD_ANTS_BUILD(${ANTS_APP} "")
-endforeach()
+  foreach(ANTS_APP ${MORE_ANTS_APPS})
+    STANDARD_ANTS_BUILD(${ANTS_APP} "")
+  endforeach()
+else(BUILD_ALL_ANTS_APPS)
+  foreach(ANTS_APP ${MORE_ANTS_APPS})
+    if(ANTS_BUILD_${ANTS_APP})
+      STANDARD_ANTS_BUILD(${ANTS_APP} "")
+    endif()
+  endforeach()
 endif(BUILD_ALL_ANTS_APPS)
 
 
@@ -205,9 +221,11 @@ install(PROGRAMS ../Scripts/ANTSpexec.sh
      ../Scripts/waitForPBSQJobs.pl
      ../Scripts/waitForSGEQJobs.pl
      ../Scripts/waitForXGridJobs.pl
-                DESTINATION bin
+     ../Scripts/waitForSlurmJobs.pl
+                DESTINATION ${SCRIPTS_INSTALL_DIR}
                 PERMISSIONS  OWNER_WRITE OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
                 CONFIGURATIONS  Release
+                COMPONENT SCRIPTS
         )
 
 if( COPY_SCRIPT_FILES_TO_BIN_DIR )

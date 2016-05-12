@@ -29,7 +29,7 @@ namespace itk {
  * \class AdaptiveNonLocalMeansDenoisingImageFilter
  * \brief Implementation of a denoising image filter.
  *
- * \author Jose V. Manjon
+ * \author Jose V. Manjon with ITK porting by Nick Tustison
  *
  * Contributed by
  *
@@ -44,7 +44,8 @@ namespace itk {
  */
 
 template<typename TInputImage,
-  class TOutputImage = TInputImage>
+  class TOutputImage = TInputImage,
+  typename TMaskImage = Image<unsigned char, TInputImage::ImageDimension> >
 class AdaptiveNonLocalMeansDenoisingImageFilter :
   public ImageToImageFilter<TInputImage, TOutputImage>
 {
@@ -67,15 +68,20 @@ public:
 
   /** Some convenient typedefs. */
   typedef TInputImage                                    InputImageType;
+  typedef typename InputImageType::PixelType             InputPixelType;
   typedef TOutputImage                                   OutputImageType;
   typedef typename InputImageType::RegionType            RegionType;
 
-  typedef float                             RealType;
-  typedef Image<RealType, ImageDimension>   RealImageType;
-  typedef typename RealImageType::Pointer   RealImagePointer;
-  typedef typename RealImageType::IndexType IndexType;
+  typedef TMaskImage                                     MaskImageType;
+  typedef typename MaskImageType::PixelType              MaskPixelType;
+  typedef typename MaskImageType::PixelType              LabelType;
 
-  typedef GaussianOperator<RealType>        ModifiedBesselCalculatorType;
+  typedef float                                          RealType;
+  typedef Image<RealType, ImageDimension>                RealImageType;
+  typedef typename RealImageType::Pointer                RealImagePointer;
+  typedef typename RealImageType::IndexType              IndexType;
+
+  typedef GaussianOperator<RealType>                     ModifiedBesselCalculatorType;
 
   typedef ConstNeighborhoodIterator<RealImageType>             ConstNeighborhoodIteratorType;
   typedef typename ConstNeighborhoodIteratorType::RadiusType   NeighborhoodRadiusType;
@@ -85,6 +91,25 @@ public:
    * The image expected for input for noise correction.
    */
   void SetInput1( const InputImageType *image ) { this->SetInput( image ); }
+
+  /**
+   * Set mask image function.  If a binary mask image is specified, only
+   * those input image voxels corresponding with the mask image.
+   */
+  void SetMaskImage( const MaskImageType *mask )
+    {
+    this->SetNthInput( 1, const_cast<MaskImageType *>( mask ) );
+    }
+  void SetInput2( const MaskImageType *mask ) { this->SetMaskImage( mask ); }
+
+  /**
+   * Get mask image function.  If a binary mask image is specified, only
+   * those input image voxels corresponding with the mask image.
+   */
+  const MaskImageType* GetMaskImage() const
+    {
+    return static_cast<const MaskImageType*>( this->ProcessObject::GetInput( 1 ) );
+    }
 
   /**
    * Employ Rician noise model.  Otherwise use a Gaussian noise model.
@@ -128,25 +153,25 @@ public:
   itkGetConstMacro( VarianceThreshold, RealType );
 
   /**
-   * Neighborhood radius 1.
+   * Neighborhood size for computing local mean and variance images.
    * Default = 1x1x...
    */
-  itkSetMacro( NeighborhoodRadius1, NeighborhoodRadiusType );
-  itkGetConstMacro( NeighborhoodRadius1, NeighborhoodRadiusType );
+  itkSetMacro( NeighborhoodRadiusForLocalMeanAndVariance, NeighborhoodRadiusType );
+  itkGetConstMacro( NeighborhoodRadiusForLocalMeanAndVariance, NeighborhoodRadiusType );
 
   /**
-   * Neighborhood radius 2.
-   * Default = 1x1x...
+   * Neighborhood search radius.
+   * Default = 3x3x...
    */
-  itkSetMacro( NeighborhoodRadius2, NeighborhoodRadiusType );
-  itkGetConstMacro( NeighborhoodRadius2, NeighborhoodRadiusType );
+  itkSetMacro( NeighborhoodSearchRadius, NeighborhoodRadiusType );
+  itkGetConstMacro( NeighborhoodSearchRadius, NeighborhoodRadiusType );
 
   /**
-   * Block neighborhood radius.
+   * Neighborhood block radius.
    * Default = 1x1x...
    */
-  itkSetMacro( BlockNeighborhoodRadius, NeighborhoodRadiusType );
-  itkGetConstMacro( BlockNeighborhoodRadius, NeighborhoodRadiusType );
+  itkSetMacro( NeighborhoodBlockRadius, NeighborhoodRadiusType );
+  itkGetConstMacro( NeighborhoodBlockRadius, NeighborhoodRadiusType );
 
 protected:
   AdaptiveNonLocalMeansDenoisingImageFilter();
@@ -162,10 +187,8 @@ protected:
 
 private:
 
-  AdaptiveNonLocalMeansDenoisingImageFilter( const Self& ); //purposely not
-                                                             // implemented
-  void operator=( const Self& );                      //purposely not
-                                                      // implemented
+  AdaptiveNonLocalMeansDenoisingImageFilter( const Self& ) ITK_DELETE_FUNCTION;
+  void operator=( const Self& ) ITK_DELETE_FUNCTION;
 
   RealType CalculateCorrectionFactor( RealType );
 
@@ -180,6 +203,7 @@ private:
   RealType                          m_SmoothingVariance;
 
   RealType                          m_MaximumInputPixelIntensity;
+  RealType                          m_MinimumInputPixelIntensity;
 
   RealImagePointer                  m_MeanImage;
   RealImagePointer                  m_RicianBiasImage;
@@ -187,9 +211,9 @@ private:
   RealImagePointer                  m_ThreadContributionCountImage;
   RealImagePointer                  m_IntensitySquaredDistanceImage;
 
-  NeighborhoodRadiusType            m_NeighborhoodRadius1;
-  NeighborhoodRadiusType            m_NeighborhoodRadius2;
-  NeighborhoodRadiusType            m_BlockNeighborhoodRadius;
+  NeighborhoodRadiusType            m_NeighborhoodRadiusForLocalMeanAndVariance;
+  NeighborhoodRadiusType            m_NeighborhoodSearchRadius;
+  NeighborhoodRadiusType            m_NeighborhoodBlockRadius;
 
   std::vector<NeighborhoodOffsetType>  m_NeighborhoodOffsetList;
 };

@@ -73,6 +73,13 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
       -DITK_USE_FFTWD:BOOL=ON
       )
   endif()
+  if(${extProjName}_BUILD_MINC_SUPPORT)
+    set(${proj}_MINC_ARGS
+        -DModule_ITKIOMINC:BOOL=ON
+        -DModule_ITKIOTransformMINC:BOOL=ON
+        -DModule_ITKMINC:BOOL=ON
+       )
+  endif()
 
   set(${proj}_WRAP_ARGS)
   #if(foo)
@@ -126,6 +133,7 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
       ${${proj}_WRAP_ARGS}
       ${${proj}_FFTWF_ARGS}
       ${${proj}_FFTWD_ARGS}
+      ${${proj}_MINC_ARGS}
     )
 
     if( USE_VTK STREQUAL "ON" )
@@ -153,7 +161,7 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
 
   ### --- End Project specific additions
   set(${proj}_REPOSITORY ${git_protocol}://itk.org/ITK.git)
-  set(${proj}_GIT_TAG 8f51c0dcb33e796a3aac2728a0d613527b169491) ## MI multi-thread performance
+  set(${proj}_GIT_TAG fc03bcc92b11326b87c232c14eb234fc1f791f9f) ##
   set(ITK_VERSION_ID ITK-4.9) ### NOTE: When updating GIT_TAG, also update ITK_VERSION_ID
 
   ExternalProject_Add(${proj}

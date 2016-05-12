@@ -7,9 +7,11 @@
 #include "itkTimeProbe.h"
 #include "itkWeightedVotingFusionImageFilter.h"
 
+#include "stdio.h"
+
+#include <algorithm>
 #include <sstream>
 #include <string>
-#include <algorithm>
 #include <vector>
 
 #include "ANTsVersion.h"
@@ -35,7 +37,7 @@ protected:
 
 public:
 
-  void Execute(itk::Object *caller, const itk::EventObject & event)
+  void Execute(itk::Object *caller, const itk::EventObject & event) ITK_OVERRIDE
     {
     itk::ProcessObject *po = dynamic_cast<itk::ProcessObject *>( caller );
     if (! po) return;
@@ -57,7 +59,7 @@ public:
       }
     }
 
-  void Execute(const itk::Object * object, const itk::EventObject & event)
+  void Execute(const itk::Object * object, const itk::EventObject & event) ITK_OVERRIDE
     {
     itk::ProcessObject *po = dynamic_cast<itk::ProcessObject *>(
       const_cast<itk::Object *>( object ) );
@@ -112,7 +114,6 @@ int antsJointFusion( itk::ants::CommandLineParser *parser )
   typename FusionFilterType::Pointer fusionFilter = FusionFilterType::New();
   typedef typename LabelImageType::PixelType                   LabelType;
 
-
   // Get the alpha and beta parameters
 
   RealType alpha = 0.1;
@@ -133,33 +134,60 @@ int antsJointFusion( itk::ants::CommandLineParser *parser )
   fusionFilter->SetBeta( beta );
 
   // Get the search and patch radii
-
-  std::vector<unsigned int> searchRadius;
-  searchRadius.push_back( 3 );
   typename OptionType::Pointer searchRadiusOption = parser->GetOption( "search-radius" );
+
   if( searchRadiusOption && searchRadiusOption->GetNumberOfFunctions() )
     {
-    searchRadius = parser->ConvertVector<unsigned int>( searchRadiusOption->GetFunction( 0 )->GetName() );
-    }
-  if( searchRadius.size() == 1 )
-    {
-    for( unsigned int d = 1; d < ImageDimension; d++ )
+    // try reading the search radius as an image first.
+    std::string searchRadiusString = searchRadiusOption->GetFunction( 0 )->GetName();
+    if( itksys::SystemTools::FileExists( searchRadiusString.c_str() ) )
       {
-      searchRadius.push_back( searchRadius[0] );
+      typedef typename FusionFilterType::RadiusImageType  RadiusImageType;
+      typename RadiusImageType::Pointer searchRadiusImage;
+      bool fileReadSuccessfully = ReadImage<RadiusImageType>( searchRadiusImage, searchRadiusString.c_str() );
+      if( fileReadSuccessfully )
+        {
+        fusionFilter->SetSearchNeighborhoodRadiusImage( searchRadiusImage );
+        }
+      else
+        {
+        if( verbose )
+          {
+          std::cerr << "Search radius image exists but was not read successfully.." << std::endl;
+          }
+        return EXIT_FAILURE;
+        }
       }
-    }
-  if( searchRadius.size() != ImageDimension )
-    {
-    if( verbose )
+    else
       {
-      std::cerr << "Search radius specified incorrectly.  Please see usage options." << std::endl;
+      std::vector<unsigned int> searchRadius;
+      searchRadius.push_back( 3 );
+      if( searchRadiusOption && searchRadiusOption->GetNumberOfFunctions() )
+        {
+        searchRadius = parser->ConvertVector<unsigned int>( searchRadiusString );
+        }
+      if( searchRadius.size() == 1 )
+        {
+        for( unsigned int d = 1; d < ImageDimension; d++ )
+          {
+          searchRadius.push_back( searchRadius[0] );
+          }
+        }
+      if( searchRadius.size() != ImageDimension )
+        {
+        if( verbose )
+          {
+          std::cerr << "Search radius specified incorrectly.  Please see usage options." << std::endl;
+          }
+        return EXIT_FAILURE;
+        }
+      typename FusionFilterType::NeighborhoodRadiusType searchNeighborhoodRadius;
+      for( unsigned int d = 0; d < ImageDimension; d++ )
+        {
+        searchNeighborhoodRadius[d] = searchRadius[d];
+        }
+      fusionFilter->SetSearchNeighborhoodRadius( searchNeighborhoodRadius );
       }
-    return EXIT_FAILURE;
-    }
-  typename FusionFilterType::NeighborhoodRadiusType searchNeighborhoodRadius;
-  for( unsigned int d = 0; d < ImageDimension; d++ )
-    {
-    searchNeighborhoodRadius[d] = searchRadius[d];
     }
 
   std::vector<unsigned int> patchRadius;
@@ -190,7 +218,6 @@ int antsJointFusion( itk::ants::CommandLineParser *parser )
     patchNeighborhoodRadius[d] = patchRadius[d];
     }
 
-  fusionFilter->SetSearchNeighborhoodRadius( searchNeighborhoodRadius );
   fusionFilter->SetPatchNeighborhoodRadius( patchNeighborhoodRadius );
 
   // Retain atlas voting and label posterior images
@@ -527,33 +554,10 @@ int antsJointFusion( itk::ants::CommandLineParser *parser )
           {
           std::cout << "  Writing label probability image (label " << *labelIt << ")" << std::endl;
           }
-        std::ostringstream convert;
-        convert << *labelIt;
-        std::string labelString = convert.str();
 
-        // Try to guess how the user is going to specify the file format.  May need to add more.
-        std::vector<std::string> possibleReplacements;
-        possibleReplacements.push_back( std::string( "%d" ) );
-        possibleReplacements.push_back( std::string( "%01d" ) );
-        possibleReplacements.push_back( std::string( "%02d" ) );
-        possibleReplacements.push_back( std::string( "%03d" ) );
-        possibleReplacements.push_back( std::string( "%04d" ) );
-
-        std::string filename = labelPosteriorName;
-
-        for( unsigned int n = 0; n < possibleReplacements[n].size(); n++ )
-          {
-          for( size_t pos = 0; ; pos += labelString.length() )
-            {
-            pos = filename.find( possibleReplacements[n], pos );
-            if( pos == std::string::npos ) break;
-
-            filename.erase( pos, possibleReplacements[n].length() );
-            filename.insert( pos, labelString );
-            }
-          }
-
-        WriteImage<typename FusionFilterType::ProbabilityImageType>( fusionFilter->GetLabelPosteriorProbabilityImage( *labelIt ), filename.c_str() );
+        char buffer[256];
+        std::snprintf( buffer, sizeof( buffer ), labelPosteriorName.c_str(), *labelIt );
+        WriteImage<typename FusionFilterType::ProbabilityImageType>( fusionFilter->GetLabelPosteriorProbabilityImage( *labelIt ), buffer );
         }
       }
     if( !atlasVotingName.empty() && fusionFilter->GetRetainAtlasVotingWeightImages() )
@@ -730,13 +734,16 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
   {
   std::string description =
-    std::string( "Search radius for similarity measures.  Default = 3x3x3" );
+    std::string( "Search radius for similarity measures.  Default = 3x3x3.  One " )
+    + std::string( "can also specify an image where the value at the voxel specifies " )
+    + std::string( "the isotropic search radius at that voxel." );
 
   OptionType::Pointer option = OptionType::New();
   option->SetLongName( "search-radius" );
   option->SetShortName( 's' );
   option->SetUsageOption( 0, "3" );
   option->SetUsageOption( 1, "3x3x3" );
+  option->SetUsageOption( 2, "searchRadiusMap.nii.gz" );
   option->SetDescription( description );
   parser->AddOption( option );
   }
@@ -962,17 +969,17 @@ private:
     {
     case 2:
       {
-      antsJointFusion<2>( parser );
+      return antsJointFusion<2>( parser );
       }
       break;
     case 3:
       {
-      antsJointFusion<3>( parser );
+      return antsJointFusion<3>( parser );
       }
       break;
     case 4:
       {
-      antsJointFusion<4>( parser );
+      return antsJointFusion<4>( parser );
       }
       break;
     default:

@@ -5,7 +5,7 @@ VERSION="0.0"
 # Check dependencies
 
 PROGRAM_DEPENDENCIES=( 'antsRegistration' 'antsApplyTransforms' 'N4BiasFieldCorrection' 'Atropos' 'KellyKapowski' )
-SCRIPTS_DEPENDENCIES=( 'antsBrainExtraction.sh' 'antsAtroposN4.sh' 'antsMultivariateTemplateConstruction2.sh' 'antsMalfLabeling.sh' )
+SCRIPTS_DEPENDENCIES=( 'antsBrainExtraction.sh' 'antsAtroposN4.sh' 'antsMultivariateTemplateConstruction2.sh' 'antsJointLabelFusion.sh' )
 
 for D in ${PROGRAM_DEPENDENCIES[@]};
   do
@@ -38,7 +38,7 @@ are performed:
      b. The brain extraction SST prior is created by smoothing the brain extraction
         mask created during 2a.
      c. If labeled atlases are not provided, we smooth the posteriors from 2a to create
-        the SST segmentation priors, otherwise we use antsMalfLabeling to create a set of
+        the SST segmentation priors, otherwise we use antsJointFusion to create a set of
         posteriors (https://github.com/ntustison/antsCookTemplatePriorsExample).
   3. Using the SST + priors, we run each subject through the antsCorticalThickness
      pipeline.
@@ -104,6 +104,7 @@ Optional arguments:
                                                   2 = use PEXEC (localhost)
                                                   3 = Apple XGrid
                                                   4 = PBS qsub
+                                                  5 = SLURM
      -t:  template for t1 registration          Anatomical *intensity* template (assumed to be skull-stripped).  A common
                                                 use case would be where this would be the same template as specified in the
                                                 -e option which is not skull stripped.
@@ -130,9 +131,12 @@ Optional arguments:
                                                 subject template (default = 0.25)
      -w:  Atropos segmentation weight (Indiv.)  Atropos spatial prior *probability* weight for the segmentation for the individual
                                                 time points (default = 0.5)
-     -q:  Use quick registration parameters     If = 1, use antsRegistrationSyNQuick.sh as the basis for registration
-                                                during brain extraction, brain segmentation, and (optional) normalization
-                                                to a template.  Otherwise use antsRegistrationSyN.sh (default = 0).
+     -q:  Use quick registration parameters     If 'yes' then we use antsRegistrationSyNQuick.sh as the basis for registration.
+                                                Otherwise use antsRegistrationSyN.sh.  The options are as follows:
+                                                '-q 0' = antsRegistrationSyN for everything (default)
+                                                '-q 1' = Fast antsCorticalThickness to SST
+                                                '-q 2' = Fast JLF cooking
+                                                '-q 3' = Fast everything
      -r:  rigid alignment to SST                This option dictates if the individual subjects are registered to the single
                                                 subject template before running through antsCorticalThickness.  This potentially
                                                 reduces bias caused by subject orientation and voxel spacing (default = 0).
@@ -262,9 +266,9 @@ else
        ;;
           c)
        DOQSUB=$OPTARG
-       if [[ $DOQSUB -gt 4 ]];
+       if [[ $DOQSUB -gt 5 ]];
          then
-           echo " DOQSUB must be an integer value (0=serial, 1=SGE qsub, 2=try pexec, 3=XGrid, 4=PBS qsub ) you passed  -c $DOQSUB "
+           echo " DOQSUB must be an integer value (0=serial, 1=SGE qsub, 2=try pexec, 3=XGrid, 4=PBS qsub, 5=SLURM ) you passed  -c $DOQSUB "
            exit 1
          fi
        ;;
@@ -637,18 +641,47 @@ if [[ ! -f ${SINGLE_SUBJECT_TEMPLATE} ]];
 
 # clean up
 
+SINGLE_SUBJECT_ANTSCT_PREFIX=${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}/T_template
+
 logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}job*.sh
 logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}job*.txt
 logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}rigid*
 logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}*Repaired*
 logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}*WarpedToTemplate*
-logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}T_*Warp.nii.gz
-logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}T_*Affine.txt
-logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}T_*GenericAffine*
 logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}T_template0warp.nii.gz
 logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}T_template0Affine.txt
 logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}T_templatewarplog.txt
 logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}initTemplateModality*.nii.gz
+
+# Also remove the warp files but we have to be careful to not remove the affine and
+# warp files generated in subsequent steps (specifically from running the SST through
+# the cortical thickness pipeline if somebody has to re-run the longitudinal pipeline
+
+if [[ -f ${SINGLE_SUBJECT_ANTSCT_PREFIX}SubjectToTemplate1Warp.nii.gz ]];
+  then
+
+    logCmd mkdir -p ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}/TmpFiles/
+    logCmd mv -f ${SINGLE_SUBJECT_ANTSCT_PREFIX}SubjectToTemplate1*Warp.nii.gz \
+                 ${SINGLE_SUBJECT_ANTSCT_PREFIX}SubjectToTemplate0GenericAffine.mat \
+                 ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}/TmpFiles/
+    logCmd mv -f ${SINGLE_SUBJECT_ANTSCT_PREFIX}TemplateToSubject0*Warp.nii.gz \
+                 ${SINGLE_SUBJECT_ANTSCT_PREFIX}TemplateToSubject1GenericAffine.mat \
+                 ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}/TmpFiles/
+
+    logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}T_*Warp.nii.gz
+    logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}T_*Affine.txt
+    logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}T_*GenericAffine*
+
+    logCmd mv -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}/TmpFiles/* ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}
+    logCmd rm -rf ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}/TmpFiles/
+
+  else
+
+    logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}T_*Warp.nii.gz
+    logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}T_*Affine.txt
+    logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}T_*GenericAffine*
+
+  fi
 
 # Need to change the number of iterations to  -q \
 
@@ -667,7 +700,6 @@ echo
 #
 ################################################################################
 
-SINGLE_SUBJECT_ANTSCT_PREFIX=${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}/T_template
 SINGLE_SUBJECT_TEMPLATE_EXTRACTION_MASK=${SINGLE_SUBJECT_ANTSCT_PREFIX}BrainExtractionMask.${OUTPUT_SUFFIX}
 SINGLE_SUBJECT_TEMPLATE_EXTRACTION_REGISTRATION_MASK=${SINGLE_SUBJECT_ANTSCT_PREFIX}BrainExtractionRegistrationMask.${OUTPUT_SUFFIX}
 SINGLE_SUBJECT_TEMPLATE_PRIOR=${SINGLE_SUBJECT_ANTSCT_PREFIX}Priors\%${FORMAT}d.${OUTPUT_SUFFIX}
@@ -769,11 +801,11 @@ if [[ ${SINGLE_SUBJECT_TEMPLATE_PRIORS_EXIST} -eq 0 ]];
       else
 
         echo
-        echo "   ---> Cooking single-subject priors using antsMalfLabeling."
+        echo "   ---> Cooking single-subject priors using antsJointLabelFusion."
         echo
 
         SINGLE_SUBJECT_TEMPLATE_MALF_LABELS_PREFIX=${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_TEMPLATE}/T_template
-        SINGLE_SUBJECT_TEMPLATE_MALF_LABELS=${SINGLE_SUBJECT_TEMPLATE_MALF_LABELS_PREFIX}MalfLabels.nii.gz
+        SINGLE_SUBJECT_TEMPLATE_MALF_LABELS=${SINGLE_SUBJECT_TEMPLATE_MALF_LABELS_PREFIX}Labels.nii.gz
 
         ATLAS_AND_LABELS_STRING=''
         for (( j=0; j < ${#MALF_ATLASES[@]}; j++ ))
@@ -783,9 +815,10 @@ if [[ ${SINGLE_SUBJECT_TEMPLATE_PRIORS_EXIST} -eq 0 ]];
 
         if [[ ! -f ${SINGLE_SUBJECT_TEMPLATE_MALF_LABELS} ]];
           then
-            logCmd ${ANTSPATH}/antsMalfLabeling.sh \
+            logCmd ${ANTSPATH}/antsJointLabelFusion.sh \
               -d ${DIMENSION} \
               -q ${RUN_FAST_MALF_COOKING} \
+              -x ${SINGLE_SUBJECT_TEMPLATE_EXTRACTION_MASK} \
               -c ${DOQSUB} \
               -j ${CORES} \
               -t ${SINGLE_SUBJECT_TEMPLATE_SKULL_STRIPPED} \
@@ -880,8 +913,10 @@ for (( i=0; i < ${#ANATOMICAL_IMAGES[@]}; i+=$NUMBER_OF_MODALITIES ))
           -m ${ANATOMICAL_IMAGES[$i]} \
           -f ${SINGLE_SUBJECT_TEMPLATE} \
           -t r
+        logCmd rm -f ${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_CORTICAL_THICKNESS}/${BASENAME_ID}RigidToSSTInverseWarped.nii.gz
 
         ANATOMICAL_REFERENCE_IMAGE=${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_CORTICAL_THICKNESS}/${BASENAME_ID}RigidToSSTWarped.nii.gz
+
 
         let k=$i+$NUMBER_OF_MODALITIES
         for (( j=$i; j < $k; j++ ))
@@ -931,23 +966,30 @@ for (( i=0; i < ${#ANATOMICAL_IMAGES[@]}; i+=$NUMBER_OF_MODALITIES ))
 
     if [[ $DO_REGISTRATION_TO_TEMPLATE -eq 1 ]];
       then
-        logCmd ${ANTSPATH}/antsApplyTransforms \
-          -d ${DIMENSION} \
-          -r ${REGISTRATION_TEMPLATE} \
-          -o [${OUTPUT_LOCAL_PREFIX}SubjectToGroupTemplateWarp.nii.gz,1] \
-          -t ${SINGLE_SUBJECT_ANTSCT_PREFIX}SubjectToTemplate1Warp.nii.gz \
-          -t ${SINGLE_SUBJECT_ANTSCT_PREFIX}SubjectToTemplate0GenericAffine.mat \
-          -t ${OUTPUT_LOCAL_PREFIX}SubjectToTemplate1Warp.nii.gz \
-          -t ${OUTPUT_LOCAL_PREFIX}SubjectToTemplate0GenericAffine.mat
 
-        logCmd ${ANTSPATH}/antsApplyTransforms \
-          -d ${DIMENSION} \
-          -r ${ANATOMICAL_REFERENCE_IMAGE} \
-          -o [${OUTPUT_LOCAL_PREFIX}GroupTemplateToSubjectWarp.nii.gz,1] \
-          -t ${OUTPUT_LOCAL_PREFIX}TemplateToSubject1GenericAffine.mat \
-          -t ${OUTPUT_LOCAL_PREFIX}TemplateToSubject0Warp.nii.gz \
-          -t ${SINGLE_SUBJECT_ANTSCT_PREFIX}TemplateToSubject1GenericAffine.mat \
-          -t ${SINGLE_SUBJECT_ANTSCT_PREFIX}TemplateToSubject0Warp.nii.gz
+        if [[ ! -f ${OUTPUT_LOCAL_PREFIX}SubjectToGroupTemplateWarp.nii.gz ]];
+          then
+            logCmd ${ANTSPATH}/antsApplyTransforms \
+              -d ${DIMENSION} \
+              -r ${REGISTRATION_TEMPLATE} \
+              -o [${OUTPUT_LOCAL_PREFIX}SubjectToGroupTemplateWarp.nii.gz,1] \
+              -t ${SINGLE_SUBJECT_ANTSCT_PREFIX}SubjectToTemplate1Warp.nii.gz \
+              -t ${SINGLE_SUBJECT_ANTSCT_PREFIX}SubjectToTemplate0GenericAffine.mat \
+              -t ${OUTPUT_LOCAL_PREFIX}SubjectToTemplate1Warp.nii.gz \
+              -t ${OUTPUT_LOCAL_PREFIX}SubjectToTemplate0GenericAffine.mat
+          fi
+
+        if [[ ! -f ${OUTPUT_LOCAL_PREFIX}GroupTemplateToSubjectWarp.nii.gz ]];
+          then
+            logCmd ${ANTSPATH}/antsApplyTransforms \
+              -d ${DIMENSION} \
+              -r ${ANATOMICAL_REFERENCE_IMAGE} \
+              -o [${OUTPUT_LOCAL_PREFIX}GroupTemplateToSubjectWarp.nii.gz,1] \
+              -t ${OUTPUT_LOCAL_PREFIX}TemplateToSubject1GenericAffine.mat \
+              -t ${OUTPUT_LOCAL_PREFIX}TemplateToSubject0Warp.nii.gz \
+              -t ${SINGLE_SUBJECT_ANTSCT_PREFIX}TemplateToSubject1GenericAffine.mat \
+              -t ${SINGLE_SUBJECT_ANTSCT_PREFIX}TemplateToSubject0Warp.nii.gz
+          fi
 
         if [[ -f ${CORTICAL_LABEL_IMAGE} ]];
           then
@@ -957,17 +999,20 @@ for (( i=0; i < ${#ANATOMICAL_IMAGES[@]}; i+=$NUMBER_OF_MODALITIES ))
             SUBJECT_TMP=${OUTPUT_LOCAL_PREFIX}Tmp.${OUTPUT_SUFFIX}
             SUBJECT_STATS=${OUTPUT_LOCAL_PREFIX}LabelThickness.csv
 
-            logCmd ${ANTSPATH}/antsApplyTransforms \
-              -d ${DIMENSION} \
-              -i ${CORTICAL_LABEL_IMAGE} \
-              -r ${ANATOMICAL_REFERENCE_IMAGE} \
-              -o ${SUBJECT_CORTICAL_LABELS} \
-              -n MultiLabel \
-              -t ${OUTPUT_LOCAL_PREFIX}GroupTemplateToSubjectWarp.nii.gz
+            if [[ ! -f ${SUBJECT_CORTICAL_LABELS} ]];
+              then
+                logCmd ${ANTSPATH}/antsApplyTransforms \
+                  -d ${DIMENSION} \
+                  -i ${CORTICAL_LABEL_IMAGE} \
+                  -r ${ANATOMICAL_REFERENCE_IMAGE} \
+                  -o ${SUBJECT_CORTICAL_LABELS} \
+                  -n MultiLabel \
+                  -t ${OUTPUT_LOCAL_PREFIX}GroupTemplateToSubjectWarp.nii.gz
 
-            logCmd ${ANTSPATH}/ThresholdImage ${DIMENSION} ${OUTPUT_LOCAL_PREFIX}BrainSegmentation.${OUTPUT_SUFFIX} ${SUBJECT_TMP} 2 2 1 0
-            logCmd ${ANTSPATH}/ImageMath ${DIMENSION} ${SUBJECT_CORTICAL_LABELS} m ${SUBJECT_TMP} ${SUBJECT_CORTICAL_LABELS}
-            logCmd ${ANTSPATH}/ImageMath ${DIMENSION} ${SUBJECT_STATS} LabelStats ${SUBJECT_CORTICAL_LABELS} ${SUBJECT_CORTICAL_THICKNESS}
+                logCmd ${ANTSPATH}/ThresholdImage ${DIMENSION} ${OUTPUT_LOCAL_PREFIX}BrainSegmentation.${OUTPUT_SUFFIX} ${SUBJECT_TMP} 2 2 1 0
+                logCmd ${ANTSPATH}/ImageMath ${DIMENSION} ${SUBJECT_CORTICAL_LABELS} m ${SUBJECT_TMP} ${SUBJECT_CORTICAL_LABELS}
+                logCmd ${ANTSPATH}/ImageMath ${DIMENSION} ${SUBJECT_STATS} LabelStats ${SUBJECT_CORTICAL_LABELS} ${SUBJECT_CORTICAL_THICKNESS}
+              fi
 
             logCmd rm -f $SUBJECT_TMP
           fi

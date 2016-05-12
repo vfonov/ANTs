@@ -289,8 +289,8 @@ typename ImageType::Pointer ReadImage(char* fn )
     return NULL;
     }
 
-  typename ImageType::DirectionType dir;
-  dir.SetIdentity();
+  //typename ImageType::DirectionType dir;
+  //dir.SetIdentity();
   //  reffilter->GetOutput()->SetDirection(dir);
 
   typename ImageType::Pointer target = reffilter->GetOutput();
@@ -488,7 +488,7 @@ bool WritePointSet( itk::SmartPointer<TPointSet> pointSet, const char *file )
 }
 
 template <class TImageType>
-bool WriteImage(itk::SmartPointer<TImageType> image, const char *file)
+bool WriteImage(const itk::SmartPointer<TImageType> image, const char *file)
 {
   if( std::string(file).length() < 3 )
     {
@@ -520,6 +520,7 @@ bool WriteImage(itk::SmartPointer<TImageType> image, const char *file)
       std::exception();
       }
     writer->SetInput(image);
+    writer->SetUseCompression( true );
     writer->Update();
     }
   return true;
@@ -556,6 +557,7 @@ void WriteTensorImage(itk::SmartPointer<TImageType> image, const char *file, boo
   else
     {
     writer->SetInput(writeImage);
+    writer->SetUseCompression( true );
     writer->Update();
     }
 }

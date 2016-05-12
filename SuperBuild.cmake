@@ -93,6 +93,8 @@ CMAKE_DEPENDENT_OPTION(
   "BUILD_STYLE_UTILS" OFF
   )
 
+option(ITK_BUILD_MINC_SUPPORT "Build support for MINC2" OFF)
+
 set(EXTERNAL_PROJECT_BUILD_TYPE "Release" CACHE STRING "Default build type for support libraries")
 
 
@@ -213,12 +215,6 @@ if(APPLE)
     -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
 endif()
 
-set(${LOCAL_PROJECT_NAME}_CLI_RUNTIME_DESTINATION  bin)
-set(${LOCAL_PROJECT_NAME}_CLI_LIBRARY_DESTINATION  lib)
-set(${LOCAL_PROJECT_NAME}_CLI_ARCHIVE_DESTINATION  lib)
-set(${LOCAL_PROJECT_NAME}_CLI_INSTALL_RUNTIME_DESTINATION  bin)
-set(${LOCAL_PROJECT_NAME}_CLI_INSTALL_LIBRARY_DESTINATION  lib)
-set(${LOCAL_PROJECT_NAME}_CLI_INSTALL_ARCHIVE_DESTINATION  lib)
 #-----------------------------------------------------------------------------
 # Add external project CMake args
 #-----------------------------------------------------------------------------
@@ -284,7 +280,6 @@ ExternalProject_Add(${proj}
     ${CMAKE_OSX_EXTERNAL_PROJECT_ARGS}
     ${COMMON_EXTERNAL_PROJECT_ARGS}
     -D${LOCAL_PROJECT_NAME}_SUPERBUILD:BOOL=OFF
-    -DBUILD_EXTERNAL_APPLICATIONS:BOOL=${BUILD_EXTERNAL_APPLICATIONS}
   INSTALL_COMMAND ""
   )
 

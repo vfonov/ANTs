@@ -69,6 +69,9 @@ public:
   typedef typename TFixedPointSet::PointsContainer     FixedPointsContainer;
   typedef typename TFixedPointSet::PointDataContainer  FixedPointDataContainer;
 
+  /** Dimension type */
+  typedef typename Superclass::DimensionType                  DimensionType;
+
   itkStaticConstMacro( FixedPointDimension, DimensionType, Superclass::FixedDimension );
 
   /**  Type of the moving point set. */
@@ -83,9 +86,6 @@ public:
   /** Transform types from Superclass*/
   typedef typename Superclass::FixedTransformType            FixedTransformType;
   typedef typename Superclass::MovingTransformType           MovingTransformType;
-
-  /** Dimension type */
-  typedef typename Superclass::DimensionType                  DimensionType;
 
   itkStaticConstMacro( PointDimension, DimensionType, Superclass::PointDimension );
 
@@ -138,7 +138,7 @@ public:
   /**
    * Prepare point sets for use.
    */
-  virtual void InitializePointSets() const;
+  virtual void InitializePointSets() const ITK_OVERRIDE;
 
   /**
    * Calculates the local metric value for a single point.

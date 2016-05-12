@@ -69,6 +69,11 @@ int  LabelUniquely(int argc, char *argv[])
     std::cout << "missing cluster thresholod" << std::endl;
     throw;
     }
+  bool fullyConnected = false;
+  if( argc > 5 )
+    {
+    fullyConnected = static_cast< bool >( atoi( argv[4] ) );
+    }
   std::string fn1 = std::string(argv[1]);
   float       clusterthresh = atof(argv[3]);
 
@@ -76,17 +81,14 @@ int  LabelUniquely(int argc, char *argv[])
 
   ReadImage<ImageType>(image1, fn1.c_str() );
 
-  //  typename
   typename FilterType::Pointer filter = FilterType::New();
-// typename
   typename RelabelType::Pointer relabel = RelabelType::New();
 
   typename CastFilterType::Pointer castInput = CastFilterType::New();
   castInput->SetInput(image1);
 
   filter->SetInput( castInput->GetOutput() );
-  int fullyConnected = 0; // atoi( argv[5] );
-  filter->SetFullyConnected( fullyConnected );
+  filter->SetFullyConnected( fullyConnected ); // old default was false
   relabel->SetInput( filter->GetOutput() );
   relabel->SetMinimumObjectSize( (unsigned int) clusterthresh );
 
@@ -106,7 +108,7 @@ int  LabelUniquely(int argc, char *argv[])
   castRegions->Update();
   WriteImage<ImageType>(   castRegions->GetOutput() , argv[2] );
 
-  return 0;
+  return EXIT_SUCCESS;
 }
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
@@ -158,7 +160,7 @@ private:
   if( argc < 3 )
     {
     std::cout << "Usage:  " << std::endl;
-    std::cout << argv[0] << " ImageDimension clustersin.hdr labeledclustersout.hdr   sizethresh " << std::endl;
+    std::cout << argv[0] << " ImageDimension clustersin.hdr labeledclustersout.hdr   sizethresh optionalBoolFullyConnected" << std::endl;
     if( argc >= 2 &&
         ( std::string( argv[1] ) == std::string("--help") || std::string( argv[1] ) == std::string("-h") ) )
       {
@@ -171,12 +173,12 @@ private:
     {
     case 2:
       {
-      LabelUniquely<2>(argc, argv + 1);
+      return LabelUniquely<2>(argc, argv + 1);
       }
       break;
     case 3:
       {
-      LabelUniquely<3>(argc, argv + 1);
+      return LabelUniquely<3>(argc, argv + 1);
       }
       break;
     default:
@@ -186,5 +188,3 @@ private:
   return EXIT_SUCCESS;
 }
 } // namespace ants
-
-

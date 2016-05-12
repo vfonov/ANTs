@@ -2520,10 +2520,10 @@ RegistrationHelper<TComputeType, VImageDimension>
 
         typedef itk::Image<VectorType, VImageDimension + 1> TimeVaryingVelocityFieldControlPointLatticeType;
 
-        typename ImageType::SizeType fixedImageSize = preprocessedFixedImagesPerStage[0]->GetBufferedRegion().GetSize();
-        typename ImageType::PointType fixedImageOrigin = preprocessedFixedImagesPerStage[0]->GetOrigin();
-        typename ImageType::SpacingType fixedImageSpacing = preprocessedFixedImagesPerStage[0]->GetSpacing();
-        typename ImageType::DirectionType fixedImageDirection = preprocessedFixedImagesPerStage[0]->GetDirection();
+        typename ImageType::SizeType fixedImageSize = virtualDomainImage->GetBufferedRegion().GetSize();
+        typename ImageType::PointType fixedImageOrigin = virtualDomainImage->GetOrigin();
+        typename ImageType::SpacingType fixedImageSpacing = virtualDomainImage->GetSpacing();
+        typename ImageType::DirectionType fixedImageDirection = virtualDomainImage->GetDirection();
 
         typename TimeVaryingVelocityFieldControlPointLatticeType::SizeType transformDomainMeshSize;
         typename TimeVaryingVelocityFieldControlPointLatticeType::PointType transformDomainOrigin;
@@ -2556,172 +2556,282 @@ RegistrationHelper<TComputeType, VImageDimension>
         typedef itk::TimeVaryingBSplineVelocityFieldTransform <TComputeType, ImageType::ImageDimension>
           TimeVaryingBSplineVelocityFieldOutputTransformType;
 
-        typedef itk::TimeVaryingBSplineVelocityFieldImageRegistrationMethod<ImageType, ImageType,
-          TimeVaryingBSplineVelocityFieldOutputTransformType, ImageType, LabeledPointSetType>
-          VelocityFieldRegistrationType;
-        typename VelocityFieldRegistrationType::Pointer velocityFieldRegistration =
-          VelocityFieldRegistrationType::New();
-
-        if( this->m_RestrictDeformationOptimizerWeights.size() > currentStageNumber )
+        if( stageMetricList[0].m_MetricType != IGDM )
           {
-          if( this->m_RestrictDeformationOptimizerWeights[currentStageNumber].size() == VImageDimension )
-            {
-            typename VelocityFieldRegistrationType::OptimizerWeightsType optimizerWeights( VImageDimension );
-            for( unsigned int d = 0; d < VImageDimension; d++ )
-              {
-              optimizerWeights[d] = this->m_RestrictDeformationOptimizerWeights[currentStageNumber][d];
-              }
-            velocityFieldRegistration->SetOptimizerWeights( optimizerWeights );
-            }
-          }
+          typedef itk::TimeVaryingBSplineVelocityFieldImageRegistrationMethod<ImageType, ImageType,
+            TimeVaryingBSplineVelocityFieldOutputTransformType, ImageType, LabeledPointSetType>
+            VelocityFieldRegistrationType;
 
-        typedef typename VelocityFieldRegistrationType::OutputTransformType OutputTransformType;
-        typename OutputTransformType::Pointer outputTransform = velocityFieldRegistration->GetModifiableTransform();
-        for( unsigned int n = 0; n < stageMetricList.size(); n++ )
-          {
-          if( !this->IsPointSetMetric( stageMetricList[n].m_MetricType ) )
+          typename VelocityFieldRegistrationType::Pointer velocityFieldRegistration =
+            this->PrepareRegistrationMethod<VelocityFieldRegistrationType>(
+                  this->m_CompositeTransform, currentStageNumber, VImageDimension,
+                  preprocessedFixedImagesPerStage, preprocessedMovingImagesPerStage,
+                  fixedLabeledPointSetsPerStage, movingLabeledPointSetsPerStage, stageMetricList, singleMetric,
+                  multiMetric, optimizer, numberOfLevels, shrinkFactorsPerDimensionForAllLevels,
+                  smoothingSigmasPerLevel, metricSamplingStrategy, samplingPercentage );
+
+          typename TimeVaryingBSplineVelocityFieldOutputTransformType::Pointer
+            outputTransform = velocityFieldRegistration->GetModifiableTransform();
+
+          if( useMultiMetric )
             {
-            velocityFieldRegistration->SetFixedImage( n, preprocessedFixedImagesPerStage[n] );
-            velocityFieldRegistration->SetMovingImage( n, preprocessedMovingImagesPerStage[n] );
+            velocityFieldRegistration->SetMetric( multiMetric );
             }
           else
             {
-            velocityFieldRegistration->SetFixedPointSet( n, stageMetricList[n].m_FixedLabeledPointSet.GetPointer() );
-            velocityFieldRegistration->SetMovingPointSet( n, stageMetricList[n].m_MovingLabeledPointSet.GetPointer() );
+            velocityFieldRegistration->SetMetric( singleMetric );
             }
-          }
-        if( useMultiMetric )
-          {
-          velocityFieldRegistration->SetMetric( multiMetric );
+
+          velocityFieldRegistration->SetNumberOfTimePointSamples( numberOfTimePointSamples );
+          velocityFieldRegistration->SetLearningRate( learningRate );
+          velocityFieldRegistration->SetConvergenceThreshold( convergenceThreshold );
+          velocityFieldRegistration->SetConvergenceWindowSize( convergenceWindowSize );
+          outputTransform->SetSplineOrder( splineOrder );
+          outputTransform->SetLowerTimeBound( 0.0 );
+          outputTransform->SetUpperTimeBound( 1.0 );
+
+          typedef itk::TimeVaryingBSplineVelocityFieldTransformParametersAdaptor<TimeVaryingBSplineVelocityFieldOutputTransformType>
+            VelocityFieldTransformAdaptorType;
+          typename VelocityFieldTransformAdaptorType::Pointer initialFieldTransformAdaptor =
+            VelocityFieldTransformAdaptorType::New();
+          initialFieldTransformAdaptor->SetTransform( outputTransform );
+          initialFieldTransformAdaptor->SetRequiredTransformDomainOrigin( transformDomainOrigin );
+          initialFieldTransformAdaptor->SetRequiredTransformDomainSpacing( transformDomainSpacing );
+          initialFieldTransformAdaptor->SetRequiredTransformDomainSize( transformDomainSize );
+          initialFieldTransformAdaptor->SetRequiredTransformDomainMeshSize( transformDomainMeshSize );
+          initialFieldTransformAdaptor->SetRequiredTransformDomainDirection( transformDomainDirection );
+
+          typename TimeVaryingVelocityFieldControlPointLatticeType::Pointer
+          velocityFieldLattice = AllocImage<TimeVaryingVelocityFieldControlPointLatticeType>
+              ( initialFieldTransformAdaptor->GetRequiredControlPointLatticeSize(),
+              initialFieldTransformAdaptor->GetRequiredControlPointLatticeSpacing(),
+              initialFieldTransformAdaptor->GetRequiredControlPointLatticeOrigin(),
+              initialFieldTransformAdaptor->GetRequiredControlPointLatticeDirection(),
+              zeroVector );
+
+          typename TimeVaryingBSplineVelocityFieldOutputTransformType::VelocityFieldPointType        sampledVelocityFieldOrigin;
+          typename TimeVaryingBSplineVelocityFieldOutputTransformType::VelocityFieldSpacingType      sampledVelocityFieldSpacing;
+          typename TimeVaryingBSplineVelocityFieldOutputTransformType::VelocityFieldSizeType         sampledVelocityFieldSize;
+          typename TimeVaryingBSplineVelocityFieldOutputTransformType::VelocityFieldDirectionType    sampledVelocityFieldDirection;
+
+          sampledVelocityFieldOrigin.Fill( 0.0 );
+          sampledVelocityFieldSpacing.Fill( 1.0 );
+          sampledVelocityFieldSize.Fill( numberOfTimePointSamples );
+          sampledVelocityFieldDirection.SetIdentity();
+          for( unsigned int i = 0; i < VImageDimension; i++ )
+            {
+            sampledVelocityFieldOrigin[i] = virtualDomainImage->GetOrigin()[i];
+            sampledVelocityFieldSpacing[i] = virtualDomainImage->GetSpacing()[i];
+            sampledVelocityFieldSize[i] = virtualDomainImage->GetRequestedRegion().GetSize()[i];
+            for( unsigned int j = 0; j < VImageDimension; j++ )
+              {
+              sampledVelocityFieldDirection[i][j] = virtualDomainImage->GetDirection()[i][j];
+              }
+            }
+
+          outputTransform->SetTimeVaryingVelocityFieldControlPointLattice( velocityFieldLattice );
+          outputTransform->SetVelocityFieldOrigin( sampledVelocityFieldOrigin );
+          outputTransform->SetVelocityFieldDirection( sampledVelocityFieldDirection );
+          outputTransform->SetVelocityFieldSpacing( sampledVelocityFieldSpacing );
+          outputTransform->SetVelocityFieldSize( sampledVelocityFieldSize );
+
+          typename VelocityFieldRegistrationType::NumberOfIterationsArrayType numberOfIterationsPerLevel;
+          numberOfIterationsPerLevel.SetSize( numberOfLevels );
+          for( unsigned int d = 0; d < numberOfLevels; d++ )
+            {
+            numberOfIterationsPerLevel[d] = currentStageIterations[d];
+            }
+          velocityFieldRegistration->SetNumberOfIterationsPerLevel( numberOfIterationsPerLevel );
+
+          for( unsigned int level = 0; level < numberOfLevels; ++level )
+            {
+            velocityFieldRegistration->SetShrinkFactorsPerDimension( level, shrinkFactorsPerDimensionForAllLevels[level] );
+            }
+          velocityFieldRegistration->SetSmoothingSigmasPerLevel( smoothingSigmasPerLevel );
+          velocityFieldRegistration->SetSmoothingSigmasAreSpecifiedInPhysicalUnits(
+            this->m_SmoothingSigmasAreInPhysicalUnits[currentStageNumber] );
+
+          typename VelocityFieldRegistrationType::TransformParametersAdaptorsContainerType adaptors;
+          for( unsigned int level = 0; level < numberOfLevels; level++ )
+            {
+            typename VelocityFieldTransformAdaptorType::Pointer fieldTransformAdaptor =
+              VelocityFieldTransformAdaptorType::New();
+            fieldTransformAdaptor->SetTransform( outputTransform );
+            fieldTransformAdaptor->SetRequiredTransformDomainOrigin( transformDomainOrigin );
+            fieldTransformAdaptor->SetRequiredTransformDomainMeshSize( transformDomainMeshSize );
+            fieldTransformAdaptor->SetRequiredTransformDomainSpacing( transformDomainSpacing );
+            fieldTransformAdaptor->SetRequiredTransformDomainSize( transformDomainSize );
+
+            adaptors.push_back( fieldTransformAdaptor.GetPointer() );
+            for( unsigned int i = 0; i <= VImageDimension; i++ )
+              {
+              transformDomainMeshSize[i] <<= 1;
+              }
+            }
+          velocityFieldRegistration->SetTransformParametersAdaptorsPerLevel( adaptors );
+
+          typedef antsRegistrationCommandIterationUpdate<VelocityFieldRegistrationType> VelocityFieldCommandType;
+          typename VelocityFieldCommandType::Pointer velocityFieldRegistrationObserver = VelocityFieldCommandType::New();
+          velocityFieldRegistrationObserver->SetLogStream( *this->m_LogStream );
+          velocityFieldRegistrationObserver->SetNumberOfIterations( currentStageIterations );
+
+          velocityFieldRegistration->AddObserver( itk::IterationEvent(), velocityFieldRegistrationObserver );
+          velocityFieldRegistration->AddObserver( itk::InitializeEvent(), velocityFieldRegistrationObserver );
+
+          try
+            {
+            this->Logger() << std::endl
+                           << "*** Running time-varying b-spline velocity field registration (initial mesh size = "
+                           << initialTransformDomainMeshSize << ") ***" << std::endl << std::endl;
+            velocityFieldRegistrationObserver->Execute( velocityFieldRegistration, itk::StartEvent() );
+            velocityFieldRegistration->Update();
+            }
+          catch( itk::ExceptionObject & e )
+            {
+            this->Logger() << "Exception caught: " << e << std::endl;
+            return EXIT_FAILURE;
+            }
+          // Add calculated transform to the composite transform
+          this->m_CompositeTransform->AddTransform( outputTransform );
           }
         else
           {
-          velocityFieldRegistration->SetMetric( singleMetric );
-          }
+          typedef itk::TimeVaryingBSplineVelocityFieldImageRegistrationMethod<ImageType, ImageType,
+            TimeVaryingBSplineVelocityFieldOutputTransformType, ImageType, IntensityPointSetType>
+            VelocityFieldRegistrationType;
 
-        if( this->m_CompositeTransform->GetNumberOfTransforms() > 0 )
-          {
-          velocityFieldRegistration->SetMovingInitialTransform( this->m_CompositeTransform );
-          }
-        if( this->m_FixedInitialTransform->GetNumberOfTransforms() > 0 )
-          {
-          velocityFieldRegistration->SetFixedInitialTransform( this->m_FixedInitialTransform );
-          }
-        velocityFieldRegistration->SetNumberOfLevels( numberOfLevels );
-        velocityFieldRegistration->SetNumberOfTimePointSamples( numberOfTimePointSamples );
-        velocityFieldRegistration->SetMetricSamplingStrategy(
-          static_cast<typename VelocityFieldRegistrationType::MetricSamplingStrategyType>( metricSamplingStrategy ) );
-        velocityFieldRegistration->SetMetricSamplingPercentage( samplingPercentage );
-        velocityFieldRegistration->SetLearningRate( learningRate );
-        velocityFieldRegistration->SetConvergenceThreshold( convergenceThreshold );
-        velocityFieldRegistration->SetConvergenceWindowSize( convergenceWindowSize );
-        outputTransform->SetSplineOrder( splineOrder );
-        outputTransform->SetLowerTimeBound( 0.0 );
-        outputTransform->SetUpperTimeBound( 1.0 );
+          typename VelocityFieldRegistrationType::Pointer velocityFieldRegistration =
+            this->PrepareRegistrationMethod<VelocityFieldRegistrationType>(
+                  this->m_CompositeTransform, currentStageNumber, VImageDimension,
+                  preprocessedFixedImagesPerStage, preprocessedMovingImagesPerStage,
+                  fixedIntensityPointSetsPerStage, movingIntensityPointSetsPerStage, stageMetricList, singleMetric,
+                  multiMetric, optimizer, numberOfLevels, shrinkFactorsPerDimensionForAllLevels,
+                  smoothingSigmasPerLevel, metricSamplingStrategy, samplingPercentage );
 
-        typedef itk::TimeVaryingBSplineVelocityFieldTransformParametersAdaptor<OutputTransformType>
-          VelocityFieldTransformAdaptorType;
-        typename VelocityFieldTransformAdaptorType::Pointer initialFieldTransformAdaptor =
-          VelocityFieldTransformAdaptorType::New();
-        initialFieldTransformAdaptor->SetTransform( outputTransform );
-        initialFieldTransformAdaptor->SetRequiredTransformDomainOrigin( transformDomainOrigin );
-        initialFieldTransformAdaptor->SetRequiredTransformDomainSpacing( transformDomainSpacing );
-        initialFieldTransformAdaptor->SetRequiredTransformDomainSize( transformDomainSize );
-        initialFieldTransformAdaptor->SetRequiredTransformDomainMeshSize( transformDomainMeshSize );
-        initialFieldTransformAdaptor->SetRequiredTransformDomainDirection( transformDomainDirection );
+          typename TimeVaryingBSplineVelocityFieldOutputTransformType::Pointer
+            outputTransform = velocityFieldRegistration->GetModifiableTransform();
 
-        typename TimeVaryingVelocityFieldControlPointLatticeType::Pointer
-        velocityFieldLattice = AllocImage<TimeVaryingVelocityFieldControlPointLatticeType>
-            ( initialFieldTransformAdaptor->GetRequiredControlPointLatticeSize(),
-            initialFieldTransformAdaptor->GetRequiredControlPointLatticeSpacing(),
-            initialFieldTransformAdaptor->GetRequiredControlPointLatticeOrigin(),
-            initialFieldTransformAdaptor->GetRequiredControlPointLatticeDirection(),
-            zeroVector );
-
-        typename OutputTransformType::VelocityFieldPointType        sampledVelocityFieldOrigin;
-        typename OutputTransformType::VelocityFieldSpacingType      sampledVelocityFieldSpacing;
-        typename OutputTransformType::VelocityFieldSizeType         sampledVelocityFieldSize;
-        typename OutputTransformType::VelocityFieldDirectionType    sampledVelocityFieldDirection;
-
-        sampledVelocityFieldOrigin.Fill( 0.0 );
-        sampledVelocityFieldSpacing.Fill( 1.0 );
-        sampledVelocityFieldSize.Fill( numberOfTimePointSamples );
-        sampledVelocityFieldDirection.SetIdentity();
-        for( unsigned int i = 0; i < VImageDimension; i++ )
-          {
-          sampledVelocityFieldOrigin[i] = preprocessedFixedImagesPerStage[0]->GetOrigin()[i];
-          sampledVelocityFieldSpacing[i] = preprocessedFixedImagesPerStage[0]->GetSpacing()[i];
-          sampledVelocityFieldSize[i] = preprocessedFixedImagesPerStage[0]->GetRequestedRegion().GetSize()[i];
-          for( unsigned int j = 0; j < VImageDimension; j++ )
+          if( useMultiMetric )
             {
-            sampledVelocityFieldDirection[i][j] = preprocessedFixedImagesPerStage[0]->GetDirection()[i][j];
+            velocityFieldRegistration->SetMetric( multiMetric );
             }
-          }
+          else
+            {
+            velocityFieldRegistration->SetMetric( singleMetric );
+            }
 
-        outputTransform->SetTimeVaryingVelocityFieldControlPointLattice( velocityFieldLattice );
-        outputTransform->SetVelocityFieldOrigin( sampledVelocityFieldOrigin );
-        outputTransform->SetVelocityFieldDirection( sampledVelocityFieldDirection );
-        outputTransform->SetVelocityFieldSpacing( sampledVelocityFieldSpacing );
-        outputTransform->SetVelocityFieldSize( sampledVelocityFieldSize );
+          velocityFieldRegistration->SetNumberOfTimePointSamples( numberOfTimePointSamples );
+          velocityFieldRegistration->SetLearningRate( learningRate );
+          velocityFieldRegistration->SetConvergenceThreshold( convergenceThreshold );
+          velocityFieldRegistration->SetConvergenceWindowSize( convergenceWindowSize );
+          outputTransform->SetSplineOrder( splineOrder );
+          outputTransform->SetLowerTimeBound( 0.0 );
+          outputTransform->SetUpperTimeBound( 1.0 );
 
-        typename VelocityFieldRegistrationType::NumberOfIterationsArrayType numberOfIterationsPerLevel;
-        numberOfIterationsPerLevel.SetSize( numberOfLevels );
-        for( unsigned int d = 0; d < numberOfLevels; d++ )
-          {
-          numberOfIterationsPerLevel[d] = currentStageIterations[d];
-          }
-        velocityFieldRegistration->SetNumberOfIterationsPerLevel( numberOfIterationsPerLevel );
-
-        for( unsigned int level = 0; level < numberOfLevels; ++level )
-          {
-          velocityFieldRegistration->SetShrinkFactorsPerDimension( level, shrinkFactorsPerDimensionForAllLevels[level] );
-          }
-        velocityFieldRegistration->SetSmoothingSigmasPerLevel( smoothingSigmasPerLevel );
-        velocityFieldRegistration->SetSmoothingSigmasAreSpecifiedInPhysicalUnits(
-          this->m_SmoothingSigmasAreInPhysicalUnits[currentStageNumber] );
-
-        typename VelocityFieldRegistrationType::TransformParametersAdaptorsContainerType adaptors;
-        for( unsigned int level = 0; level < numberOfLevels; level++ )
-          {
-          typename VelocityFieldTransformAdaptorType::Pointer fieldTransformAdaptor =
+          typedef itk::TimeVaryingBSplineVelocityFieldTransformParametersAdaptor<TimeVaryingBSplineVelocityFieldOutputTransformType>
+            VelocityFieldTransformAdaptorType;
+          typename VelocityFieldTransformAdaptorType::Pointer initialFieldTransformAdaptor =
             VelocityFieldTransformAdaptorType::New();
-          fieldTransformAdaptor->SetTransform( outputTransform );
-          fieldTransformAdaptor->SetRequiredTransformDomainOrigin( transformDomainOrigin );
-          fieldTransformAdaptor->SetRequiredTransformDomainMeshSize( transformDomainMeshSize );
-          fieldTransformAdaptor->SetRequiredTransformDomainSpacing( transformDomainSpacing );
-          fieldTransformAdaptor->SetRequiredTransformDomainSize( transformDomainSize );
+          initialFieldTransformAdaptor->SetTransform( outputTransform );
+          initialFieldTransformAdaptor->SetRequiredTransformDomainOrigin( transformDomainOrigin );
+          initialFieldTransformAdaptor->SetRequiredTransformDomainSpacing( transformDomainSpacing );
+          initialFieldTransformAdaptor->SetRequiredTransformDomainSize( transformDomainSize );
+          initialFieldTransformAdaptor->SetRequiredTransformDomainMeshSize( transformDomainMeshSize );
+          initialFieldTransformAdaptor->SetRequiredTransformDomainDirection( transformDomainDirection );
 
-          adaptors.push_back( fieldTransformAdaptor.GetPointer() );
-          for( unsigned int i = 0; i <= VImageDimension; i++ )
+          typename TimeVaryingVelocityFieldControlPointLatticeType::Pointer
+          velocityFieldLattice = AllocImage<TimeVaryingVelocityFieldControlPointLatticeType>
+              ( initialFieldTransformAdaptor->GetRequiredControlPointLatticeSize(),
+              initialFieldTransformAdaptor->GetRequiredControlPointLatticeSpacing(),
+              initialFieldTransformAdaptor->GetRequiredControlPointLatticeOrigin(),
+              initialFieldTransformAdaptor->GetRequiredControlPointLatticeDirection(),
+              zeroVector );
+
+          typename TimeVaryingBSplineVelocityFieldOutputTransformType::VelocityFieldPointType        sampledVelocityFieldOrigin;
+          typename TimeVaryingBSplineVelocityFieldOutputTransformType::VelocityFieldSpacingType      sampledVelocityFieldSpacing;
+          typename TimeVaryingBSplineVelocityFieldOutputTransformType::VelocityFieldSizeType         sampledVelocityFieldSize;
+          typename TimeVaryingBSplineVelocityFieldOutputTransformType::VelocityFieldDirectionType    sampledVelocityFieldDirection;
+
+          sampledVelocityFieldOrigin.Fill( 0.0 );
+          sampledVelocityFieldSpacing.Fill( 1.0 );
+          sampledVelocityFieldSize.Fill( numberOfTimePointSamples );
+          sampledVelocityFieldDirection.SetIdentity();
+          for( unsigned int i = 0; i < VImageDimension; i++ )
             {
-            transformDomainMeshSize[i] <<= 1;
+            sampledVelocityFieldOrigin[i] = virtualDomainImage->GetOrigin()[i];
+            sampledVelocityFieldSpacing[i] = virtualDomainImage->GetSpacing()[i];
+            sampledVelocityFieldSize[i] = virtualDomainImage->GetRequestedRegion().GetSize()[i];
+            for( unsigned int j = 0; j < VImageDimension; j++ )
+              {
+              sampledVelocityFieldDirection[i][j] = virtualDomainImage->GetDirection()[i][j];
+              }
             }
-          }
-        velocityFieldRegistration->SetTransformParametersAdaptorsPerLevel( adaptors );
 
-        typedef antsRegistrationCommandIterationUpdate<VelocityFieldRegistrationType> VelocityFieldCommandType;
-        typename VelocityFieldCommandType::Pointer velocityFieldRegistrationObserver = VelocityFieldCommandType::New();
-        velocityFieldRegistrationObserver->SetLogStream( *this->m_LogStream );
-        velocityFieldRegistrationObserver->SetNumberOfIterations( currentStageIterations );
+          outputTransform->SetTimeVaryingVelocityFieldControlPointLattice( velocityFieldLattice );
+          outputTransform->SetVelocityFieldOrigin( sampledVelocityFieldOrigin );
+          outputTransform->SetVelocityFieldDirection( sampledVelocityFieldDirection );
+          outputTransform->SetVelocityFieldSpacing( sampledVelocityFieldSpacing );
+          outputTransform->SetVelocityFieldSize( sampledVelocityFieldSize );
 
-        velocityFieldRegistration->AddObserver( itk::IterationEvent(), velocityFieldRegistrationObserver );
-        velocityFieldRegistration->AddObserver( itk::InitializeEvent(), velocityFieldRegistrationObserver );
+          typename VelocityFieldRegistrationType::NumberOfIterationsArrayType numberOfIterationsPerLevel;
+          numberOfIterationsPerLevel.SetSize( numberOfLevels );
+          for( unsigned int d = 0; d < numberOfLevels; d++ )
+            {
+            numberOfIterationsPerLevel[d] = currentStageIterations[d];
+            }
+          velocityFieldRegistration->SetNumberOfIterationsPerLevel( numberOfIterationsPerLevel );
 
-        try
-          {
-          this->Logger() << std::endl
-                         << "*** Running time-varying b-spline velocity field registration (initial mesh size = "
-                         << initialTransformDomainMeshSize << ") ***" << std::endl << std::endl;
-          velocityFieldRegistrationObserver->Execute( velocityFieldRegistration, itk::StartEvent() );
-          velocityFieldRegistration->Update();
+          for( unsigned int level = 0; level < numberOfLevels; ++level )
+            {
+            velocityFieldRegistration->SetShrinkFactorsPerDimension( level, shrinkFactorsPerDimensionForAllLevels[level] );
+            }
+          velocityFieldRegistration->SetSmoothingSigmasPerLevel( smoothingSigmasPerLevel );
+          velocityFieldRegistration->SetSmoothingSigmasAreSpecifiedInPhysicalUnits(
+            this->m_SmoothingSigmasAreInPhysicalUnits[currentStageNumber] );
+
+          typename VelocityFieldRegistrationType::TransformParametersAdaptorsContainerType adaptors;
+          for( unsigned int level = 0; level < numberOfLevels; level++ )
+            {
+            typename VelocityFieldTransformAdaptorType::Pointer fieldTransformAdaptor =
+              VelocityFieldTransformAdaptorType::New();
+            fieldTransformAdaptor->SetTransform( outputTransform );
+            fieldTransformAdaptor->SetRequiredTransformDomainOrigin( transformDomainOrigin );
+            fieldTransformAdaptor->SetRequiredTransformDomainMeshSize( transformDomainMeshSize );
+            fieldTransformAdaptor->SetRequiredTransformDomainSpacing( transformDomainSpacing );
+            fieldTransformAdaptor->SetRequiredTransformDomainSize( transformDomainSize );
+
+            adaptors.push_back( fieldTransformAdaptor.GetPointer() );
+            for( unsigned int i = 0; i <= VImageDimension; i++ )
+              {
+              transformDomainMeshSize[i] <<= 1;
+              }
+            }
+          velocityFieldRegistration->SetTransformParametersAdaptorsPerLevel( adaptors );
+
+          typedef antsRegistrationCommandIterationUpdate<VelocityFieldRegistrationType> VelocityFieldCommandType;
+          typename VelocityFieldCommandType::Pointer velocityFieldRegistrationObserver = VelocityFieldCommandType::New();
+          velocityFieldRegistrationObserver->SetLogStream( *this->m_LogStream );
+          velocityFieldRegistrationObserver->SetNumberOfIterations( currentStageIterations );
+
+          velocityFieldRegistration->AddObserver( itk::IterationEvent(), velocityFieldRegistrationObserver );
+          velocityFieldRegistration->AddObserver( itk::InitializeEvent(), velocityFieldRegistrationObserver );
+
+          try
+            {
+            this->Logger() << std::endl
+                           << "*** Running time-varying b-spline velocity field registration (initial mesh size = "
+                           << initialTransformDomainMeshSize << ") ***" << std::endl << std::endl;
+            velocityFieldRegistrationObserver->Execute( velocityFieldRegistration, itk::StartEvent() );
+            velocityFieldRegistration->Update();
+            }
+          catch( itk::ExceptionObject & e )
+            {
+            this->Logger() << "Exception caught: " << e << std::endl;
+            return EXIT_FAILURE;
+            }
+          // Add calculated transform to the composite transform
+          this->m_CompositeTransform->AddTransform( outputTransform );
           }
-        catch( itk::ExceptionObject & e )
-          {
-          this->Logger() << "Exception caught: " << e << std::endl;
-          return EXIT_FAILURE;
-          }
-        // Add calculated transform to the composite transform
-        this->m_CompositeTransform->AddTransform( outputTransform );
 
         this->m_AllPreviousTransformsAreLinear = false;
         }
@@ -3359,7 +3469,7 @@ RegistrationHelper<TComputeType, VImageDimension>
     {
     RealType domain = static_cast<RealType>(
       inputImage->GetLargestPossibleRegion().GetSize()[d] - 1 ) * inputImage->GetSpacing()[d];
-    meshSize.push_back( static_cast<unsigned int>( vcl_ceil( domain / knotSpacing ) ) );
+    meshSize.push_back( static_cast<unsigned int>( std::ceil( domain / knotSpacing ) ) );
 //     unsigned long extraPadding = static_cast<unsigned long>(
 //       ( numberOfSpans * splineDistance - domain ) / inputImage->GetSpacing()[d] + 0.5 );
 //     lowerBound[d] = static_cast<unsigned long>( 0.5 * extraPadding );
@@ -3729,7 +3839,7 @@ RegistrationHelper<TComputeType, VImageDimension>
       if( tempInitializerTransform.IsNull() )
         {
         this->Logger() << "WARNING: Initialization Failed" << std::endl;
-        return EXIT_FAILURE;
+        return false;
         }
       //Translation to Translation
       initialTransform->SetFixedParameters( tempInitializerTransform->GetFixedParameters() );
@@ -3738,7 +3848,7 @@ RegistrationHelper<TComputeType, VImageDimension>
     else
       {
       this->Logger() << "WARNING: Initialization Failed" << std::endl;
-      return EXIT_FAILURE;
+      return false;
       }
     }
 /////
@@ -3754,7 +3864,7 @@ RegistrationHelper<TComputeType, VImageDimension>
       if( tempInitializerTransform.IsNull() )
         {
         this->Logger() << "WARNING: Initialization Failed" << std::endl;
-        return EXIT_FAILURE;
+        return false;
         }
       //Translation to Rigid
       initialTransform->SetOffset( tempInitializerTransform->GetOffset() );
@@ -3766,7 +3876,7 @@ RegistrationHelper<TComputeType, VImageDimension>
       if( tempInitializerTransform.IsNull() )
         {
         this->Logger() << "WARNING: Initialization Failed" << std::endl;
-        return EXIT_FAILURE;
+        return false;
         }
       //Rigid to Rigid
       initialTransform->SetFixedParameters( tempInitializerTransform->GetFixedParameters() );
@@ -3775,7 +3885,7 @@ RegistrationHelper<TComputeType, VImageDimension>
     else
       {
       this->Logger() << "WARNING: Initialization Failed" << std::endl;
-      return EXIT_FAILURE;
+      return false;
       }
     }
 /////
@@ -3792,7 +3902,7 @@ RegistrationHelper<TComputeType, VImageDimension>
       if( tempInitializerTransform.IsNull() )
         {
         this->Logger() << "WARNING: Initialization Failed" << std::endl;
-        return EXIT_FAILURE;
+        return false;
         }
       //Translation to Affine
       initialTransform->SetOffset( tempInitializerTransform->GetOffset() );
@@ -3804,7 +3914,7 @@ RegistrationHelper<TComputeType, VImageDimension>
       if( tempInitializerTransform.IsNull() )
         {
         this->Logger() << "WARNING: Initialization Failed" << std::endl;
-        return EXIT_FAILURE;
+        return false;
         }
       //Rigid to Affine
       initialTransform->SetCenter( tempInitializerTransform->GetCenter() );
@@ -3818,7 +3928,7 @@ RegistrationHelper<TComputeType, VImageDimension>
       if( tempInitializerTransform.IsNull() )
         {
         this->Logger() << "WARNING: Initialization Failed" << std::endl;
-        return EXIT_FAILURE;
+        return false;
         }
       //Affine to Affine
       initialTransform->SetFixedParameters( tempInitializerTransform->GetFixedParameters() );
@@ -3827,16 +3937,19 @@ RegistrationHelper<TComputeType, VImageDimension>
     else
       {
       this->Logger() << "WARNING: Initialization Failed" << std::endl;
-      return EXIT_FAILURE;
+      return false;
       }
     }
   else
     {
     this->Logger() << "WARNING: Initialization Failed" << std::endl;
-    return EXIT_FAILURE;
+    return false;
     }
 /////
-  return EXIT_SUCCESS;
+  return true; // This function only returns flase or true (NOT FAILURE or SUCCESS).
+               // If direct intialization fails, the program should NOT be stopped,
+               // because the initial transform will be kept in the composite transform,
+               // and the final results will be still correct.
 }
 
 template <class TComputeType, unsigned VImageDimension>

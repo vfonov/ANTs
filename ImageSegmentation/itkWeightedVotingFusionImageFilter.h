@@ -113,6 +113,9 @@ public:
   typedef ConstNeighborhoodIterator<InputImageType>               ConstNeighborhoodIteratorType;
   typedef typename ConstNeighborhoodIteratorType::RadiusType      NeighborhoodRadiusType;
   typedef typename ConstNeighborhoodIteratorType::OffsetType      NeighborhoodOffsetType;
+  typedef typename SizeType::SizeValueType                        RadiusValueType;
+  typedef Image<RadiusValueType, ImageDimension>                  RadiusImageType;
+  typedef typename RadiusImageType::Pointer                       RadiusImagePointer;
 
   /**
    * Neighborhood patch similarity metric enumerated type
@@ -199,6 +202,14 @@ public:
   itkGetConstMacro( SearchNeighborhoodRadius, NeighborhoodRadiusType );
 
   /**
+   * Set/Get the local search neighborhood radius image.
+   */
+  void SetSearchNeighborhoodRadiusImage( RadiusImageType *image )
+    {
+    this->m_SearchNeighborhoodRadiusImage = image;
+    }
+
+  /**
    * Set/Get the patch neighborhood for calculating the similarity measures.
    * Default = 2x2x2.
    */
@@ -244,7 +255,8 @@ public:
 
   /**
    * Boolean for constraining the weights to be positive and sum to 1.  We use
-   * the vnl function vnl_solve_qp_non_neg_sum_one to do this.
+   * an implementation of the algorithm based on the algorithm by Lawson, Charles L.;
+   * Hanson, Richard J. (1995). Solving Least Squares Problems. SIAM.
    */
   itkSetMacro( ConstrainSolutionToNonnegativeWeights, bool );
   itkGetConstMacro( ConstrainSolutionToNonnegativeWeights, bool );
@@ -353,6 +365,17 @@ private:
 
   void UpdateInputs();
 
+  typedef std::pair<unsigned int, RealType>           DistanceIndexType;
+  typedef std::vector<DistanceIndexType>              DistanceIndexVectorType;
+
+  struct DistanceIndexComparator
+    {
+    bool operator () ( const DistanceIndexType& left, const DistanceIndexType& right )
+      {
+      return left.second < right.second;
+      }
+    };
+
   bool                                                 m_IsWeightedAveragingComplete;
 
   /** Input variables   */
@@ -361,7 +384,8 @@ private:
   LabelImageList                                       m_AtlasSegmentations;
   LabelExclusionMap                                    m_LabelExclusionImages;
   MaskImagePointer                                     m_MaskImage;
-  LabelType                                            m_MaskLabel;
+
+  RegionType                                           m_TargetImageRequestedRegion;
 
   typename CountImageType::Pointer                     m_CountImage;
 
@@ -372,9 +396,11 @@ private:
 
   NeighborhoodRadiusType                               m_SearchNeighborhoodRadius;
   NeighborhoodRadiusType                               m_PatchNeighborhoodRadius;
-  SizeValueType                                        m_SearchNeighborhoodSize;
   SizeValueType                                        m_PatchNeighborhoodSize;
   std::vector<NeighborhoodOffsetType>                  m_SearchNeighborhoodOffsetList;
+  std::map<RadiusValueType,
+    std::vector<NeighborhoodOffsetType> >              m_SearchNeighborhoodOffsetSetsMap;
+
   std::vector<NeighborhoodOffsetType>                  m_PatchNeighborhoodOffsetList;
 
   RealType                                             m_Alpha;
@@ -387,6 +413,8 @@ private:
   SimilarityMetricType                                 m_SimilarityMetric;
 
   ProbabilityImagePointer                              m_WeightSumImage;
+
+  RadiusImagePointer                                   m_SearchNeighborhoodRadiusImage;
 
   /** Output variables     */
   LabelPosteriorProbabilityMap                         m_LabelPosteriorProbabilityImages;

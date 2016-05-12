@@ -18,6 +18,7 @@
 #include "itkNearestNeighborInterpolateImageFunction.h"
 #include "itkWindowedSincInterpolateImageFunction.h"
 #include "itkLabelImageGaussianInterpolateImageFunction.h"
+#include "itkLabelImageGenericInterpolateImageFunction.h"
 #include "include/antsRegistration.h"
 #include "ReadWriteData.h"
 
@@ -786,7 +787,7 @@ DoRegistration(typename ParserType::Pointer & parser)
         if( transformOption->GetFunction( currentStage )->GetNumberOfParameters() > 2 )
           {
           std::vector<float> meshSizeForTheTotalFieldFloat =
-            parser->ConvertVector<float>( transformOption->GetFunction( currentStage )->GetParameter( 1 ) );
+            parser->ConvertVector<float>( transformOption->GetFunction( currentStage )->GetParameter( 2 ) );
           if( meshSizeForTheTotalFieldFloat.size() == 1 )
             {
             typename ImageType::Pointer fixedImage;
@@ -799,7 +800,7 @@ DoRegistration(typename ParserType::Pointer & parser)
           else
             {
             meshSizeForTheTotalField =
-              parser->ConvertVector<unsigned int>( transformOption->GetFunction( currentStage )->GetParameter( 1 ) );
+              parser->ConvertVector<unsigned int>( transformOption->GetFunction( currentStage )->GetParameter( 2 ) );
             }
           }
         else
