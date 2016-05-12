@@ -357,15 +357,15 @@ public:
 
     if( curIter > 9 )
       {
-      currentFileName << "_Iters" << curIter << ".nii.gz";
+      currentFileName << "_Iters" << curIter << ".mnc";
       }
     else if( curIter > 19 )
       {
-      currentFileName << "_Itert" << curIter << ".nii.gz";
+      currentFileName << "_Itert" << curIter << ".mnc";
       }
     else
       {
-      currentFileName << "_Iter" << curIter << ".nii.gz";
+      currentFileName << "_Iter" << curIter << ".mnc";
       }
     std::cout << "*"; // The star befor each DIAGNOSTIC shows that its output is writtent out.
 
