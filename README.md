@@ -1,3 +1,5 @@
+![ants chimp](http://i.imgur.com/4tPvy05.png)
+
 ============================
 Advanced Normalization Tools
 ============================
@@ -244,6 +246,8 @@ here](https://sourceforge.net/p/advants/discussion/840261/thread/1cb7b165/?limit
 
 Brief ANTs segmentation [video](http://vimeo.com/67814201)
 
+**Benchmarks** [results](https://github.com/gdevenyi/antsRegistration-benchmarking)
+
 References
 ----------------------------------------------------------
 
@@ -306,7 +310,6 @@ References
 [12] http://www.ncbi.nlm.nih.gov/pubmed/23813017
 
 [13] http://www.ncbi.nlm.nih.gov/pubmed/24830834
-
 
 
 ANTs was supported by: R01-EB006266-01 and by K01-ES025432-01
