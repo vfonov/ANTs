@@ -78,7 +78,7 @@ Optional arguments:
 
      -s:  spline distance for deformable B-spline SyN transform (default = 26)
 
-     -x:  mask for the fixed image space
+     -x:  mask for the fixed image space, applied only in the last stage
 
      -p:  precision type (default = 'd')
         f: float
@@ -220,18 +220,17 @@ REPORTMAPPINGPARAMETERS
 cleanup()
 {
   echo "\n*** Performing cleanup, please wait ***\n"
-  
+
   runningANTSpids=$( ps --ppid $$ -o pid= )
-  
+
   for thePID in $runningANTSpids
   do
       echo "killing:  ${thePID}"
       kill ${thePID}
   done
-  
+
   return $?
 }
-
 
 control_c()
 # run if user hits control-c
@@ -241,7 +240,6 @@ control_c()
   exit $?
   echo -en "\n*** Script cancelled by user ***\n"
 }
-
 
 # Provide output for Help
 if [[ "$1" == "-h" || $# -eq 0 ]];
@@ -360,6 +358,23 @@ reportMappingParameters
 
 ##############################
 #
+# Mask stuff
+#
+##############################
+
+if [[ ${#MASK} -lt 3 ]];
+  then
+    NULLMASK=""
+    MASK=""
+    HAVEMASK=0
+  else
+    NULLMASK=" -x [NULL,NULL] "
+    MASK=" -x [$MASK, NULL] "
+    HAVEMASK=1
+  fi
+
+##############################
+#
 # Infer the number of levels based on
 # the size of the input fixed image.
 #
@@ -470,18 +485,33 @@ STAGES=''
 case "$TRANSFORMTYPE" in
 "r" | "t")
   STAGES="$INITIALSTAGE $RIGIDSTAGE"
+  if [[ $HAVEMASK -eq 1 ]] ; then
+    $STAGES=" $INITIALSTAGE $RIGIDSTAGE $MASK "
+  fi
   ;;
 "a")
   STAGES="$INITIALSTAGE $RIGIDSTAGE $AFFINESTAGE"
+  if [[ $HAVEMASK -eq 1 ]] ; then
+    STAGES="$INITIALSTAGE $RIGIDSTAGE $NULLMASK $AFFINESTAGE $MASK "
+  fi
   ;;
 "b" | "s")
   STAGES="$INITIALSTAGE $RIGIDSTAGE $AFFINESTAGE $SYNSTAGE"
+  if [[ $HAVEMASK -eq 1 ]] ; then
+    STAGES="$INITIALSTAGE $RIGIDSTAGE $NULLMASK $AFFINESTAGE $NULLMASK $SYNSTAGE $MASK "
+  fi
   ;;
 "br" | "sr")
   STAGES="$INITIALSTAGE $RIGIDSTAGE  $SYNSTAGE"
+  if [[ $HAVEMASK -eq 1 ]] ; then
+    STAGES="$INITIALSTAGE $RIGIDSTAGE $NULLMASK $SYNSTAGE $MASK "
+  fi
   ;;
 "bo" | "so")
   STAGES="$INITIALSTAGE $SYNSTAGE"
+  if [[ $HAVEMASK -eq 1 ]] ; then
+    $STAGES=" $INITIALSTAGE $SYNSTAGE $MASK "
+  fi
   ;;
 *)
   echo "Transform type '$TRANSFORMTYPE' is not an option.  See usage: '$0 -h 1'"
@@ -503,21 +533,12 @@ case "$PRECISIONTYPE" in
   ;;
 esac
 
-
-if [[ ${#MASK} -lt 3 ]] ; then
-  MASK=""
-else
-  MASK=" -x $MASK "
-fi
-
-
 COMMAND="${ANTS} --verbose 1 \
                  --dimensionality $DIM $PRECISION \
                  --output [$OUTPUTNAME,${OUTPUTNAME}Warped.nii.gz,${OUTPUTNAME}InverseWarped.nii.gz] \
                  --interpolation Linear \
                  --use-histogram-matching ${USEHISTOGRAMMATCHING} \
                  --winsorize-image-intensities [0.005,0.995] \
-                 ${MASK} \
                  $STAGES"
 
 echo " antsRegistration call:"

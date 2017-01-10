@@ -50,6 +50,7 @@ endmacro()
 
 set(CORE_ANTS_APPS
   antsAffineInitializer
+  antsJointFusion
   SurfaceBasedSmoothing
   CreateJacobianDeterminantImage
   ThresholdImage
@@ -70,7 +71,6 @@ set(CORE_ANTS_APPS
 
 set(MORE_ANTS_APPS
     antsAI
-    antsJointFusion
     antsJointTensorFusion
     ImageMath
     iMath
@@ -168,26 +168,10 @@ endif(BUILD_ALL_ANTS_APPS)
 
 
 if(USE_VTK)
-find_package(VTK 6.2 REQUIRED NO_MODULE)
-find_package(VTK COMPONENTS
-   vtkCommonCore
-   vtkCommonDataModel
-   vtkIOGeometry
-   vtkIOXML
-   vtkIOLegacy
-   vtkIOPLY
-   vtkRenderingOpenGL
-   vtkFiltersModeling
-   vtkImagingStencil
-   vtkImagingGeneral
-   vtkRenderingAnnotation
-   )
-include(${VTK_USE_FILE})
-include_directories(${VTK_INCLUDE_DIRS})
-
 set(VTK_ANTS_APPS
-#    ConvertVectorFieldToVTK
+    # ConvertVectorFieldToVTK
     antsSurf
+    antsVol
     GetMeshAndTopology
     CheckTopology
     WarpVTKPolyDataMultiTransform
