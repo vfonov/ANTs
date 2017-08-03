@@ -53,6 +53,8 @@
 
 #include "antsUtilitiesTesting.h"
 
+#include "antsVol.h"
+
 #include "ANTSUseDeformationFieldToGetAffineTransform.h"
 
 #include "ANTSUseLandmarkImagesToGetAffineTransform.h"
@@ -162,6 +164,8 @@
 #include "N3BiasFieldCorrection.h"
 
 #include "N4BiasFieldCorrection.h"
+
+#include "NonLocalSuperResolution.h"
 
 #include "PasteImageIntoImage.h"
 

@@ -504,7 +504,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
       if( count % ImageDimension == 0 )
         {
         directions.push_back( direction );
-        if( dwiOption->GetFunction( 0 )->GetNumberOfParameters() < 2 )
+        if( dwiOption->GetFunction( 0 )->GetNumberOfParameters() < 3 )
           {
           str >> x;
           bvalues.push_back( x );
@@ -516,11 +516,23 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
         }
       }
 
-    if( numberOfDirections != directions.size() - 1 )
+    if( dwiOption->GetFunction( 0 )->GetNumberOfParameters() < 3 )
       {
-      std::cout << "ERROR:  Number of directions does not match the data file."
-               << std::endl;
-      return EXIT_FAILURE;
+      if( bvalues.size() != directions.size() )
+        {
+        std::cout << "ERROR:  Number of bvalues does not match the number of directions."
+                 << std::endl;
+        return EXIT_FAILURE;
+        }
+      }
+    else
+      {
+      if( numberOfDirections != directions.size() - 1 )
+        {
+        std::cout << "ERROR:  Number of directions does not match the data file."
+                 << std::endl;
+        return EXIT_FAILURE;
+        }
       }
     }
   else

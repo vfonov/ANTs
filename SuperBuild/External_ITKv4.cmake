@@ -155,17 +155,15 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
       ${${proj}_WRAP_ARGS}
       ${${proj}_FFTWF_ARGS}
       ${${proj}_FFTWD_ARGS}
+      ${${proj}_MINC_ARGS}
       )
     endif()
 
 
   ### --- End Project specific additions
   set(${proj}_REPOSITORY ${git_protocol}://github.com/InsightSoftwareConsortium/ITK.git)
-  set(${proj}_GIT_TAG f60bbd3aadc4b9fbf2cff1cf7227cef1e92b979a) ##
-  set(ITK_VERSION_ID ITK-4.10) ### NOTE: When updating GIT_TAG, also update ITK_VERSION_ID
-
-  set(${proj}_GIT_TAG 9405479927dc36c95ff7b658cfb25580705be5ba) ##
-  set(ITK_VERSION_ID ITK-4.11) ### NOTE: When updating GIT_TAG, also update ITK_VERSION_ID
+  set(${proj}_GIT_TAG c5138560409c75408ff76bccff938f21e5dcafc6) ##
+  set(ITK_VERSION_ID ITK-4.12) ### NOTE: When updating GIT_TAG, also update ITK_VERSION_ID
 
   ExternalProject_Add(${proj}
     GIT_REPOSITORY ${${proj}_REPOSITORY}

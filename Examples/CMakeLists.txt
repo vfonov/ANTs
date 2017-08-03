@@ -9,6 +9,7 @@ add_library(antsUtilities STATIC antsUtilities.cxx
             ../Utilities/antsCommandLineOption.cxx
             ../Utilities/antsCommandLineParser.cxx
             ANTsVersion.cxx
+            ImageMathHelper.cxx ImageMathHelper2D.cxx  ImageMathHelper3D.cxx  ImageMathHelper4D.cxx
             )
 target_link_libraries(antsUtilities ${ITK_LIBRARIES} )
 install(TARGETS antsUtilities
@@ -50,6 +51,8 @@ endmacro()
 
 set(CORE_ANTS_APPS
   antsAffineInitializer
+  antsJointFusion
+  DenoiseImage
   SurfaceBasedSmoothing
   CreateJacobianDeterminantImage
   ThresholdImage
@@ -70,7 +73,6 @@ set(CORE_ANTS_APPS
 
 set(MORE_ANTS_APPS
     antsAI
-    antsJointFusion
     antsJointTensorFusion
     ImageMath
     iMath
@@ -119,7 +121,7 @@ set(MORE_ANTS_APPS
     TileImages
     CreateTiledMosaic
     CreateImage
-    DenoiseImage
+    NonLocalSuperResolution
     WarpTensorImageMultiTransform
     ReorientTensorImage
     RebaseTensorImage
@@ -168,26 +170,10 @@ endif(BUILD_ALL_ANTS_APPS)
 
 
 if(USE_VTK)
-find_package(VTK 6.2 REQUIRED NO_MODULE)
-find_package(VTK COMPONENTS
-   vtkCommonCore
-   vtkCommonDataModel
-   vtkIOGeometry
-   vtkIOXML
-   vtkIOLegacy
-   vtkIOPLY
-   vtkRenderingOpenGL
-   vtkFiltersModeling
-   vtkImagingStencil
-   vtkImagingGeneral
-   vtkRenderingAnnotation
-   )
-include(${VTK_USE_FILE})
-include_directories(${VTK_INCLUDE_DIRS})
-
 set(VTK_ANTS_APPS
-#    ConvertVectorFieldToVTK
+    # ConvertVectorFieldToVTK
     antsSurf
+    antsVol
     GetMeshAndTopology
     CheckTopology
     WarpVTKPolyDataMultiTransform
@@ -211,7 +197,7 @@ install(PROGRAMS ../Scripts/ANTSpexec.sh
      ../Scripts/antsIntroduction.sh
      ../Scripts/antsLaplacianBoundaryCondition.R
      ../Scripts/antsLongitudinalCorticalThickness.sh
-     ../Scripts/antsMalfLabeling.sh
+     ../Scripts/antsJointLabelFusion.sh
      ../Scripts/antsMultivariateTemplateConstruction.sh
      ../Scripts/antsMultivariateTemplateConstruction2.sh
      ../Scripts/antsNetworkAnalysis.R

@@ -112,13 +112,14 @@ Optional arguments:
                                                 aren't used then we simply smooth the single-subject template posteriors after
                                                 passing through antsCorticalThickness.sh. Example:
 
- 						  -a atlas1.nii.gz -a atlas2.nii.gz ... -a atlasN.nii.gz
+ 						                                         -a atlas1.nii.gz -a atlas2.nii.gz ... -a atlasN.nii.gz
 
      -l:                                        Labels associated with each atlas, in the same order as they are specified
 						with the -a option. The number of labels in each image is assumed to be equal
                                                 to the number of priors.
      -f:  extraction registration mask          Mask (defined in the template space) used during registration
                                                 for brain extraction.
+     -g:  denoise anatomical images             Denoise anatomical images (default = 0).
      -j:  number of cpu cores                   Number of cpu cores to use locally for pexec option (default 2; requires "-c 2")
      -k:  number of modalities                  Number of modalities used to construct the template (default 1):  For example,
                                                 if one wanted to use multiple modalities consisting of T1, T2, and FA
@@ -126,11 +127,12 @@ Optional arguments:
      -n:  use SST cortical thickness prior      If set to '1', the cortical thickness map from the single-subject template is used
                                                 as a prior constraint for each of the individual calls to antsCorticalThickness.sh
                                                 (default = 0).
-     -g:  use floating-point precision          Use floating point precision in registrations (default = 0)
+     -u:  use floating-point precision          Use floating point precision in registrations (default = 0)
      -v:  Atropos segmentation weight (SST)     Atropos spatial prior *probability* weight for the segmentation for the single
                                                 subject template (default = 0.25)
      -w:  Atropos segmentation weight (Indiv.)  Atropos spatial prior *probability* weight for the segmentation for the individual
                                                 time points (default = 0.5)
+     -x:                                        Number of iterations within Atropos (default 5).
      -q:  Use quick registration parameters     If 'yes' then we use antsRegistrationSyNQuick.sh as the basis for registration.
                                                 Otherwise use antsRegistrationSyN.sh.  The options are as follows:
                                                 '-q 0' = antsRegistrationSyN for everything (default)
@@ -140,7 +142,11 @@ Optional arguments:
      -r:  rigid alignment to SST                This option dictates if the individual subjects are registered to the single
                                                 subject template before running through antsCorticalThickness.  This potentially
                                                 reduces bias caused by subject orientation and voxel spacing (default = 0).
-     -z:  Test / debug mode                     If > 0, runs a faster version of the script. Only for testing. Implies -u 0.
+     -b:  keep temporary files                  Keep brain extraction/segmentation warps, etc (default = 0).
+     -y:  averge rigid transform component      Update the template with the full affine transform (default 0). If 1, the rigid
+                                                component of the affine transform will be used to update the template.
+     -z:  Test / debug mode                     If > 0, runs a faster version of the script. Only for testing. Implies -u 0
+                                                in the antsCorticalThickness.sh script (i.e., no random seeding).
                                                 Requires single thread computation for complete reproducibility.
 USAGE
     exit 1
@@ -163,11 +169,13 @@ echoParameters() {
       run quick               = ${RUN_QUICK}
       debug mode              = ${DEBUG_MODE}
       float precision         = ${USE_FLOAT_PRECISION}
+      denoise                 = ${DENOISE}
       use random seeding      = ${USE_RANDOM_SEEDING}
       number of modalities    = ${NUMBER_OF_MODALITIES}
       number of cores         = ${CORES}
       control type            = ${DOQSUB}
       rigid alignment to SST  = ${RIGID_ALIGNMENT_TO_SST}
+      average rigid component = ${AFFINE_UPDATE_FULL}
 
 PARAMETERS
 }
@@ -231,9 +239,13 @@ SEGMENTATION_PRIOR=""
 USE_SST_CORTICAL_THICKNESS_PRIOR=0
 REGISTRATION_TEMPLATE=""
 DO_REGISTRATION_TO_TEMPLATE=0
+DENOISE=0
 
 ATROPOS_SEGMENTATION_PRIOR_WEIGHT_SST=0.25
 ATROPOS_SEGMENTATION_PRIOR_WEIGHT_TIMEPOINT=0.5
+ATROPOS_SEGMENTATION_INTERNAL_ITERATIONS=5
+
+AFFINE_UPDATE_FULL=0
 
 DOQSUB=0
 CORES=2
@@ -250,19 +262,20 @@ MALF_LABEL_STRINGS_FOR_PRIORS=()
 ################################################################################
 
 USE_FLOAT_PRECISION=0
+KEEP_TMP_IMAGES=0
 
 if [[ $# -lt 3 ]] ; then
   Usage >&2
   exit 1
 else
-  while getopts "a:b:c:d:e:f:g:h:j:k:l:m:n:o:p:q:r:s:t:v:w:z:" OPT
+  while getopts "a:b:c:d:e:f:g:h:j:k:l:m:n:o:p:q:r:s:t:u:v:x:w:y:z:" OPT
     do
       case $OPT in
           a)
        MALF_ATLASES[${#MALF_ATLASES[@]}]=$OPTARG
        ;;
-          b) # posterior formulation
-       ATROPOS_SEGMENTATION_POSTERIOR_FORMULATION=$OPTARG
+          b)
+       KEEP_TMP_IMAGES=$OPTARG
        ;;
           c)
        DOQSUB=$OPTARG
@@ -286,8 +299,8 @@ else
           f) #brain extraction registration mask
        EXTRACTION_REGISTRATION_MASK=$OPTARG
        ;;
-          g) #use floating point precision
-       USE_FLOAT_PRECISION=$OPTARG
+          g) #denoise
+       DENOISE=$OPTARG
        ;;
           h) #help
        Usage >&2
@@ -308,6 +321,9 @@ else
           n) # use
        USE_SST_CORTICAL_THICKNESS_PRIOR=$OPTARG
        ;;
+          x) #atropos segmentation internal iterations
+       ATROPOS_SEGMENTATION_INTERNAL_ITERATIONS=$OPTARG
+       ;;
           o) #output prefix
        OUTPUT_PREFIX=$OPTARG
        ;;
@@ -324,11 +340,17 @@ else
           q) # run quick
        RUN_QUICK=$OPTARG
        ;;
+          u) #use floating point precision
+       USE_FLOAT_PRECISION=$OPTARG
+       ;;
           v) #atropos prior weight for single subject template
        ATROPOS_SEGMENTATION_PRIOR_WEIGHT_SST=$OPTARG
        ;;
           w) #atropos prior weight for each individual time point
        ATROPOS_SEGMENTATION_PRIOR_WEIGHT_TIMEPOINT=$OPTARG
+       ;;
+          y) # 1 update with full affine, 0 for no rigid (default = 0)
+       AFFINE_UPDATE_FULL=$OPTARG
        ;;
           z) #debug mode
        DEBUG_MODE=$OPTARG
@@ -491,19 +513,42 @@ if [[ ${#ANATOMICAL_IMAGES[@]} -eq ${NUMBER_OF_MODALITIES} ]];
 
     # Won't be quick unless -q 3 was specified
     # But if you are running a longitudinal script without longitudinal data, that may not be the only problem
-
+    if [[ $DO_REGISTRATION_TO_TEMPLATE -eq 1 ]];
+        then
     logCmd ${ANTSPATH}/antsCorticalThickness.sh \
-      -d ${DIMENSION} \
+      -d ${DIMENSION}
+      -x ${ATROPOS_SEGMENTATION_INTERNAL_ITERATIONS} \
+      -t ${REGISTRATION_TEMPLATE} \
       -q ${RUN_FAST_ANTSCT_TO_GROUP_TEMPLATE} \
       ${SUBJECT_ANATOMICAL_IMAGES} \
       -e ${BRAIN_TEMPLATE} \
       -f ${EXTRACTION_REGISTRATION_MASK} \
       -m ${EXTRACTION_PRIOR} \
-      -k 0 \
+      -k ${KEEP_TMP_IMAGES} \
+      -g ${DENOISE} \
       -w ${ATROPOS_SEGMENTATION_PRIOR_WEIGHT_TIMEPOINT} \
       -z ${DEBUG_MODE} \
       -p ${SEGMENTATION_PRIOR} \
       -o ${OUTPUT_PREFIX}
+    fi
+
+    if [[ $DO_REGISTRATION_TO_TEMPLATE -eq 0 ]];
+        then
+    logCmd ${ANTSPATH}/antsCorticalThickness.sh \
+      -d ${DIMENSION}
+      -x ${ATROPOS_SEGMENTATION_INTERNAL_ITERATIONS} \
+      -q ${RUN_FAST_ANTSCT_TO_GROUP_TEMPLATE} \
+      ${SUBJECT_ANATOMICAL_IMAGES} \
+      -e ${BRAIN_TEMPLATE} \
+      -f ${EXTRACTION_REGISTRATION_MASK} \
+      -m ${EXTRACTION_PRIOR} \
+      -k ${KEEP_TMP_IMAGES} \
+      -g ${DENOISE} \
+      -w ${ATROPOS_SEGMENTATION_PRIOR_WEIGHT_TIMEPOINT} \
+      -z ${DEBUG_MODE} \
+      -p ${SEGMENTATION_PRIOR} \
+      -o ${OUTPUT_PREFIX}
+    fi
 
     exit 0
   fi
@@ -602,7 +647,7 @@ if [[ ! -f $SINGLE_SUBJECT_TEMPLATE ]];
           -r 1 \
           -s CC \
           -t GR \
-          -y 0 \
+          -y ${AFFINE_UPDATE_FULL} \
           ${TEMPLATE_Z_IMAGES} \
           ${ANATOMICAL_IMAGES[@]}
     else
@@ -626,7 +671,7 @@ if [[ ! -f $SINGLE_SUBJECT_TEMPLATE ]];
          -l 1 \
          -m CC[4] \
          -t SyN \
-         -y 0 \
+         -y ${AFFINE_UPDATE_FULL} \
          ${TEMPLATE_Z_IMAGES} \
          ${ANATOMICAL_IMAGES[@]}
     fi
@@ -720,27 +765,29 @@ if [[ ! -f ${SINGLE_SUBJECT_TEMPLATE_CORTICAL_THICKNESS} ]];
     if [[ $DO_REGISTRATION_TO_TEMPLATE -eq 0 ]];
       then
         logCmd ${ANTSPATH}/antsCorticalThickness.sh \
-          -d ${DIMENSION} \
+          -d ${DIMENSION} -x ${ATROPOS_SEGMENTATION_INTERNAL_ITERATIONS} \
           -q ${RUN_FAST_ANTSCT_TO_GROUP_TEMPLATE} \
           -a ${SINGLE_SUBJECT_TEMPLATE} \
           -e ${BRAIN_TEMPLATE} \
           -f ${EXTRACTION_REGISTRATION_MASK} \
+          -g ${DENOISE} \
           -m ${EXTRACTION_PRIOR} \
-          -k 0 \
+          -k ${KEEP_TMP_IMAGES} \
           -z ${DEBUG_MODE} \
           -p ${SEGMENTATION_PRIOR} \
           -w ${ATROPOS_SEGMENTATION_PRIOR_WEIGHT_SST} \
           -o ${SINGLE_SUBJECT_ANTSCT_PREFIX}
       else
         logCmd ${ANTSPATH}/antsCorticalThickness.sh \
-          -d ${DIMENSION} \
+          -d ${DIMENSION} -x ${ATROPOS_SEGMENTATION_INTERNAL_ITERATIONS}  \
           -t ${REGISTRATION_TEMPLATE} \
           -q ${RUN_FAST_ANTSCT_TO_GROUP_TEMPLATE} \
           -a ${SINGLE_SUBJECT_TEMPLATE} \
           -e ${BRAIN_TEMPLATE} \
           -f ${EXTRACTION_REGISTRATION_MASK} \
+          -g ${DENOISE} \
           -m ${EXTRACTION_PRIOR} \
-          -k 0 \
+          -k ${KEEP_TMP_IMAGES} \
           -z ${DEBUG_MODE} \
           -p ${SEGMENTATION_PRIOR} \
           -w ${ATROPOS_SEGMENTATION_PRIOR_WEIGHT_SST} \
@@ -951,13 +998,14 @@ for (( i=0; i < ${#ANATOMICAL_IMAGES[@]}; i+=$NUMBER_OF_MODALITIES ))
     OUTPUT_LOCAL_PREFIX=${OUTPUT_DIRECTORY_FOR_SINGLE_SUBJECT_CORTICAL_THICKNESS}/${BASENAME_ID}
 
     logCmd ${ANTSPATH}/antsCorticalThickness.sh \
-      -d ${DIMENSION} \
+      -d ${DIMENSION} -x ${ATROPOS_SEGMENTATION_INTERNAL_ITERATIONS}  \
       -q ${RUN_ANTSCT_TO_SST_QUICK} \
       ${SUBJECT_ANATOMICAL_IMAGES} \
       -e ${SINGLE_SUBJECT_TEMPLATE} \
       -m ${SINGLE_SUBJECT_TEMPLATE_EXTRACTION_PRIOR} \
       -f ${SINGLE_SUBJECT_TEMPLATE_EXTRACTION_REGISTRATION_MASK} \
-      -k 0 \
+      -g ${DENOISE} \
+      -k ${KEEP_TMP_IMAGES} \
       -z ${DEBUG_MODE} \
       -w ${ATROPOS_SEGMENTATION_PRIOR_WEIGHT_TIMEPOINT} \
       -p ${SINGLE_SUBJECT_TEMPLATE_PRIOR} \
