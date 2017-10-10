@@ -77,8 +77,6 @@ Compulsory arguments (minimal command line requires SGE/PBS cluster, otherwise u
      -d:  ImageDimension: 2 or 3 (for 2 or 3 dimensional registration of single volume)
    ImageDimension: 4 (for template generation of time-series data)
 
-     -o:  OutputPrefix; A prefix that is prepended to all output files.
-
 <images>  List of images in the current directory, eg *_t1.nii.gz. Should be at the end
           of the command.  Optionally, one can specify a .csv or .txt file where each
           line is the location of the input image.  One can also specify more than
@@ -110,8 +108,9 @@ Optional arguments:
      -e   use single precision ( default 1 )
 
      -g:  Gradient step size (default 0.25): smaller in magnitude results in more
-          cautious steps.
-
+          cautious steps.  Use smaller steps to refine template details.
+          0.25 is an upper (aggressive) limit for this parameter.
+          
      -i:  Iteration limit (default 4): iterations of the template construction
           (Iteration limit)*NumImages registrations.
 
@@ -131,13 +130,15 @@ Optional arguments:
             L = fine resolution iteratioxns (here, full resolution).
           Finer resolutions take much more time per iteration than coarser resolutions.
 
-     -f:  Shrink factors (default = 6x4x2x1):  Also in the same form as -q max iterations.  
+     -f:  Shrink factors (default = 6x4x2x1):  Also in the same form as -q max iterations.
           Needs to have the same number of components.
 
      -s:  Smoothing factors (default = 3x2x1x0):  Also in the same form as -q max
           iterations.  Needs to have the same number of components.
 
      -n:  N4BiasFieldCorrection of moving image: 0 == off, 1 == on (default 1).
+
+     -o:  OutputPrefix; A prefix that is prepended to all output files (default = "antsBTP").
 
      -p:  Commands to prepend to job scripts (e.g., change into appropriate directory, set
           paths, etc)
@@ -162,6 +163,11 @@ Optional arguments:
             BSplineSyN = Greedy B-spline SyN
             TimeVaryingVelocityField = Time-varying velocity field
             TimeVaryingBSplineVelocityField = Time-varying B-spline velocity field
+             
+            The transformations above are used after linear registration. To use use linear registration only:
+
+            Affine = Rigid + Affine.
+            Rigid = Rigid only. 
 
      -u:  Walltime (default = 20:00:00):  Option for PBS/SLURM qsub specifying requested time
           per pairwise registration.
@@ -264,8 +270,9 @@ function summarizeimageset() {
   case $method in
     0) #mean
       ${ANTSPATH}/AverageImages $dim $output 0 ${images[*]}
+      ${ANTSPATH}/ImageMath $dim $output Sharpen $output
       ;;
-    1) #mean of normalized images
+    1) #mean of normalized images, sharpens automatically
       ${ANTSPATH}/AverageImages $dim $output 1 ${images[*]}
       ;;
     2) #median
@@ -276,6 +283,7 @@ function summarizeimageset() {
         done
 
       ${ANTSPATH}/ImageSetStatistics $dim ${output}_list.txt ${output} 0
+      ${ANTSPATH}/ImageMath $dim $output Sharpen $output
       rm ${output}_list.txt
       ;;
   esac
@@ -486,6 +494,7 @@ MEMORY="8gb"
 # It can be set to an empty string if you do not need any special cluster options
 QSUBOPTS="" # EDIT THIS
 OUTPUTNAME=antsBTP
+TEMPLATENAME=${OUTPUTNAME}template
 AFFINE_UPDATE_FULL=1
 
 ##Getting system info from linux can be done with these variables.
@@ -730,6 +739,16 @@ elif [[ $TRANSFORMATIONTYPE == "Affine"* ]];
         TRANSFORMATION=${TRANSFORMATIONTYPE}
       else
         TRANSFORMATION=Affine[0.1]
+    fi
+elif [[ $TRANSFORMATIONTYPE == "Rigid"* ]];
+  then
+    echo "Rigid transforms only!!!!"
+    NOWARP=1
+    if [[ $TRANSFORMATIONTYPE == "Rigid["*"]" ]]
+      then
+        TRANSFORMATION=${TRANSFORMATIONTYPE}
+      else
+        TRANSFORMATION=Rigid[0.1]
     fi
 else
   echo "Invalid transformation. See `basename $0` -h for help menu."
@@ -1361,8 +1380,16 @@ while [[ $i -lt ${ITERATIONLIMIT} ]];
             pexe="$pexe ${basecall} ${stageId} ${stage3} >> ${outdir}/job_${count}_metriclog.txt\n"
           elif [[ $NOWARP -eq 1 ]];
             then
-              exe="$exebase ${basecall} ${stage0} ${stage1} ${stage2}\n";
-              pexe="$pexebase ${basecall} ${stage0} ${stage1} ${stage2} >> ${outdir}/job_${count}_metriclog.txt\n"
+    	      if [[ ${TRANSFORMATION} == "Affine"* ]]; 
+	        then
+          	  # If affine, do standard rigid, then affine with levels, etc from command line
+		  exe="$exebase ${basecall} ${stage0} ${stage1} ${stage3}\n";
+		  pexe="$pexebase ${basecall} ${stage0} ${stage1} ${stage3} >> ${outdir}/job_${count}_metriclog.txt\n"
+	        else
+		  # Rigid only - just use command line params
+		  exe="$exebase ${basecall} ${stage0} ${stage3}\n";
+		  pexe="$pexebase ${basecall} ${stage0} ${stage3} >> ${outdir}/job_${count}_metriclog.txt\n"
+                fi
           else
             exe="$exe ${basecall} ${stage0} ${stage1} ${stage2} ${stage3}\n"
             pexe="$pexe ${basecall} ${stage0} ${stage1} ${stage2} ${stage3} >> ${outdir}/job_${count}_metriclog.txt\n"

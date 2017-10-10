@@ -54,8 +54,38 @@ option(BUILD_ALL_ANTS_APPS "Use All ANTs Apps" ON)
 option(USE_VTK "Use VTK Libraries" OFF)
 if(USE_VTK)
   find_package(VTK)
+
+  if(VTK_VERSION_MAJOR GREATER 6)
+    find_package(VTK COMPONENTS vtkRenderingVolumeOpenGL2
+   vtkCommonCore
+   vtkCommonDataModel
+   vtkIOGeometry
+   vtkIOXML
+   vtkIOLegacy
+   vtkIOPLY
+   vtkFiltersModeling
+   vtkImagingStencil
+   vtkImagingGeneral
+   vtkRenderingAnnotation
+   )
+  else(VTK_VERSION_MAJOR GREATER 6)
+     find_package(VTK COMPONENTS vtkRenderingVolumeOpenGL
+     vtkCommonCore
+     vtkCommonDataModel
+     vtkIOGeometry
+     vtkIOXML
+     vtkIOLegacy
+     vtkIOPLY
+     vtkFiltersModeling
+     vtkImagingStencil
+     vtkImagingGeneral
+     vtkRenderingAnnotation)
+  endif(VTK_VERSION_MAJOR GREATER 6)
+
   if(VTK_FOUND)
     include(${VTK_USE_FILE})
+    include_directories(${VTK_INCLUDE_DIRS})
+    set(INIT_VTK_LIBRARIES ${VTK_LIBRARIES})
   else(VTK_FOUND)
      message("Cannot build some programs without VTK.  Please set VTK_DIR if you need these programs.")
   endif(VTK_FOUND)
@@ -105,14 +135,14 @@ link_directories( ${ITK_LIBRARY_PATH}  )
 #----------------------------------------------------------------------------
 # Setup ants build environment
 set(PICSL_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/Utilities
-  ${CMAKE_CURRENT_SOURCE_DIR}/ImageRegistration
-  ${CMAKE_CURRENT_SOURCE_DIR}/ImageSegmentation
+${CMAKE_CURRENT_SOURCE_DIR}/Utilities
+${CMAKE_CURRENT_SOURCE_DIR}/ImageRegistration
+${CMAKE_CURRENT_SOURCE_DIR}/ImageSegmentation
 #  ${CMAKE_CURRENT_SOURCE_DIR}/GraphTheory
-  ${CMAKE_CURRENT_SOURCE_DIR}/Tensor
-  ${CMAKE_CURRENT_SOURCE_DIR}/Temporary
-  ${CMAKE_CURRENT_SOURCE_DIR}/Examples
-  ${CMAKE_CURRENT_BINARY_DIR}
+${CMAKE_CURRENT_SOURCE_DIR}/Tensor
+${CMAKE_CURRENT_SOURCE_DIR}/Temporary
+${CMAKE_CURRENT_SOURCE_DIR}/Examples
+${CMAKE_CURRENT_BINARY_DIR}
 )
 include_directories(${PICSL_INCLUDE_DIRS})
 

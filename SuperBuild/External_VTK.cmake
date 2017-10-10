@@ -19,7 +19,7 @@ ProjectDependancyPush(CACHED_proj ${proj})
 # SlicerMacroCheckExternalProjectDependency
 set(extProjName VTK) #The find_package known name
 set(proj        VTK) #This local name
-set(${extProjName}_REQUIRED_VERSION "6.2")  #If a required version is necessary, then set this, else leave blank
+# set(${extProjName}_REQUIRED_VERSION "6.2")  #If a required version is necessary, then set this, else leave blank
 
 #if(${USE_SYSTEM_${extProjName}})
 #  unset(${extProjName}_DIR CACHE)
@@ -147,7 +147,7 @@ if(NOT ( DEFINED "USE_SYSTEM_${extProjName}" AND "${USE_SYSTEM_${extProjName}}" 
       -DBUILD_EXAMPLES:BOOL=OFF
       -DBUILD_TESTING:BOOL=OFF
       -DVTK_USE_PARALLEL:BOOL=ON
-      -DBUILD_SHARED_LIBS:OFF
+      -DBUILD_SHARED_LIBS:BOOL=OFF
       -DVTK_DEBUG_LEAKS:BOOL=${${PROJECT_NAME}_USE_VTK_DEBUG_LEAKS}
       -DVTK_LEGACY_REMOVE:BOOL=OFF
       -DVTK_WRAP_TCL:BOOL=${VTK_WRAP_TCL}
@@ -195,7 +195,8 @@ if(NOT ( DEFINED "USE_SYSTEM_${extProjName}" AND "${USE_SYSTEM_${extProjName}}" 
 #    -P ${VTKPatchScript}
 #    )
 
-  set(${extProjName}_DIR ${CMAKE_BINARY_DIR}/${proj}-install/lib/vtk-6.2)
+set(${extProjName}_DIR ${CMAKE_BINARY_DIR}/${proj}-install)
+
 else()
   if(${USE_SYSTEM_${extProjName}})
     find_package(${extProjName} ${${extProjName}_REQUIRED_VERSION} REQUIRED)

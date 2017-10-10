@@ -29,16 +29,30 @@ public:
   itkNewMacro( CommandProgressUpdate );
 protected:
 
-  CommandProgressUpdate() : m_CurrentProgress( 0 ) {};
+  CommandProgressUpdate() : m_CurrentProgress( 0 ), m_StartNewLine( true ) {};
 
   typedef TFilter FilterType;
 
   unsigned int m_CurrentProgress;
+  bool         m_StartNewLine;
 
 public:
 
   void Execute(itk::Object *caller, const itk::EventObject & event) ITK_OVERRIDE
     {
+    const TFilter * filter = dynamic_cast<const TFilter *>( caller );
+
+    if( this->m_CurrentProgress == 0 && ! filter->GetIsWeightedAveragingComplete() )
+      {
+      std::cout << "Weighted averaging: " << std::flush;
+      }
+    else if( this->m_StartNewLine && filter->GetIsWeightedAveragingComplete() )
+      {
+      std::cout << std::endl << "Reconstruction: " << std::flush;
+      this->m_StartNewLine = false;
+      this->m_CurrentProgress = 0;
+      }
+
     itk::ProcessObject *po = dynamic_cast<itk::ProcessObject *>( caller );
     if (! po) return;
 //    std::cout << po->GetProgress() << std::endl;
@@ -61,12 +75,26 @@ public:
 
   void Execute(const itk::Object * object, const itk::EventObject & event) ITK_OVERRIDE
     {
+    const TFilter * filter = dynamic_cast<const TFilter *>( object );
+
+    if( this->m_CurrentProgress == 0 && ! filter->GetIsWeightedAveragingComplete() )
+      {
+      std::cout << "Weighted averaging: " << std::flush;
+      }
+    else if( this->m_StartNewLine && filter->GetIsWeightedAveragingComplete() )
+      {
+      std::cout << std::endl << "Reconstruction: " << std::flush;
+      this->m_StartNewLine = false;
+      this->m_CurrentProgress = 0;
+      }
+
     itk::ProcessObject *po = dynamic_cast<itk::ProcessObject *>(
       const_cast<itk::Object *>( object ) );
     if (! po) return;
 
     if( typeid( event ) == typeid ( itk::ProgressEvent )  )
       {
+
       if( this->m_CurrentProgress < 99 )
         {
         this->m_CurrentProgress++;
@@ -147,7 +175,7 @@ int antsJointFusion( itk::ants::CommandLineParser *parser )
       bool fileReadSuccessfully = ReadImage<RadiusImageType>( searchRadiusImage, searchRadiusString.c_str() );
       if( fileReadSuccessfully )
         {
-        fusionFilter->SetSearchNeighborhoodRadiusImage( searchRadiusImage );
+        fusionFilter->SetNeighborhoodSearchRadiusImage( searchRadiusImage );
         }
       else
         {
@@ -186,7 +214,7 @@ int antsJointFusion( itk::ants::CommandLineParser *parser )
         {
         searchNeighborhoodRadius[d] = searchRadius[d];
         }
-      fusionFilter->SetSearchNeighborhoodRadius( searchNeighborhoodRadius );
+      fusionFilter->SetNeighborhoodSearchRadius( searchNeighborhoodRadius );
       }
     }
 
@@ -218,25 +246,39 @@ int antsJointFusion( itk::ants::CommandLineParser *parser )
     patchNeighborhoodRadius[d] = patchRadius[d];
     }
 
-  fusionFilter->SetPatchNeighborhoodRadius( patchNeighborhoodRadius );
+  fusionFilter->SetNeighborhoodPatchRadius( patchNeighborhoodRadius );
 
-  // Retain atlas voting and label posterior images
+  // Check if the user wants to retain atlas voting and/or label posterior images
 
   bool retainAtlasVotingImages = false;
   bool retainLabelPosteriorImages = false;
+
+  typename OptionType::Pointer outputOption = parser->GetOption( "output" );
+  if( outputOption && outputOption->GetNumberOfFunctions() )
+    {
+    if( outputOption->GetFunction( 0 )->GetNumberOfParameters() > 2 )
+      {
+      retainLabelPosteriorImages = true;
+      }
+    if( outputOption->GetFunction( 0 )->GetNumberOfParameters() > 3 )
+      {
+      retainAtlasVotingImages = true;
+      }
+    }
+
+//   typename OptionType::Pointer retainLabelPosteriorOption = parser->GetOption( "retain-label-posterior-images" );
+//   if( retainLabelPosteriorOption && retainLabelPosteriorOption->GetNumberOfFunctions() > 0 )
+//     {
+//     retainLabelPosteriorImages = parser->Convert<bool>( retainLabelPosteriorOption->GetFunction()->GetName() );
+//     }
+//
+//   typename OptionType::Pointer retainAtlasVotingOption = parser->GetOption( "retain-atlas-voting-images" );
+//   if( retainAtlasVotingOption && retainAtlasVotingOption->GetNumberOfFunctions() > 0 )
+//     {
+//     retainAtlasVotingImages = parser->Convert<bool>( retainAtlasVotingOption->GetFunction()->GetName() );
+//     }
+
   bool constrainSolutionToNonnegativeWeights = false;
-
-  typename OptionType::Pointer retainLabelPosteriorOption = parser->GetOption( "retain-label-posterior-images" );
-  if( retainLabelPosteriorOption && retainLabelPosteriorOption->GetNumberOfFunctions() > 0 )
-    {
-    retainLabelPosteriorImages = parser->Convert<bool>( retainLabelPosteriorOption->GetFunction()->GetName() );
-    }
-
-  typename OptionType::Pointer retainAtlasVotingOption = parser->GetOption( "retain-atlas-voting-images" );
-  if( retainAtlasVotingOption && retainAtlasVotingOption->GetNumberOfFunctions() > 0 )
-    {
-    retainAtlasVotingImages = parser->Convert<bool>( retainAtlasVotingOption->GetFunction()->GetName() );
-    }
 
   typename OptionType::Pointer constrainWeightsOption = parser->GetOption( "constrain-nonnegative" );
   if( constrainWeightsOption && constrainWeightsOption->GetNumberOfFunctions() > 0 )
@@ -474,7 +516,6 @@ int antsJointFusion( itk::ants::CommandLineParser *parser )
     {
     std::cout << std::endl << "Writing output:" << std::endl;
     }
-  typename OptionType::Pointer outputOption = parser->GetOption( "output" );
   if( outputOption && outputOption->GetNumberOfFunctions() )
     {
     std::string labelFusionName;
@@ -669,30 +710,30 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   parser->AddOption( option );
   }
 
-  {
-  std::string description =
-    std::string( "Retain label posterior probability images.  Requires atlas segmentations " )
-    + std::string( "to be specified.  Default = false" );
-
-  OptionType::Pointer option = OptionType::New();
-  option->SetLongName( "retain-label-posterior-images" );
-  option->SetShortName( 'r' );
-  option->SetUsageOption( 0, "(0)/1" );
-  option->SetDescription( description );
-  parser->AddOption( option );
-  }
-
-  {
-  std::string description =
-    std::string( "Retain atlas voting images.  Default = false" );
-
-  OptionType::Pointer option = OptionType::New();
-  option->SetLongName( "retain-atlas-voting-images" );
-  option->SetShortName( 'f' );
-  option->SetUsageOption( 0, "(0)/1" );
-  option->SetDescription( description );
-  parser->AddOption( option );
-  }
+//   {
+//   std::string description =
+//     std::string( "Retain label posterior probability images.  Requires atlas segmentations " )
+//     + std::string( "to be specified.  Default = false" );
+//
+//   OptionType::Pointer option = OptionType::New();
+//   option->SetLongName( "retain-label-posterior-images" );
+//   option->SetShortName( 'r' );
+//   option->SetUsageOption( 0, "(0)/1" );
+//   option->SetDescription( description );
+//   parser->AddOption( option );
+//   }
+//
+//   {
+//   std::string description =
+//     std::string( "Retain atlas voting images.  Default = false" );
+//
+//   OptionType::Pointer option = OptionType::New();
+//   option->SetLongName( "retain-atlas-voting-images" );
+//   option->SetShortName( 'f' );
+//   option->SetUsageOption( 0, "(0)/1" );
+//   option->SetDescription( description );
+//   parser->AddOption( option );
+//   }
 
   {
   std::string description = std::string( "Constrain solution to non-negative weights." );
