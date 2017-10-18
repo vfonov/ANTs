@@ -4,13 +4,17 @@
 
 #include "ReadWriteData.h"
 
-#include "itkAddImageFilter.h"
-#include "itkAdaptiveNonLocalMeansDenoisingImageFilter.h"
-#include "itkIdentityTransform.h"
+#include "itkNonLocalSuperresolutionImageFilter.h"
+
+#include "itkBSplineInterpolateImageFunction.h"
 #include "itkLinearInterpolateImageFunction.h"
-#include "itkResampleImageFilter.h"
-#include "itkShrinkImageFilter.h"
-#include "itkSubtractImageFilter.h"
+#include "itkGaussianInterpolateImageFunction.h"
+#include "itkInterpolateImageFunction.h"
+#include "itkNearestNeighborInterpolateImageFunction.h"
+#include "itkWindowedSincInterpolateImageFunction.h"
+#include "itkLabelImageGaussianInterpolateImageFunction.h"
+#include "itkLabelImageGenericInterpolateImageFunction.h"
+
 #include "itkTimeProbe.h"
 
 #include "ANTsVersion.h"
@@ -39,6 +43,18 @@ public:
 
   void Execute(itk::Object *caller, const itk::EventObject & event) ITK_OVERRIDE
     {
+    const TFilter * filter = dynamic_cast<const TFilter *>( caller );
+
+    if( typeid( event ) == typeid( itk::IterationEvent ) )
+      {
+      if( filter->GetCurrentIteration() > 0 )
+        {
+        std::cout << "(epsilon value = " << filter->GetCurrentEpsilon() << ")." << std::endl;
+        }
+      std::cout << "Level " << filter->GetCurrentIteration() << ": " << std::flush;
+      this->m_CurrentProgress = 0;
+      }
+
     itk::ProcessObject *po = dynamic_cast<itk::ProcessObject *>( caller );
     if (! po) return;
 //    std::cout << po->GetProgress() << std::endl;
@@ -61,6 +77,18 @@ public:
 
   void Execute(const itk::Object * object, const itk::EventObject & event) ITK_OVERRIDE
     {
+    const TFilter * filter = dynamic_cast<const TFilter *>( object );
+
+    if( typeid( event ) == typeid( itk::IterationEvent ) )
+      {
+      if( filter->GetCurrentIteration() > 0 )
+        {
+        std::cout << "(epsilon value = " << filter->GetCurrentEpsilon() << ")." << std::endl;
+        }
+      std::cout << "Level " << filter->GetCurrentIteration() << ": " << std::flush;
+      this->m_CurrentProgress = 0;
+      }
+
     itk::ProcessObject *po = dynamic_cast<itk::ProcessObject *>(
       const_cast<itk::Object *>( object ) );
     if (! po) return;
@@ -84,7 +112,7 @@ public:
 };
 
 template <unsigned int ImageDimension>
-int Denoise( itk::ants::CommandLineParser *parser )
+int NonLocalSuperResolution( itk::ants::CommandLineParser *parser )
 {
   typedef float RealType;
 
@@ -107,16 +135,11 @@ int Denoise( itk::ants::CommandLineParser *parser )
   typedef itk::Image<RealType, ImageDimension> ImageType;
   typename ImageType::Pointer inputImage = ITK_NULLPTR;
 
-  //typedef itk::Image<RealType, ImageDimension> MaskImageType;
-  //typename MaskImageType::Pointer maskImage = ITK_NULLPTR;
-
   typename OptionType::Pointer inputImageOption = parser->GetOption( "input-image" );
   if( inputImageOption && inputImageOption->GetNumberOfFunctions() )
     {
     std::string inputFile = inputImageOption->GetFunction( 0 )->GetName();
     ReadImage<ImageType>( inputImage, inputFile.c_str() );
-    inputImage->Update();
-    inputImage->DisconnectPipeline();
     }
   else
     {
@@ -127,75 +150,64 @@ int Denoise( itk::ants::CommandLineParser *parser )
     return EXIT_FAILURE;
     }
 
-  typedef itk::AdaptiveNonLocalMeansDenoisingImageFilter<ImageType, ImageType> DenoiserType;
-  typename DenoiserType::Pointer denoiser = DenoiserType::New();
+  typename ImageType::Pointer referenceImage = ITK_NULLPTR;
+  typename OptionType::Pointer referenceImageOption = parser->GetOption( "reference-image" );
+  typename ImageType::Pointer interpolatedImage = ITK_NULLPTR;
+  typename OptionType::Pointer interpolatedImageOption = parser->GetOption( "interpolated-image" );
 
-  typedef itk::ShrinkImageFilter<ImageType, ImageType> ShrinkerType;
-  typename ShrinkerType::Pointer shrinker = ShrinkerType::New();
-  shrinker->SetInput( inputImage );
-  shrinker->SetShrinkFactors( 1 );
-
-  typename OptionType::Pointer shrinkFactorOption = parser->GetOption( "shrink-factor" );
-  int shrinkFactor = 1;
-  if( shrinkFactorOption && shrinkFactorOption->GetNumberOfFunctions() )
+  if( referenceImageOption && referenceImageOption->GetNumberOfFunctions() )
     {
-    shrinkFactor = parser->Convert<int>( shrinkFactorOption->GetFunction( 0 )->GetName() );
+    std::string inputFile = referenceImageOption->GetFunction( 0 )->GetName();
+
+    typedef itk::ImageFileReader<ImageType> ReaderType;
+    typename ReaderType::Pointer reader = ReaderType::New();
+    reader->SetFileName( inputFile.c_str() );
+
+    referenceImage = reader->GetOutput();
+    referenceImage->Update();
+    referenceImage->DisconnectPipeline();
     }
+  else if( interpolatedImageOption && interpolatedImageOption->GetNumberOfFunctions() )
+      {
+      std::string inputFile = interpolatedImageOption->GetFunction( 0 )->GetName();
 
-//   if( shrinkFactor != 1 && verbose )
-//     {
-//     std::cout << "A shrink factor of > 1 doesn't seem to be working.  I'm turning off this option for now." << std::endl;
-//     }
+      typedef itk::ImageFileReader<ImageType> ReaderType;
+      typename ReaderType::Pointer reader = ReaderType::New();
+      reader->SetFileName( inputFile.c_str() );
 
-  shrinker->SetShrinkFactors( shrinkFactor );
-  shrinker->Update();
-
-  denoiser->SetInput( shrinker->GetOutput() );
-
-  typename OptionType::Pointer noiseModelOption = parser->GetOption( "noise-model" );
-  std::string noiseModel( "gaussian" );
-  if( noiseModelOption && noiseModelOption->GetNumberOfFunctions() )
-    {
-    noiseModel = noiseModelOption->GetFunction( 0 )->GetName();
-    }
-  ConvertToLowerCase( noiseModel );
-
-  if( std::strcmp( noiseModel.c_str(), "rician" ) == 0 )
-    {
-    denoiser->SetUseRicianNoiseModel( true );
-    }
-  else if( std::strcmp( noiseModel.c_str(), "gaussian" ) == 0 )
-    {
-    denoiser->SetUseRicianNoiseModel( false );
-    }
+      interpolatedImage = reader->GetOutput();
+      interpolatedImage->Update();
+      interpolatedImage->DisconnectPipeline();
+      }
   else
     {
     if( verbose )
       {
-      std::cerr << "Unrecognized noise model:  " << noiseModel << ".  See help menu." << std::endl;
+      std::cerr << "Reference image or interpolated image not specified." << std::endl;
       }
     return EXIT_FAILURE;
     }
 
-  /**
-   * handle the mask image
-   */
-  typedef typename DenoiserType::MaskImageType MaskImageType;
-  typename MaskImageType::Pointer maskImage = ITK_NULLPTR;
+  typedef itk::NonLocalSuperresolutionImageFilter<ImageType, ImageType> SuperresoluterType;
+  typename SuperresoluterType::Pointer superresoluter = SuperresoluterType::New();
 
-  typename OptionType::Pointer maskImageOption = parser->GetOption( "mask-image" );
-  if( maskImageOption && maskImageOption->GetNumberOfFunctions() )
+  superresoluter->SetLowResolutionInputImage( inputImage );
+  if( referenceImage )
     {
-    std::string inputFile = maskImageOption->GetFunction( 0 )->GetName();
-    ReadImage<MaskImageType>( maskImage, inputFile.c_str() );
+    superresoluter->SetHighResolutionReferenceImage( referenceImage );
+    superresoluter->SetPerformInitialMeanCorrection( false );
     }
-  denoiser->SetMaskImage( maskImage );
+  else if( interpolatedImage )
+    {
+    superresoluter->SetHighResolutionReferenceImage( interpolatedImage );
+    superresoluter->SetPerformInitialMeanCorrection( true );
+    }
 
-  typename DenoiserType::NeighborhoodRadiusType neighborhoodPatchRadius;
-  typename DenoiserType::NeighborhoodRadiusType neighborhoodSearchRadius;
+  typename SuperresoluterType::NeighborhoodRadiusType neighborhoodPatchRadius;
+  typename SuperresoluterType::NeighborhoodRadiusType neighborhoodSearchRadius;
 
   neighborhoodPatchRadius.Fill( 1 );
-  neighborhoodSearchRadius.Fill( 2 );
+  neighborhoodSearchRadius.Fill( 3 );
 
   // Get the search and patch radii
   typename OptionType::Pointer searchRadiusOption = parser->GetOption( "search-radius" );
@@ -204,7 +216,7 @@ int Denoise( itk::ants::CommandLineParser *parser )
     std::string searchRadiusString = searchRadiusOption->GetFunction( 0 )->GetName();
 
     std::vector<unsigned int> searchRadius;
-    searchRadius.push_back( 2 );
+    searchRadius.push_back( 3 );
     if( searchRadiusOption && searchRadiusOption->GetNumberOfFunctions() )
       {
       searchRadius = parser->ConvertVector<unsigned int>( searchRadiusString );
@@ -229,7 +241,7 @@ int Denoise( itk::ants::CommandLineParser *parser )
       neighborhoodSearchRadius[d] = searchRadius[d];
       }
     }
-  denoiser->SetNeighborhoodSearchRadius( neighborhoodSearchRadius );
+  superresoluter->SetNeighborhoodSearchRadius( neighborhoodSearchRadius );
 
   typename OptionType::Pointer patchRadiusOption = parser->GetOption( "patch-radius" );
   if( patchRadiusOption && patchRadiusOption->GetNumberOfFunctions() )
@@ -258,38 +270,86 @@ int Denoise( itk::ants::CommandLineParser *parser )
       neighborhoodPatchRadius[d] = patchRadius[d];
       }
     }
-  denoiser->SetNeighborhoodPatchRadius( neighborhoodPatchRadius );
+  superresoluter->SetNeighborhoodPatchRadius( neighborhoodPatchRadius );
 
-  /**
-   * The parameters below are the default parameters taken from Jose's original
-   *   code.  I don't have a good handle on them so I'm hiding them from the
-   *   user for now.
-   */
-  typename DenoiserType::NeighborhoodRadiusType neighborhoodRadiusForLocalMeanAndVariance;
-  neighborhoodRadiusForLocalMeanAndVariance.Fill( 1 );
+  RealType intensitySigma = 1.0;
 
-  denoiser->SetNeighborhoodRadiusForLocalMeanAndVariance( neighborhoodRadiusForLocalMeanAndVariance );
+  typename OptionType::Pointer intensitySigmaOption = parser->GetOption( "intensity-difference-sigma" );
+  if( intensitySigmaOption && intensitySigmaOption->GetNumberOfFunctions() )
+    {
+    intensitySigma = parser->Convert<RealType>( intensitySigmaOption->GetFunction( 0 )->GetName() );
+    }
+  superresoluter->SetIntensityDifferenceSigma( intensitySigma );
 
-  denoiser->SetEpsilon( 0.00001 );
-  denoiser->SetMeanThreshold( 0.95 );
-  denoiser->SetVarianceThreshold( 0.5 );
-  denoiser->SetSmoothingFactor( 1.0 );
-  denoiser->SetSmoothingVariance( 2.0 );
+  RealType patchSimilaritySigma = 1.0;
+
+  typename OptionType::Pointer patchSimilaritySigmaOption = parser->GetOption( "patch-similarity-sigma" );
+  if( patchSimilaritySigmaOption && patchSimilaritySigmaOption->GetNumberOfFunctions() )
+    {
+    patchSimilaritySigma = parser->Convert<RealType>( patchSimilaritySigmaOption->GetFunction( 0 )->GetName() );
+    }
+  superresoluter->SetPatchSimilaritySigma( patchSimilaritySigma );
+
+
+  std::vector<RealType> scaleLevels;
+  scaleLevels.push_back( 32.0 );
+  scaleLevels.push_back( 16.0 );
+  scaleLevels.push_back(  8.0 );
+  scaleLevels.push_back(  4.0 );
+  scaleLevels.push_back(  2.0 );
+  scaleLevels.push_back(  1.0 );
+
+  typename OptionType::Pointer scaleLevelsOption = parser->GetOption( "scale-levels" );
+  if( scaleLevelsOption && scaleLevelsOption->GetNumberOfFunctions() )
+    {
+    scaleLevels = parser->ConvertVector<RealType>( scaleLevelsOption->GetFunction( 0 )->GetName() );
+    }
+  superresoluter->SetScaleLevels( scaleLevels );
+
+  // Get the interpolator and possible parameters
+  std::string whichInterpolator( "linear" );
+  typename itk::ants::CommandLineParser::OptionType::Pointer interpolationOption = parser->GetOption( "interpolation" );
+  if( interpolationOption && interpolationOption->GetNumberOfFunctions() )
+    {
+    whichInterpolator = interpolationOption->GetFunction( 0 )->GetName();
+    ConvertToLowerCase( whichInterpolator );
+    }
+  if( !std::strcmp( whichInterpolator.c_str(), "multilabel" ) || !std::strcmp( whichInterpolator.c_str(), "genericlabel" ) )
+    {
+    if( verbose )
+      {
+      std::cerr << "A label-based interpolator is not appropriate for this application." << std::endl;
+      }
+    return EXIT_FAILURE;
+    }
+
+  const size_t VImageDimension = ImageDimension;
+  typename ImageType::SpacingType
+    cache_spacing_for_smoothing_sigmas(itk::NumericTraits<typename ImageType::SpacingType::ValueType>::ZeroValue());
+  if( !std::strcmp( whichInterpolator.c_str(), "gaussian" ) )
+    {
+    cache_spacing_for_smoothing_sigmas = referenceImage->GetSpacing();
+    }
+
+#include "make_interpolator_snip.tmpl"
+
+  superresoluter->SetInterpolator( interpolator );
 
   itk::TimeProbe timer;
   timer.Start();
 
   if( verbose )
     {
-    typedef CommandProgressUpdate<DenoiserType> CommandType;
+    typedef CommandProgressUpdate<SuperresoluterType> CommandType;
     typename CommandType::Pointer observer = CommandType::New();
-    denoiser->AddObserver( itk::ProgressEvent(), observer );
+    superresoluter->AddObserver( itk::ProgressEvent(), observer );
+    superresoluter->AddObserver( itk::IterationEvent(), observer );
     }
 
   try
     {
-    // denoiser->DebugOn();
-    denoiser->Update();
+    // superresoluter->DebugOn();
+    superresoluter->Update();
     }
   catch( itk::ExceptionObject & e )
     {
@@ -303,7 +363,7 @@ int Denoise( itk::ants::CommandLineParser *parser )
   if( verbose )
     {
     std::cout << std::endl << std::endl;
-    denoiser->Print( std::cout, 3 );
+    superresoluter->Print( std::cout, 3 );
     }
 
   timer.Stop();
@@ -319,54 +379,7 @@ int Denoise( itk::ants::CommandLineParser *parser )
     parser->GetOption( "output" );
   if( outputOption && outputOption->GetNumberOfFunctions() )
     {
-    /**
-     * Get the noise image and resample to full resolution
-     */
-    typedef itk::SubtractImageFilter<ImageType, ImageType, ImageType> SubtracterType;
-    typename SubtracterType::Pointer subtracter = SubtracterType::New();
-    subtracter->SetInput1( denoiser->GetInput() );
-    subtracter->SetInput2( denoiser->GetOutput() );
-
-    typedef itk::ResampleImageFilter<ImageType, ImageType, RealType> ResamplerType;
-    typename ResamplerType::Pointer resampler = ResamplerType::New();
-    {
-      typedef itk::IdentityTransform<RealType, ImageDimension> TransformType;
-      typename TransformType::Pointer transform = TransformType::New();
-      transform->SetIdentity();
-      resampler->SetTransform( transform );
-    }
-    {
-      typedef itk::LinearInterpolateImageFunction<ImageType, RealType> LinearInterpolatorType;
-      typename LinearInterpolatorType::Pointer interpolator = LinearInterpolatorType::New();
-      interpolator->SetInputImage( subtracter->GetOutput() );
-      resampler->SetInterpolator( interpolator );
-    }
-    resampler->SetOutputParametersFromImage( inputImage );
-    resampler->UseReferenceImageOn();
-    resampler->SetInput( subtracter->GetOutput() );
-
-    typename ImageType::Pointer noiseImage = resampler->GetOutput();
-    noiseImage->Update();
-    noiseImage->DisconnectPipeline();
-
-    if( outputOption->GetFunction( 0 )->GetNumberOfParameters() > 1 )
-      {
-      WriteImage<ImageType>( noiseImage,  ( outputOption->GetFunction( 0 )->GetParameter( 1 ) ).c_str() );
-      }
-
-    typename SubtracterType::Pointer subtracter2 = SubtracterType::New();
-    subtracter2->SetInput1( inputImage );
-    subtracter2->SetInput2( noiseImage );
-    subtracter2->Update();
-
-    if( outputOption->GetFunction( 0 )->GetNumberOfParameters() == 0 )
-      {
-      WriteImage<ImageType>( subtracter2->GetOutput(),  ( outputOption->GetFunction( 0 )->GetName() ).c_str() );
-      }
-    else if( outputOption->GetFunction( 0 )->GetNumberOfParameters() > 0 )
-      {
-      WriteImage<ImageType>( subtracter2->GetOutput(),  ( outputOption->GetFunction( 0 )->GetParameter( 0 ) ).c_str() );
-      }
+    WriteImage<ImageType>( superresoluter->GetOutput(),  ( outputOption->GetFunction( 0 )->GetName() ).c_str() );
     }
 
   return EXIT_SUCCESS;
@@ -391,7 +404,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
   {
   std::string description =
-    std::string( "A scalar image is expected as input for noise correction.  " );
+    std::string( "A low-resolution image input image to be superresoluted.  " );
 
   OptionType::Pointer option = OptionType::New();
   option->SetLongName( "input-image" );
@@ -403,40 +416,29 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
   {
   std::string description =
-    std::string( "Employ a Rician or Gaussian noise model.  " );
+    std::string( "An interpolated version of the low-resolution image (such as B-spline). " ) +
+    std::string( "One should specify either this option as a secondary input or a high-resolution " ) +
+    std::string( "multi-modal counterpart (cf the -k option)." );
 
   OptionType::Pointer option = OptionType::New();
-  option->SetLongName( "noise-model" );
-  option->SetShortName( 'n' );
-  option->SetUsageOption( 0, "Rician/(Gaussian)" );
+  option->SetLongName( "interpolated-image" );
+  option->SetShortName( 'j' );
+  option->SetUsageOption( 0, "inputImageFilename" );
   option->SetDescription( description );
   parser->AddOption( option );
   }
 
   {
   std::string description =
-    std::string( "If a mask image is specified, denoising is " )
-    + std::string( "only performed in the mask region.  " );
+    std::string( "A high resolution reference multi-modal image.  Assumed to be in the same " ) +
+    std::string( "space as the low-resolution input image (i.e., registered)." ) +
+    std::string( "One should specify either this option as a secondary input or an interpolated " ) +
+    std::string( "version (cf the -j option)." );
 
   OptionType::Pointer option = OptionType::New();
-  option->SetLongName( "mask-image" );
-  option->SetShortName( 'x' );
-  option->SetUsageOption( 0, "maskImageFilename" );
-  option->SetDescription( description );
-  parser->AddOption( option );
-  }
-
-  {
-  std::string description =
-    std::string( "Running noise correction on large images can be time consuming. " )
-    + std::string( "To lessen computation time, the input image can be resampled. " )
-    + std::string( "The shrink factor, specified as a single integer, describes " )
-    + std::string( "this resampling.  Shrink factor = 1 is the default." );
-
-  OptionType::Pointer option = OptionType::New();
-  option->SetLongName( "shrink-factor" );
-  option->SetShortName( 's' );
-  option->SetUsageOption( 0, "(1)/2/3/..." );
+  option->SetLongName( "reference-image" );
+  option->SetShortName( 'k' );
+  option->SetUsageOption( 0, "inputImageFilename" );
   option->SetDescription( description );
   parser->AddOption( option );
   }
@@ -456,17 +458,72 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
   {
   std::string description =
-    std::string( "Search radius.  Default = 2x2x2." );
+    std::string( "Search radius.  Default = 3x3x3." );
 
   OptionType::Pointer option = OptionType::New();
   option->SetLongName( "search-radius" );
   option->SetShortName( 'r' );
-  option->SetUsageOption( 0, "2" );
-  option->SetUsageOption( 1, "2x2x2" );
+  option->SetUsageOption( 0, "3" );
+  option->SetUsageOption( 1, "3x3x3" );
   option->SetDescription( description );
   parser->AddOption( option );
   }
 
+  {
+  std::string description =
+    std::string( "Intensity difference sigma.  Default = 1.0" );
+
+  OptionType::Pointer option = OptionType::New();
+  option->SetLongName( "intensity-difference-sigma" );
+  option->SetShortName( 'g' );
+  option->SetUsageOption( 0, "1.0" );
+  option->SetDescription( description );
+  parser->AddOption( option );
+  }
+
+  {
+  std::string description =
+    std::string( "Patch similarity sigma.  Default = 1.0" );
+
+  OptionType::Pointer option = OptionType::New();
+  option->SetLongName( "patch-similarity-sigma" );
+  option->SetShortName( 't' );
+  option->SetUsageOption( 0, "1.0" );
+  option->SetDescription( description );
+  parser->AddOption( option );
+  }
+
+  {
+  std::string description =
+    std::string( "Scale levels.  Default = 32x16x8x2x1" );
+
+  OptionType::Pointer option = OptionType::New();
+  option->SetLongName( "scale-levels" );
+  option->SetShortName( 's' );
+  option->SetUsageOption( 0, "32x16x8x2x1" );
+  option->SetDescription( description );
+  parser->AddOption( option );
+  }
+
+  {
+  std::string description =
+    std::string( "Several interpolation options are available in ITK. " )
+    + std::string( "These have all been made available." );
+
+  OptionType::Pointer option = OptionType::New();
+  option->SetLongName( "interpolation" );
+  option->SetShortName( 'n' );
+  option->SetUsageOption( 0, "Linear" );
+  option->SetUsageOption( 1, "NearestNeighbor" );
+  option->SetUsageOption( 2, "Gaussian[<sigma=imageSpacing>,<alpha=1.0>]" );
+  option->SetUsageOption( 3, "BSpline[<order=3>]" );
+  option->SetUsageOption( 4, "CosineWindowedSinc" );
+  option->SetUsageOption( 5, "WelchWindowedSinc" );
+  option->SetUsageOption( 6, "HammingWindowedSinc" );
+  option->SetUsageOption( 7, "LanczosWindowedSinc" );
+  option->SetDescription( description );
+  parser->AddOption( option );
+  }
 
   {
   std::string description =
@@ -477,8 +534,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   OptionType::Pointer option = OptionType::New();
   option->SetLongName( "output" );
   option->SetShortName( 'o' );
-  option->SetUsageOption( 0, "correctedImage" );
-  option->SetUsageOption( 1, "[correctedImage,<noiseImage>]" );
+  option->SetUsageOption( 0, "outputImage" );
   option->SetDescription( description );
   parser->AddOption( option );
   }
@@ -523,13 +579,13 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int DenoiseImage( std::vector<std::string> args, std::ostream* /*out_stream = NULL */ )
+int NonLocalSuperResolution( std::vector<std::string> args, std::ostream* /*out_stream = NULL */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
   // 'args' may have adjacent arguments concatenated into one argument,
   // which the parser should handle
-  args.insert( args.begin(), "DenoiseImage" );
+  args.insert( args.begin(), "NonLocalSuperResolution" );
 
   int     argc = args.size();
   char* * argv = new char *[args.size() + 1];
@@ -573,11 +629,13 @@ private:
   parser->SetCommand( argv[0] );
 
   std::string commandDescription =
-    std::string( "Denoise an image using a spatially adaptive filter originally described in " )
-    + std::string( "J. V. Manjon, P. Coupe, Luis Marti-Bonmati, D. L. Collins, " )
-    + std::string( "and M. Robles. Adaptive Non-Local Means Denoising of MR Images With " )
-    + std::string( "Spatially Varying Noise Levels, Journal of Magnetic Resonance Imaging, " )
-    + std::string( "31:192-203, June 2010." );
+    std::string( "Non-local super resolution described in the following papers:  " )
+    + std::string( "1) JV Manjon, P Coupe, A Buades, V Fonov, DL Collins, and Montserrat Robles. " )
+    + std::string( "Non-local MRI Upsampling." )
+    + std::string( "Medical Image Analysis, 14:784-792, 2010 and" )
+    + std::string( "2) JV Manjon, P Coupe, A Buades, DL Collins, and Montserrat Robles. " )
+    + std::string( "MRI Superresolution Using Self-Similarity and Image Priors." )
+    + std::string( "International Journal of Biomedical Imaging, 2010." );
 
   parser->SetCommandDescription( commandDescription );
   InitializeCommandLineOptions( parser );
@@ -631,7 +689,16 @@ private:
 
     itk::ants::CommandLineParser::OptionType::Pointer imageOption =
       parser->GetOption( "input-image" );
-    if( imageOption && imageOption->GetNumberOfFunctions() > 0 )
+    itk::ants::CommandLineParser::OptionType::Pointer interpolatedImageOption =
+      parser->GetOption( "interpolated-image" );
+    itk::ants::CommandLineParser::OptionType::Pointer referenceImageOption =
+      parser->GetOption( "reference-image" );
+    if( imageOption && imageOption->GetNumberOfFunctions() > 0 &&
+        (
+          ( interpolatedImageOption && interpolatedImageOption->GetNumberOfFunctions() > 0 ) ||
+          ( referenceImageOption && referenceImageOption->GetNumberOfFunctions() > 0 )
+        )
+      )
       {
       if( imageOption->GetFunction( 0 )->GetNumberOfParameters() > 0 )
         {
@@ -644,8 +711,9 @@ private:
       }
     else
       {
-      std::cerr << "No input images were specified.  Specify an input image"
-               << " with the -i option" << std::endl;
+      std::cerr << "Not enough input images were specified.  Specify an input image"
+               << " with the -i option and a corresponding high-resoution image.  Either"
+               << " an interpolated version (-j) or multi-modal counterpart (-k)." << std::endl;
       return EXIT_FAILURE;
       }
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(
@@ -657,17 +725,17 @@ private:
     {
     case 2:
       {
-      return Denoise<2>( parser );
+      return NonLocalSuperResolution<2>( parser );
       }
       break;
     case 3:
       {
-      return Denoise<3>( parser );
+      return NonLocalSuperResolution<3>( parser );
       }
       break;
     case 4:
       {
-      return Denoise<4>( parser );
+      return NonLocalSuperResolution<4>( parser );
       }
       break;
     default:

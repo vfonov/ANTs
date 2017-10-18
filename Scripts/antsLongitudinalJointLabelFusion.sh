@@ -81,7 +81,7 @@ Compulsory arguments (minimal command line requires SGE cluster, otherwise use -
 
      -o:  OutputPrefix:   A prefix that is prepended to all output files.
 
-     -t:  TargetImage:    Target image to be labeled.
+     -t:  TargetImage:    Subjet Templae Target image to be labeled.
 
      -g:  Atlas:          Atlas to be warped to target image.
 
@@ -130,12 +130,9 @@ Optional arguments:
         br: rigid + deformable b-spline syn
         bo: deformable b-spline syn only
 
-     -x:  Target mask image (default = 'majorityvoting')
+     -x:  Target mask image (default = 'otsu')
         otsu: use otsu thresholding to define foreground/background
         or: 'or' all the warped atlas images to defined foreground/background
-        majorityvoting: perform a voxelwise label voting.  If >= 80% of the warped atlases agree at that
-                        voxel, we keep that voted label at that voxel and *do not* perform JLF.  Note that
-                        the 80% threshold is hard-coded but can be easily changed in the script.
         <filename>: a user-specified mask
         none: don't use a mask
 
@@ -145,7 +142,10 @@ Example:
               -p malfPosteriors%04d.nii.gz \
               -g atlas1.nii.gz -l labels1.nii.gz \
               -g atlas2.nii.gz -l labels2.nii.gz \
-              -g atlas3.nii.gz -l labels3.nii.gz
+              -g atlas3.nii.gz -l labels3.nii.gz \
+              -b timepoint_0_dir \
+              -b timepoint_1_dir \
+              -b timepoint_2_dir
 
 --------------------------------------------------------------------------------------
 JLF was created by:
@@ -161,7 +161,7 @@ Wang H, Suh JW, Das SR, Pluta J, Craige C, Yushkevich PA.
 Multi-Atlas Segmentation with Joint Label Fusion.
 IEEE Trans Pattern Anal Mach Intell.
 --------------------------------------------------------------------------------------
-script by Nick Tustison
+script by Jeff Duda
 --------------------------------------------------------------------------------------
 
 USAGE
@@ -172,7 +172,7 @@ function Help {
     cat <<HELP
 
 `basename $0` will propagate labels from a set of pre-labeled atlases using the JLF
-algorithm.
+algorithm. This occurs via a single subject template provided by antsLongitudinalCorticalThickness.
 
 Usage:
 
@@ -193,13 +193,15 @@ Compulsory arguments (minimal command line requires SGE cluster, otherwise use -
 
      -o:  OutputPrefix:   A prefix that is prepended to all output files.
 
-     -t:  TargetImage:    Target image to be labeled.
+     -t:  TargetImage:    Target image for registrations - single subject template.
 
      -g:  Atlas:          Atlas to be warped to target image.
 
      -l:  Labels:         Labels corresponding to atlas (cf -g).
 
 Optional arguments:
+
+     -b:  Timepoint directory: Single timepoint directory created by antsLongitudinalCorticalThickness.sh
 
      -m:  Majority vote:  Use majority vote instead of joint label fusion (default = 0).
 
@@ -240,12 +242,9 @@ Optional arguments:
         br: rigid + deformable b-spline syn
         bo: deformable b-spline syn only
 
-     -x:  Target mask image (default = 'majorityvoting')
+     -x:  Target mask image (default = 'otsu')
         otsu: use otsu thresholding to define foreground/background
         or: 'or' all the warped atlas images to defined foreground/background
-        majorityvoting: perform a voxelwise label voting.  If >= 80% of the warped atlases agree at that
-                        voxel, we keep that voted label at that voxel and *do not* perform JLF.  Note that
-                        the 80% threshold is hard-coded but can be easily changed in the script.
         <filename>: a user-specified mask
         none: don't use a mask
 
@@ -285,7 +284,7 @@ Wang H, Suh JW, Das SR, Pluta J, Craige C, Yushkevich PA.
 Multi-Atlas Segmentation with Joint Label Fusion.
 IEEE Trans Pattern Anal Mach Intell.
 --------------------------------------------------------------------------------------
-script by Nick Tustison
+script by Jeff Duda
 --------------------------------------------------------------------------------------
 
 HELP
@@ -355,6 +354,9 @@ ATLAS_IMAGES=()
 ATLAS_LABELS=()
 TRANSFORM='s'
 
+TIME_IMAGES=()
+TIME_DIRECTORIES=()
+
 KEEP_ALL_IMAGES=0
 DOQSUB=0
 CORES=1
@@ -363,7 +365,7 @@ PRECISION=0
 XGRID_OPTS=""
 SCRIPT_PREPEND=""
 QSUB_OPTS=""
-TARGET_MASK_IMAGE="majorityvoting"
+TARGET_MASK_IMAGE="otsu"
 
 REGISTRATION_WALLTIME="20:00:00"
 REGISTRATION_MEMORY="8gb"
@@ -391,7 +393,7 @@ MAJORITYVOTE=0
 RUNQUICK=1
 TRANSFORM_TYPE="s"
 # reading command line arguments
-while getopts "c:d:f:g:h:j:k:l:m:o:p:q:r:t:u:v:w:x:y:z:" OPT
+while getopts "b:c:d:f:g:h:j:k:l:m:o:p:q:r:t:u:v:w:x:y:z:" OPT
   do
   case $OPT in
       h) #help
@@ -413,6 +415,9 @@ while getopts "c:d:f:g:h:j:k:l:m:o:p:q:r:t:u:v:w:x:y:z:" OPT
        echo " Dimensionality is only valid for 2 or 3.  You passed -d $DIM."
        exit 1
      fi
+   ;;
+      b) # time directory
+      TIME_DIRECTORIES[${#TIME_DIRECTORIES[@]}]=$OPTARG
    ;;
       f)
       PRECISION=$OPTARG
@@ -650,6 +655,7 @@ if [[ $DOQSUB -eq 0 ]];
 
     EXISTING_WARPED_ATLAS_IMAGES=()
     EXISTING_WARPED_ATLAS_LABELS=()
+
     for (( i = 0; i < ${#WARPED_ATLAS_IMAGES[@]}; i++ ))
       do
         echo ${WARPED_ATLAS_IMAGES[$i]}
@@ -686,7 +692,7 @@ if [[ $DOQSUB -eq 0 ]];
           then
             jlfCall="${jlfCall} -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz]"
           else
-            jlfCall="${jlfCall} -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz,${OUTPUT_POSTERIORS_FORMAT}]"
+            jlfCall="${jlfCall}  -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz,${OUTPUT_POSTERIORS_FORMAT}]"
           fi
 
         if [[ ${TARGET_MASK_IMAGE} == 'otsu' ]];
@@ -695,24 +701,18 @@ if [[ $DOQSUB -eq 0 ]];
             maskCall="${ANTSPATH}/ThresholdImage ${DIM} ${TARGET_IMAGE} ${TARGET_MASK_IMAGE} Otsu 1;"
 
             jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
-
         elif [[ ${TARGET_MASK_IMAGE} == 'or' ]];
           then
             TARGET_MASK_IMAGE="${OUTPUT_PREFIX}TargetMaskImageOr.nii.gz"
 
-            maskCall="${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${EXISTING_WARPED_ATLAS_LABELS[0]} ${EXISTING_WARPED_ATLAS_LABELS[1]};"
-            for (( i = 2; i < ${#EXISTING_WARPED_ATLAS_LABELS[@]}; i++ ))
+            maskCall="${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${EXISTING_WARPED_ATLAS_IMAGES[0]} ${EXISTING_WARPED_ATLAS_IMAGES[1]};"
+            for (( i = 2; i < ${#EXISTING_WARPED_ATLAS_IMAGES[@]}; i++ ))
               do
-                maskCall="${maskCall} ${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${TARGET_MASK_IMAGE} ${EXISTING_WARPED_ATLAS_LABELS[$i]};"
+                maskCall="${maskCall} ${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${TARGET_MASK_IMAGE} ${EXISTING_WARPED_ATLAS_IMAGES[$i]};"
               done
             maskCall="${maskCall} ${ANTSPATH}/ThresholdImage ${DIM} ${TARGET_MASK_IMAGE} ${TARGET_MASK_IMAGE} 0 0 0 1"
 
-        elif [[ ${TARGET_MASK_IMAGE} == 'majorityvoting' ]];
-          then
-            MAJORITY_VOTING_IMAGE="${OUTPUT_PREFIX}TargetMaskImageMajorityVoting.nii.gz"
-            maskCall="${ANTSPATH}/ImageMath ${DIM} ${MAJORITY_VOTING_IMAGE} MajorityVoting 0.8 ${EXISTING_WARPED_ATLAS_LABELS[@]};"
-            jlfCall="${jlfCall} -x ${OUTPUT_PREFIX}TargetMaskImageMajorityVoting_Mask.nii.gz"
-
+            jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
         elif [[ -f ${TARGET_MASK_IMAGE} ]];
           then
             jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
@@ -724,14 +724,110 @@ if [[ $DOQSUB -eq 0 ]];
     echo "$maskCall" > $qscript2
     echo "$jlfCall" >> $qscript2
 
-    if [[ ${TARGET_MASK_IMAGE} == 'majorityvoting' ]];
+    if [[ ! -f ${OUTPUT_PREFIX}Labels.nii.gz ]];
       then
-        combineCall="${ANTSPATH}/ImageMath ${DIM} ${OUTPUT_PREFIX}Labels.nii.gz max ${OUTPUT_PREFIX}Labels.nii.gz ${OUTPUT_PREFIX}TargetMaskImageMajorityVoting.nii.gz"
-        echo "$combineCall" >> $qscript2
+        echo $qscript2
+        bash $qscript2
+      else
+        echo "File ${OUTPUT_PREFIX}Labels.nii.gz already exists"
       fi
 
-    echo $qscript2
-    bash $qscript2
+    for (( j = 0; j < ${#TIME_DIRECTORIES[@]}; j++ ))
+      do
+        tImg=`ls ${TIME_DIRECTORIES[$j]}/*ExtractedBrain0N4.nii.gz`
+        tMask=`ls ${TIME_DIRECTORIES[$j]}/*BrainExtractionMask.nii.gz`
+
+        # FIXME - inverse of this?
+        #tMat=`ls ${TIME_DIRECTORIES[$j]}/*SubjectToTemplate0GenericAffine.mat`
+        #tWarp=`ls ${TIME_DIRECTORIES[$j]}/*SubjectToTemplate1Warp.nii.gz`
+        tMat=`ls ${TIME_DIRECTORIES[$j]}/*TemplateToSubject1GenericAffine.mat`
+        tWarp=`ls ${TIME_DIRECTORIES[$j]}/*TemplateToSubject0Warp.nii.gz`
+
+
+        qscript3="${OUTPUT_DIR}/job_timepoint_${j}.sh"
+        echo '#!/bin/sh' > $qscript3
+
+        if [[ ! -f $tImg ]];
+          then
+            echo "No target image in ${TIME_DIRECTORIES[$j]}"
+            exit 1
+          fi
+        if [[ ! -f $tMask ]];
+          then
+            echo "No mask image in ${TIME_DIRECTORIES[$j]}"
+            exit 1
+          fi
+        if [[ ! -f $tMat ]];
+          then
+            echo "No linear transform in ${TIME_DIRECTORIES[$j]}"
+            exit 1
+          fi
+        if [[ ! -f $tWarp ]];
+          then
+            echo "No warp in ${TIME_DIRECTORIES[$j]}"
+            exit 1
+          fi
+
+        jlfTimeCall="${ANTSPATH}/antsJointFusion -d ${DIM} -t $tImg -x $tMask -o [${OUTPUT_PREFIX}${j}_Labels.nii.gz,${OUTPUT_PREFIX}${j}_Intensity.nii.gz] --verbose 1 "
+
+        for (( i = 0; i < ${#ATLAS_IMAGES[@]}; i++ ))
+          do
+            IMG_BASE=`basename ${ATLAS_IMAGES[$i]}`
+            BASENAME=` echo ${IMG_BASE} | cut -d '.' -f 1 `
+
+            labelXfrmCall="${ANTSPATH}/antsApplyTransforms \
+                                  -d ${DIM} \
+                                  --float 1 \
+                                  -i ${ATLAS_LABELS[$i]} \
+                                  -r ${tImg} \
+                                  -o ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_WarpedLabels.nii.gz \
+                                  -n MultiLabel \
+                                  -t ${tMat} \
+                                  -t ${tWarp} \
+                                  -t ${OUTPUT_PREFIX}${BASENAME}_${i}_1Warp.nii.gz \
+                                  -t ${OUTPUT_PREFIX}${BASENAME}_${i}_0GenericAffine.mat >> ${OUTPUT_PREFIX}${BASENAME}_time_${j}_log.txt"
+
+            imageXfrmCall="${ANTSPATH}/antsApplyTransforms \
+                                  -d ${DIM} \
+                                  --float 1 \
+                                  -i ${ATLAS_IMAGES[$i]} \
+                                  -r ${tImg} \
+                                  -o ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_Warped.nii.gz \
+                                  -t ${tMat} \
+                                  -t ${tWarp} \
+                                  -t ${OUTPUT_PREFIX}${BASENAME}_${i}_1Warp.nii.gz \
+                                  -t ${OUTPUT_PREFIX}${BASENAME}_${i}_0GenericAffine.mat >> ${OUTPUT_PREFIX}${BASENAME}_time_${j}_log.txt"
+
+            copyImageHeaderCall="${ANTSPATH}/CopyImageHeaderInformation \
+                                 ${tImg} \
+                                 ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_Warped.nii.gz \
+                                 ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_Warped.nii.gz 1 1 1"
+
+            copyLabelsHeaderCall="${ANTSPATH}/CopyImageHeaderInformation \
+                                  ${tImg} \
+                                  ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_WarpedLabels.nii.gz \
+                                  ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_WarpedLabels.nii.gz 1 1 1"
+
+            echo "$imageXfrmCall" >> $qscript3
+            echo "$labelXfrmCall" >> $qscript3
+            echo "$copyImageHeaderCall" >> $qscript3
+            echo "$copyLabelsHeaderCall" >> $qscript3
+
+            jlfTimeCall="${jlfTimeCall} -g ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_Warped.nii.gz -l ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_WarpedLabels.nii.gz"
+          done
+
+          echo "$jlfTimeCall" >> $qscript3
+
+
+          if [[ ! -f ${OUTPUT_PREFIX}${j}_Labels.nii.gz ]];
+            then
+              echo $qscript3
+              bash $qscript3
+            else
+              echo "File ${OUTPUT_PREFIX}${j}_Labels.nii.gz already exists"
+            fi
+
+      done
   fi
 if [[ $DOQSUB -eq 1 ]];
   then
@@ -788,7 +884,7 @@ if [[ $DOQSUB -eq 1 ]];
           then
             jlfCall="${jlfCall} -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz]"
           else
-            jlfCall="${jlfCall} -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz,${OUTPUT_POSTERIORS_FORMAT}]"
+            jlfCall="${jlfCall}  -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz,${OUTPUT_POSTERIORS_FORMAT}]"
           fi
 
         if [[ ${TARGET_MASK_IMAGE} == 'otsu' ]];
@@ -797,7 +893,6 @@ if [[ $DOQSUB -eq 1 ]];
             maskCall="${ANTSPATH}/ThresholdImage ${DIM} ${TARGET_IMAGE} ${TARGET_MASK_IMAGE} Otsu 1;"
 
             jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
-
         elif [[ ${TARGET_MASK_IMAGE} == 'or' ]];
           then
             TARGET_MASK_IMAGE="${OUTPUT_PREFIX}TargetMaskImageOr.nii.gz"
@@ -821,14 +916,91 @@ if [[ $DOQSUB -eq 1 ]];
     echo "$maskCall" > $qscript2
     echo "$jlfCall" >> $qscript2
 
-    if [[ ${TARGET_MASK_IMAGE} == 'majorityvoting' ]];
-      then
-        combineCall="${ANTSPATH}/ImageMath ${DIM} ${OUTPUT_PREFIX}Labels.nii.gz max ${OUTPUT_PREFIX}Labels.nii.gz ${OUTPUT_PREFIX}TargetMaskImageMajorityVoting.nii.gz"
-        echo "$combineCall" >> $qscript2
-      fi
-
     jobIDs=`qsub -cwd -S /bin/bash -N antsJlf -v ANTSPATH=$ANTSPATH $QSUB_OPTS $qscript2 | awk '{print $3}'`
-    ${ANTSPATH}/waitForSGEQJobs.pl 1 600 $jobIDs
+
+    for (( j = 0; j < ${#TIME_DIRECTORIES[@]}; j++ ))
+      do
+        tImg=`ls ${TIME_DIRECTORIES[$j]}/*ExtractedBrain0N4.nii.gz`
+        tMask=`ls ${TIME_DIRECTORIES[$j]}/*BrainExtractionMask.nii.gz`
+        tMat=`ls ${TIME_DIRECTORIES[$j]}/*SubjectToTemplate0GenericAffine.mat`
+        tWarp=`ls ${TIME_DIRECTORIES[$j]}/*SubjectToTemplate1Warp.nii.gz`
+
+        qscript3="${OUTPUT_DIR}/job_timepoint_${j}.sh"
+        echo '#!/bin/sh' > $qscript3
+
+        if [[ ! -f $tImg ]]; then
+          echo "No target image in ${TIME_DIRECTORIES[$j]}"
+          exit 1
+        fi
+        if [[ ! -f $tMask ]]; then
+          echo "No mask image in ${TIME_DIRECTORIES[$j]}"
+          exit 1
+        fi
+        if [[ ! -f $tMat ]]; then
+          echo "No linear transform in ${TIME_DIRECTORIES[$j]}"
+          exit 1
+        fi
+        if [[ ! -f $tWarp ]]; then
+          echo "No warp in ${TIME_DIRECTORIES[$j]}"
+          exit 1
+        fi
+
+        jlfTimeCall="${ANTSPATH}/antsJointFusion -d ${DIM} -t $tImg -x $tMask --verbose 1 "
+
+        for (( i = 0; i < ${#ATLAS_IMAGES[@]}; i++ ))
+          do
+            IMG_BASE=`basename ${ATLAS_IMAGES[$i]}`
+            BASENAME=` echo ${IMG_BASE} | cut -d '.' -f 1 `
+
+            labelXfrmCall="${ANTSPATH}/antsApplyTransforms \
+                                  -d ${DIM} \
+                                  --float 1 \
+                                  -i ${ATLAS_LABELS[$i]} \
+                                  -r ${tImg} \
+                                  -o ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_WarpedLabels.nii.gz \
+                                  -n NearestNeighbor \
+                                  -t ${tWarp} \
+                                  -t ${tMat} \
+                                  -t ${OUTPUT_PREFIX}${BASENAME}_${i}_1Warp.nii.gz \
+                                  -t ${OUTPUT_PREFIX}${BASENAME}_${i}_0GenericAffine.mat >> ${OUTPUT_PREFIX}${BASENAME}_${i}_log.txt"
+
+            imageXfrmCall="${ANTSPATH}/antsApplyTransforms \
+                                  -d ${DIM} \
+                                  --float 1 \
+                                  -i ${ATLAS_IMAGES[$i]} \
+                                  -r ${tImg} \
+                                  -o ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_Warped.nii.gz \
+                                  -n NearestNeighbor \
+                                  -t ${tWarp} \
+                                  -t ${tMat} \
+                                  -t ${OUTPUT_PREFIX}${BASENAME}_${i}_1Warp.nii.gz \
+                                  -t ${OUTPUT_PREFIX}${BASENAME}_${i}_0GenericAffine.mat >> ${OUTPUT_PREFIX}${BASENAME}_${i}_log.txt"
+
+            copyImageHeaderCall="${ANTSPATH}/CopyImageHeaderInformation \
+                                 ${tImg} \
+                                 ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_Warped.nii.gz \
+                                 ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_Warped.nii.gz 1 1 1"
+
+            copyLabelsHeaderCall="${ANTSPATH}/CopyImageHeaderInformation \
+                                  ${tImg} \
+                                  ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_WarpedLabels.nii.gz \
+                                  ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_WarpedLabels.nii.gz 1 1 1"
+
+            echo "$imageXfrmCall" >> $qscript3
+            echo "$labelXfrmCall" >> $qscript3
+            echo "$copyImageHeaderCall" >> $qscript3
+            echo "$copyLabelsHeaderCall" >> $qscript3
+
+            jlfTimeCall="${jlfTimeCall} -g ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_Warped.nii.gz -l ${OUTPUT_PREFIX}${BASENAME}_${i}_${j}_WarpedLabels.nii.gz"
+          done
+
+          echo "$jlfTimeCall" >> $qscript3
+          jobTimeIDs=`qsub -cwd -S /bin/bash -N timeJlf -v ANTSPATH=$ANTSPATH $QSUB_OPTS $qscript3 | awk '{print $3}'`
+          jobIDs="$jobIDs $jobTimeIDs"
+
+      done
+
+    ${ANTSPATH}/waitForSGEQJobs.pl 1 600 $jobTimeIDs
   fi
 if [[ $DOQSUB -eq 4 ]];
   then
@@ -884,7 +1056,7 @@ if [[ $DOQSUB -eq 4 ]];
           then
             jlfCall="${jlfCall} -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz]"
           else
-            jlfCall="${jlfCall} -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz,${OUTPUT_POSTERIORS_FORMAT}]"
+            jlfCall="${jlfCall}  -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz,${OUTPUT_POSTERIORS_FORMAT}]"
           fi
 
         if [[ ${TARGET_MASK_IMAGE} == 'otsu' ]];
@@ -893,24 +1065,18 @@ if [[ $DOQSUB -eq 4 ]];
             maskCall="${ANTSPATH}/ThresholdImage ${DIM} ${TARGET_IMAGE} ${TARGET_MASK_IMAGE} Otsu 1;"
 
             jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
-
         elif [[ ${TARGET_MASK_IMAGE} == 'or' ]];
           then
             TARGET_MASK_IMAGE="${OUTPUT_PREFIX}TargetMaskImageOr.nii.gz"
 
-            maskCall="${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${EXISTING_WARPED_ATLAS_LABELS[0]} ${EXISTING_WARPED_ATLAS_LABELS[1]};"
-            for (( i = 2; i < ${#EXISTING_WARPED_ATLAS_LABELS[@]}; i++ ))
+            maskCall="${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${EXISTING_WARPED_ATLAS_IMAGES[0]} ${EXISTING_WARPED_ATLAS_IMAGES[1]};"
+            for (( i = 2; i < ${#EXISTING_WARPED_ATLAS_IMAGES[@]}; i++ ))
               do
-                maskCall="${maskCall} ${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${TARGET_MASK_IMAGE} ${EXISTING_WARPED_ATLAS_LABELS[$i]};"
+                maskCall="${maskCall} ${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${TARGET_MASK_IMAGE} ${EXISTING_WARPED_ATLAS_IMAGES[$i]};"
               done
             maskCall="${maskCall} ${ANTSPATH}/ThresholdImage ${DIM} ${TARGET_MASK_IMAGE} ${TARGET_MASK_IMAGE} 0 0 0 1"
 
-        elif [[ ${TARGET_MASK_IMAGE} == 'majorityvoting' ]];
-          then
-            MAJORITY_VOTING_IMAGE="${OUTPUT_PREFIX}TargetMaskImageMajorityVoting.nii.gz"
-            maskCall="${ANTSPATH}/ImageMath ${DIM} ${MAJORITY_VOTING_IMAGE} MajorityVoting 0.8 ${EXISTING_WARPED_ATLAS_LABELS[@]};"
-            jlfCall="${jlfCall} -x ${OUTPUT_PREFIX}TargetMaskImageMajorityVoting_Mask.nii.gz"
-
+            jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
         elif [[ -f ${TARGET_MASK_IMAGE} ]];
           then
             jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
@@ -921,12 +1087,6 @@ if [[ $DOQSUB -eq 4 ]];
 
     echo "$maskCall" > $qscript2
     echo "$jlfCall" >> $qscript2
-
-    if [[ ${TARGET_MASK_IMAGE} == 'majorityvoting' ]];
-      then
-        combineCall="${ANTSPATH}/ImageMath ${DIM} ${OUTPUT_PREFIX}Labels.nii.gz max ${OUTPUT_PREFIX}Labels.nii.gz ${OUTPUT_PREFIX}TargetMaskImageMajorityVoting.nii.gz"
-        echo "$combineCall" >> $qscript2
-      fi
 
     jobIDs=`qsub -N antsJlf -v ANTSPATH=$ANTSPATH $QSUB_OPTS -q nopreempt -l nodes=1:ppn=1 -l mem=${JLF_MEMORY} -l walltime=${JLF_WALLTIME} $qscript2 | awk '{print $1}'`
     ${ANTSPATH}/waitForPBSQJobs.pl 1 600 $jobIDs
@@ -972,7 +1132,7 @@ if [[ $DOQSUB -eq 2 ]];
           then
             jlfCall="${jlfCall} -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz]"
           else
-            jlfCall="${jlfCall} -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz,${OUTPUT_POSTERIORS_FORMAT}]"
+            jlfCall="${jlfCall}  -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz,${OUTPUT_POSTERIORS_FORMAT}]"
           fi
 
         if [[ ${TARGET_MASK_IMAGE} == 'otsu' ]];
@@ -981,24 +1141,18 @@ if [[ $DOQSUB -eq 2 ]];
             maskCall="${ANTSPATH}/ThresholdImage ${DIM} ${TARGET_IMAGE} ${TARGET_MASK_IMAGE} Otsu 1;"
 
             jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
-
         elif [[ ${TARGET_MASK_IMAGE} == 'or' ]];
           then
             TARGET_MASK_IMAGE="${OUTPUT_PREFIX}TargetMaskImageOr.nii.gz"
 
-            maskCall="${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${EXISTING_WARPED_ATLAS_LABELS[0]} ${EXISTING_WARPED_ATLAS_LABELS[1]};"
-            for (( i = 2; i < ${#EXISTING_WARPED_ATLAS_LABELS[@]}; i++ ))
+            maskCall="${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${EXISTING_WARPED_ATLAS_IMAGES[0]} ${EXISTING_WARPED_ATLAS_IMAGES[1]};"
+            for (( i = 2; i < ${#EXISTING_WARPED_ATLAS_IMAGES[@]}; i++ ))
               do
-                maskCall="${maskCall} ${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${TARGET_MASK_IMAGE} ${EXISTING_WARPED_ATLAS_LABELS[$i]};"
+                maskCall="${maskCall} ${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${TARGET_MASK_IMAGE} ${EXISTING_WARPED_ATLAS_IMAGES[$i]};"
               done
             maskCall="${maskCall} ${ANTSPATH}/ThresholdImage ${DIM} ${TARGET_MASK_IMAGE} ${TARGET_MASK_IMAGE} 0 0 0 1"
 
-        elif [[ ${TARGET_MASK_IMAGE} == 'majorityvoting' ]];
-          then
-            MAJORITY_VOTING_IMAGE="${OUTPUT_PREFIX}TargetMaskImageMajorityVoting.nii.gz"
-            maskCall="${ANTSPATH}/ImageMath ${DIM} ${MAJORITY_VOTING_IMAGE} MajorityVoting 0.8 ${EXISTING_WARPED_ATLAS_LABELS[@]};"
-            jlfCall="${jlfCall} -x ${OUTPUT_PREFIX}TargetMaskImageMajorityVoting_Mask.nii.gz"
-
+            jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
         elif [[ -f ${TARGET_MASK_IMAGE} ]];
           then
             jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
@@ -1009,12 +1163,6 @@ if [[ $DOQSUB -eq 2 ]];
 
     echo "$maskCall" > $qscript2
     echo "$jlfCall" >> $qscript2
-
-    if [[ ${TARGET_MASK_IMAGE} == 'majorityvoting' ]];
-      then
-        combineCall="${ANTSPATH}/ImageMath ${DIM} ${OUTPUT_PREFIX}Labels.nii.gz max ${OUTPUT_PREFIX}Labels.nii.gz ${OUTPUT_PREFIX}TargetMaskImageMajorityVoting.nii.gz"
-        echo "$combineCall" >> $qscript2
-      fi
 
     sh $qscript2
   fi
@@ -1072,7 +1220,7 @@ if [[ $DOQSUB -eq 3 ]];
           then
             jlfCall="${jlfCall} -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz]"
           else
-            jlfCall="${jlfCall} -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz,${OUTPUT_POSTERIORS_FORMAT}]"
+            jlfCall="${jlfCall}  -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz,${OUTPUT_POSTERIORS_FORMAT}]"
           fi
 
         if [[ ${TARGET_MASK_IMAGE} == 'otsu' ]];
@@ -1081,24 +1229,18 @@ if [[ $DOQSUB -eq 3 ]];
             maskCall="${ANTSPATH}/ThresholdImage ${DIM} ${TARGET_IMAGE} ${TARGET_MASK_IMAGE} Otsu 1;"
 
             jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
-
         elif [[ ${TARGET_MASK_IMAGE} == 'or' ]];
           then
             TARGET_MASK_IMAGE="${OUTPUT_PREFIX}TargetMaskImageOr.nii.gz"
 
-            maskCall="${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${EXISTING_WARPED_ATLAS_LABELS[0]} ${EXISTING_WARPED_ATLAS_LABELS[1]};"
-            for (( i = 2; i < ${#EXISTING_WARPED_ATLAS_LABELS[@]}; i++ ))
+            maskCall="${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${EXISTING_WARPED_ATLAS_IMAGES[0]} ${EXISTING_WARPED_ATLAS_IMAGES[1]};"
+            for (( i = 2; i < ${#EXISTING_WARPED_ATLAS_IMAGES[@]}; i++ ))
               do
-                maskCall="${maskCall} ${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${TARGET_MASK_IMAGE} ${EXISTING_WARPED_ATLAS_LABELS[$i]};"
+                maskCall="${maskCall} ${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${TARGET_MASK_IMAGE} ${EXISTING_WARPED_ATLAS_IMAGES[$i]};"
               done
             maskCall="${maskCall} ${ANTSPATH}/ThresholdImage ${DIM} ${TARGET_MASK_IMAGE} ${TARGET_MASK_IMAGE} 0 0 0 1"
 
-        elif [[ ${TARGET_MASK_IMAGE} == 'majorityvoting' ]];
-          then
-            MAJORITY_VOTING_IMAGE="${OUTPUT_PREFIX}TargetMaskImageMajorityVoting.nii.gz"
-            maskCall="${ANTSPATH}/ImageMath ${DIM} ${MAJORITY_VOTING_IMAGE} MajorityVoting 0.8 ${EXISTING_WARPED_ATLAS_LABELS[@]};"
-            jlfCall="${jlfCall} -x ${OUTPUT_PREFIX}TargetMaskImageMajorityVoting_Mask.nii.gz"
-
+            jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
         elif [[ -f ${TARGET_MASK_IMAGE} ]];
           then
             jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
@@ -1109,12 +1251,6 @@ if [[ $DOQSUB -eq 3 ]];
 
     echo "$maskCall" > $qscript2
     echo "$jlfCall" >> $qscript2
-
-    if [[ ${TARGET_MASK_IMAGE} == 'majorityvoting' ]];
-      then
-        combineCall="${ANTSPATH}/ImageMath ${DIM} ${OUTPUT_PREFIX}Labels.nii.gz max ${OUTPUT_PREFIX}Labels.nii.gz ${OUTPUT_PREFIX}TargetMaskImageMajorityVoting.nii.gz"
-        echo "$combineCall" >> $qscript2
-      fi
 
     sh $qscript2
   fi
@@ -1175,7 +1311,7 @@ if [[ $DOQSUB -eq 5 ]];
           then
             jlfCall="${jlfCall} -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz]"
           else
-            jlfCall="${jlfCall} -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz,${OUTPUT_POSTERIORS_FORMAT}]"
+            jlfCall="${jlfCall}  -o [${OUTPUT_PREFIX}Labels.nii.gz,${OUTPUT_PREFIX}Intensity.nii.gz,${OUTPUT_POSTERIORS_FORMAT}]"
           fi
 
         if [[ ${TARGET_MASK_IMAGE} == 'otsu' ]];
@@ -1184,24 +1320,18 @@ if [[ $DOQSUB -eq 5 ]];
             maskCall="${ANTSPATH}/ThresholdImage ${DIM} ${TARGET_IMAGE} ${TARGET_MASK_IMAGE} Otsu 1;"
 
             jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
-
         elif [[ ${TARGET_MASK_IMAGE} == 'or' ]];
           then
             TARGET_MASK_IMAGE="${OUTPUT_PREFIX}TargetMaskImageOr.nii.gz"
 
-            maskCall="${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${EXISTING_WARPED_ATLAS_LABELS[0]} ${EXISTING_WARPED_ATLAS_LABELS[1]};"
-            for (( i = 2; i < ${#EXISTING_WARPED_ATLAS_LABELS[@]}; i++ ))
+            maskCall="${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${EXISTING_WARPED_ATLAS_IMAGES[0]} ${EXISTING_WARPED_ATLAS_IMAGES[1]};"
+            for (( i = 2; i < ${#EXISTING_WARPED_ATLAS_IMAGES[@]}; i++ ))
               do
-                maskCall="${maskCall} ${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${TARGET_MASK_IMAGE} ${EXISTING_WARPED_ATLAS_LABELS[$i]};"
+                maskCall="${maskCall} ${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${TARGET_MASK_IMAGE} ${EXISTING_WARPED_ATLAS_IMAGES[$i]};"
               done
             maskCall="${maskCall} ${ANTSPATH}/ThresholdImage ${DIM} ${TARGET_MASK_IMAGE} ${TARGET_MASK_IMAGE} 0 0 0 1"
 
-        elif [[ ${TARGET_MASK_IMAGE} == 'majorityvoting' ]];
-          then
-            MAJORITY_VOTING_IMAGE="${OUTPUT_PREFIX}TargetMaskImageMajorityVoting.nii.gz"
-            maskCall="${ANTSPATH}/ImageMath ${DIM} ${MAJORITY_VOTING_IMAGE} MajorityVoting 0.8 ${EXISTING_WARPED_ATLAS_LABELS[@]};"
-            jlfCall="${jlfCall} -x ${OUTPUT_PREFIX}TargetMaskImageMajorityVoting_Mask.nii.gz"
-
+            jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
         elif [[ -f ${TARGET_MASK_IMAGE} ]];
           then
             jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
@@ -1213,12 +1343,6 @@ if [[ $DOQSUB -eq 5 ]];
     echo "#!/bin/sh" > $qscript2
     echo "$maskCall" >> $qscript2
     echo "$jlfCall" >> $qscript2
-
-    if [[ ${TARGET_MASK_IMAGE} == 'majorityvoting' ]];
-      then
-        combineCall="${ANTSPATH}/ImageMath ${DIM} ${OUTPUT_PREFIX}Labels.nii.gz max ${OUTPUT_PREFIX}Labels.nii.gz ${OUTPUT_PREFIX}TargetMaskImageMajorityVoting.nii.gz"
-        echo "$combineCall" >> $qscript2
-      fi
 
     jobIDs=`sbatch --job-name=antsJlf --export=ANTSPATH=$ANTSPATH $QSUB_OPTS --nodes=1 --cpus-per-task=1 --time=${JLF_WALLTIME} --mem=${JLF_MEMORY} $qscript2 | rev | cut -f1 -d\ | rev`
     ${ANTSPATH}/waitForSlurmJobs.pl 1 600 $jobIDs

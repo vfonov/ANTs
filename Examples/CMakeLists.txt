@@ -9,6 +9,7 @@ add_library(antsUtilities STATIC antsUtilities.cxx
             ../Utilities/antsCommandLineOption.cxx
             ../Utilities/antsCommandLineParser.cxx
             ANTsVersion.cxx
+            ImageMathHelper.cxx ImageMathHelper2D.cxx  ImageMathHelper3D.cxx  ImageMathHelper4D.cxx
             )
 target_link_libraries(antsUtilities ${ITK_LIBRARIES} )
 install(TARGETS antsUtilities
@@ -51,8 +52,8 @@ endmacro()
 set(CORE_ANTS_APPS
   antsAffineInitializer
   antsJointFusion
+  DenoiseImage
   SurfaceBasedSmoothing
-  CreateJacobianDeterminantImage
   ThresholdImage
   ResampleImage
   sccan
@@ -76,6 +77,7 @@ set(MORE_ANTS_APPS
     iMath
     ANTS
     ANTSJacobian
+    CreateJacobianDeterminantImage
     PrintHeader
     ResetDirection
     ANTSUseLandmarkImagesToGetAffineTransform
@@ -119,7 +121,7 @@ set(MORE_ANTS_APPS
     TileImages
     CreateTiledMosaic
     CreateImage
-    DenoiseImage
+    NonLocalSuperResolution
     WarpTensorImageMultiTransform
     ReorientTensorImage
     RebaseTensorImage
@@ -195,7 +197,7 @@ install(PROGRAMS ../Scripts/ANTSpexec.sh
      ../Scripts/antsIntroduction.sh
      ../Scripts/antsLaplacianBoundaryCondition.R
      ../Scripts/antsLongitudinalCorticalThickness.sh
-     ../Scripts/antsMalfLabeling.sh
+     ../Scripts/antsJointLabelFusion.sh
      ../Scripts/antsMultivariateTemplateConstruction.sh
      ../Scripts/antsMultivariateTemplateConstruction2.sh
      ../Scripts/antsNetworkAnalysis.R

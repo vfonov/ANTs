@@ -36,9 +36,10 @@ if [[ ${#ANTSPATH} -le 3 ]];
 
 # Test availability of helper scripts.
 # No need to test this more than once. Can reside outside of the main loop.
+JLF=${ANTSPATH}/antsJointFusion
 ANTS=${ANTSPATH}/antsRegistration
 WARP=${ANTSPATH}/antsApplyTransforms
-JLF=${ANTSPATH}/antsJointFusion
+SMOOTH=${ANTSPATH}/SmoothDisplacementField
 PEXEC=${ANTSPATH}ANTSpexec.sh
 SGE=${ANTSPATH}waitForSGEQJobs.pl
 PBS=${ANTSPATH}waitForPBSQJobs.pl
@@ -46,7 +47,7 @@ XGRID=${ANTSPATH}waitForXGridJobs.pl
 SLURM=${ANTSPATH}/waitForSlurmJobs.pl
 
 fle_error=0
-for FLE in $JLF $ANTS $WARP $PEXEC $SGE $XGRID $PBS $SLURM
+for FLE in $JLF $ANTS $WARP $SMOOTH $PEXEC $SGE $XGRID $PBS $SLURM
   do
   if [[ ! -x $FLE ]];
     then
@@ -66,10 +67,35 @@ if [[ $fle_error = 1 ]];
   fi
 
 
-#assuming .nii.gz as default file type. This is the case for ANTS 1.7 and up
+# Assuming .nii.gz as default file type. This is the case for ANTS 1.7 and up
 
 function Usage {
     cat <<USAGE
+
+This adds some additional utilty to the original antsJointLabelFusion.sh script.
+Specifically, it adds the parameters '-a', '-b', '-e', and '-s' for performing
+multiple piecewise registration steps.  For example, suppose one wants to use
+joint label fusion to label thoracic CT where the following atlases have been
+supplied with the following labels:
+
+  label 1:  left lung
+  label 2:  right lung
+  label 3:  spinal cord
+  label 4:  heart
+
+This script allows one to perform a piecewise registration where one can register
+the two lungs separately and then "stitch" together the resulting transforms.  This
+is followed up by a registration refinement step where other labeled structures
+can be incorporated into driving the registration.  An additional benefit is that
+one can use the segmentation labels of the atlases to create fixed masks for the
+registration.  Example usage for the above would be
+
+antsJointLabelFusion2.sh -d 3 ... \
+                         -b 1 -b 2 -b 3 -b 4 \
+                         -e 1 -e 2 \
+                         -a 4 \
+                         -s 10 \
+                         ...
 
 Usage:
 
@@ -101,6 +127,16 @@ Optional arguments:
      -r:  qsub options
 
      -q:  Use quick registration parameters:  Either 0 or 1 (default = 1).
+
+     -a:  isotropic resampling in mm for specifying labels (default = 'NA' = "no resampling").
+
+     -b:  specify labels to use for dilation and masking for the final registration
+
+     -e:  subset of labels specified by the '-b' option to be used for the piecewise registration.
+          If no labels are specified by '-e', it is assumed that all the '-b' labels are to be
+          used for the initial piecewise registration.
+
+     -s:  dilation radii for labels specified with option 'b'
 
      -p:  Save posteriors:  Save posteriors in specified c-style format e.g. posterior%04d.nii.gz
                            Need to specify output directory.
@@ -160,6 +196,13 @@ in your studies.
 Wang H, Suh JW, Das SR, Pluta J, Craige C, Yushkevich PA.
 Multi-Atlas Segmentation with Joint Label Fusion.
 IEEE Trans Pattern Anal Mach Intell.
+
+For lung-specific applications, cf https://www.ncbi.nlm.nih.gov/pubmed/26222827
+
+Tustison NJ, Qing K, Wang C, Altes TA, Mugler JP 3rd.
+Atlas-based estimation of lung and lobar anatomy in proton MRI.
+Magn Reson Med. 2016 Jul;76(1):315-20.
+
 --------------------------------------------------------------------------------------
 script by Nick Tustison
 --------------------------------------------------------------------------------------
@@ -170,6 +213,31 @@ USAGE
 
 function Help {
     cat <<HELP
+
+This adds some additional utilty to the original antsJointLabelFusion.sh script.
+Specifically, it adds the parameters '-a', '-b', '-e', and '-s' for performing
+multiple piecewise registration steps.  For example, suppose one wants to use
+joint label fusion to label thoracic CT where the following atlases have been
+supplied with the following labels:
+
+  label 1:  left lung
+  label 2:  right lung
+  label 3:  spinal cord
+  label 4:  heart
+
+This script allows one to perform a piecewise registration where one can register
+the two lungs separately and then "stitch" together the resulting transforms.  This
+is followed up by a registration refinement step where other labeled structures
+can be incorporated into driving the registration.  An additional benefit is that
+one can use the segmentation labels of the atlases to create fixed masks for the
+registration.  Example usage for the above would be
+
+antsJointLabelFusion2.sh -d 3 ... \
+                         -b 1 -b 2 -b 3 -b 4 \
+                         -e 1 -e 2 \
+                         -a 4 \
+                         -s 10 \
+                         ...
 
 `basename $0` will propagate labels from a set of pre-labeled atlases using the JLF
 algorithm.
@@ -211,6 +279,16 @@ Optional arguments:
      -j:  Number of cpu cores to use (default 2; -- requires "-c 2").
 
      -q:  Use quick registration parameters:  Either 0 or 1 (default = 1).
+
+     -b:  specify labels to use for dilation and masking for the final registration
+
+     -e:  subset of labels specified by the '-b' option to be used for the piecewise registration.
+          If no labels are specified by '-e', it is assumed that all the '-b' labels are to be
+          used for the initial piecewise registration.
+
+     -s:  dilation radii (in mm) for labels specified with option 'b'
+
+     -a:  isotropic resampling in mm for specifying labels (default = 4).
 
      -p:  Save posteriors:  Save posteriors in specified c-style format e.g. posterior%04d.nii.gz
                            Need to specify output directory.
@@ -355,6 +433,11 @@ ATLAS_IMAGES=()
 ATLAS_LABELS=()
 TRANSFORM='s'
 
+PIECEWISE_LABELS=()
+PIECEWISE_LABELS_SUBSET=()
+PIECEWISE_DILATION_RADII=()
+ISOTROPIC_RESAMPLING='NA'
+
 KEEP_ALL_IMAGES=0
 DOQSUB=0
 CORES=1
@@ -391,7 +474,7 @@ MAJORITYVOTE=0
 RUNQUICK=1
 TRANSFORM_TYPE="s"
 # reading command line arguments
-while getopts "c:d:f:g:h:j:k:l:m:o:p:q:r:t:u:v:w:x:y:z:" OPT
+while getopts "a:b:c:d:e:f:g:h:j:k:l:m:o:p:q:r:s:t:u:v:w:x:y:z:" OPT
   do
   case $OPT in
       h) #help
@@ -434,6 +517,21 @@ while getopts "c:d:f:g:h:j:k:l:m:o:p:q:r:t:u:v:w:x:y:z:" OPT
    ;;
       q)
    RUNQUICK=$OPTARG
+   ;;
+      a)
+   ISOTROPIC_RESAMPLING=$OPTARG
+   ;;
+      b)
+   PIECEWISE_LABELS[${#PIECEWISE_LABELS[@]}]=$OPTARG
+   ;;
+      e)
+   PIECEWISE_LABELS_SUBSET[${#PIECEWISE_LABELS_SUBSET[@]}]=$OPTARG
+   ;;
+      s)
+   PIECEWISE_DILATION_RADII[${#PIECEWISE_DILATION_RADII[@]}]=$OPTARG
+   ;;
+      j) #number of cpu cores to use
+   CORES=$OPTARG
    ;;
       r)
    QSUB_OPTS=$OPTARG
@@ -504,6 +602,56 @@ if [[ ${#ATLAS_IMAGES[@]} -ne ${#ATLAS_LABELS[@]} ]];
     exit 1
   fi
 
+if [[ ${#PIECEWISE_LABELS[@]} -gt 0 ]];
+  then
+    if [[ ${#PIECEWISE_DILATION_RADII[@]} -eq 1 ]];
+      then
+        for (( i = 0; i < ${#PIECEWISE_LABELS[@]}; i++ ))
+          do
+            PIECEWISE_DILATION_RADII[${i}]=${PIECEWISE_DILATION_RADII[0]}
+          done
+      elif [[ ${#PIECEWISE_LABELS[@]} -ne ${#PIECEWISE_DILATION_RADII[@]} ]];
+      then
+        echo "The number of dilation radii does not equal the number of piecewise labels."
+        exit 1
+      fi
+
+    if [[ ${#PIECEWISE_LABELS_SUBSET[@]} -eq 0 ]];
+      then
+        for (( i = 0; i < ${#PIECEWISE_LABELS[@]}; i++ ))
+          do
+            PIECEWISE_LABELS_SUBSET[$i]=${PIECEWISE_LABELS[$i]}
+          done
+      else
+        for (( i = 0; i < ${#PIECEWISE_LABELS_SUBSET[@]}; i++ ))
+          do
+            LABEL_IS_FOUND=0
+            for (( j = 0; j < ${#PIECEWISE_LABELS[@]}; j++ ))
+              do
+                if [[ ${PIECEWISE_LABELS[$j]} -eq ${PIECEWISE_LABELS_SUBSET[$i]} ]];
+                  then
+                    LABEL_IS_FOUND=1
+                    break
+                  fi
+              done
+            if [[ $LABEL_IS_FOUND -eq 0 ]];
+              then
+                echo "Subset label ${PIECEWISE_LABELS_SUBSET[$i]} is not found in the labels specified by the -b option."
+                exit 1
+              fi
+          done
+      fi
+
+  fi
+
+
+
+ISOTROPIC_RESAMPLING_VECTOR="${ISOTROPIC_RESAMPLING}x${ISOTROPIC_RESAMPLING}"
+if [[ $DIM -eq 3 ]];
+  then
+    ISOTROPIC_RESAMPLING_VECTOR="${ISOTROPIC_RESAMPLING}x${ISOTROPIC_RESAMPLING}x${ISOTROPIC_RESAMPLING}"
+  fi
+
 PRECISIONFLAG='f'
 if [[ ${PRECISION} -eq 0 ]];
   then
@@ -542,15 +690,11 @@ for (( i = 0; i < ${#ATLAS_IMAGES[@]}; i++ ))
     qscript="${OUTPUT_DIR}/job_${BASENAME}_${i}.sh"
 
     WARPED_ATLAS_IMAGES[${#WARPED_ATLAS_IMAGES[@]}]="${OUTPUT_PREFIX}${BASENAME}_${i}_Warped.nii.gz"
-    INVERSE_WARPED_ATLAS_IMAGES[${#INVERSE_WARPED_ATLAS_IMAGES[@]}]="${OUTPUT_PREFIX}${BASENAME}_${i}_InverseWarped.nii.gz"
     WARPED_ATLAS_LABELS[${#WARPED_ATLAS_LABELS[@]}]="${OUTPUT_PREFIX}${BASENAME}_${i}_WarpedLabels.nii.gz"
-    WARP_FIELDS[${#WARP_FIELDS[@]}]="${OUTPUT_PREFIX}${BASENAME}_${i}_1Warp.nii.gz"
-    INVERSE_WARP_FIELDS[${#INVERSE_WARP_FIELDS[@]}]="${OUTPUT_PREFIX}${BASENAME}_${i}_1InverseWarp.nii.gz"
-    AFFINE_FILES[${#AFFINE_FILES[@]}]="${OUTPUT_PREFIX}${BASENAME}_${i}_0GenericAffine.mat"
 
-    if [[ -f "${OUTPUT_PREFIX}${BASENAME}_${i}_WarpedLabels.nii.gz" ]];
+    if [[ -f ${WARPED_ATLAS_LABELS[${i}]} ]];
       then
-        echo ${OUTPUT_PREFIX}${BASENAME}_${i}_WarpedLabels.nii.gz already exists.
+        echo "${WARPED_ATLAS_LABELS[${i}]} already exists."
         rm -f $qscript
         continue
       fi
@@ -560,47 +704,302 @@ for (( i = 0; i < ${#ATLAS_IMAGES[@]}; i++ ))
       then
         regcall=${ANTSPATH}/antsRegistrationSyNQuick.sh
       fi
-    registrationCall="$regcall \
-                          -d ${DIM} \
-                          -p ${PRECISIONFLAG} \
-                          -j 1 \
-                          -t ${TRANSFORM_TYPE} \
-                          -f ${TARGET_IMAGE} \
-                          -m ${ATLAS_IMAGES[$i]} \
-                          -o ${OUTPUT_PREFIX}${BASENAME}_${i}_ > ${OUTPUT_PREFIX}${BASENAME}_${i}_log.txt"
 
-    labelXfrmCall="${ANTSPATH}/antsApplyTransforms \
-                          -d ${DIM} \
-                          --float 1 \
-                          -i ${ATLAS_LABELS[$i]} \
-                          -r ${TARGET_IMAGE} \
-                          -o ${OUTPUT_PREFIX}${BASENAME}_${i}_WarpedLabels.nii.gz \
-                          -n NearestNeighbor \
-                          -t ${OUTPUT_PREFIX}${BASENAME}_${i}_1Warp.nii.gz \
-                          -t ${OUTPUT_PREFIX}${BASENAME}_${i}_0GenericAffine.mat >> ${OUTPUT_PREFIX}${BASENAME}_${i}_log.txt"
-
-    copyImageHeaderCall="${ANTSPATH}/CopyImageHeaderInformation \
-                         ${TARGET_IMAGE} \
-                         ${OUTPUT_PREFIX}${BASENAME}_${i}_Warped.nii.gz \
-                         ${OUTPUT_PREFIX}${BASENAME}_${i}_Warped.nii.gz 1 1 1"
-
-    copyLabelsHeaderCall="${ANTSPATH}/CopyImageHeaderInformation \
-                          ${TARGET_IMAGE} \
-                          ${OUTPUT_PREFIX}${BASENAME}_${i}_WarpedLabels.nii.gz \
-                          ${OUTPUT_PREFIX}${BASENAME}_${i}_WarpedLabels.nii.gz 1 1 1"
-
-    rm -f $qscript
-
-    if [[ $DOQSUB -eq 5 ]];
+    if [[ ${#PIECEWISE_LABELS[@]} -eq 0 ]];
       then
-        # SLURM job scripts must start with a shebang
-        echo '#!/bin/sh' > $qscript
-      fi
 
-    echo "$registrationCall" >> $qscript
-    echo "$labelXfrmCall" >> $qscript
-    echo "$copyImageHeaderCall" >> $qscript
-    echo "$copyLabelsHeaderCall" >> $qscript
+        INVERSE_WARPED_ATLAS_IMAGES[${#INVERSE_WARPED_ATLAS_IMAGES[@]}]="${OUTPUT_PREFIX}${BASENAME}_${i}_InverseWarped.nii.gz"
+        WARP_FIELDS[${#WARP_FIELDS[@]}]="${OUTPUT_PREFIX}${BASENAME}_${i}_1Warp.nii.gz"
+        INVERSE_WARP_FIELDS[${#INVERSE_WARP_FIELDS[@]}]="${OUTPUT_PREFIX}${BASENAME}_${i}_1InverseWarp.nii.gz"
+        AFFINE_FILES[${#AFFINE_FILES[@]}]="${OUTPUT_PREFIX}${BASENAME}_${i}_0GenericAffine.mat"
+
+        registrationCall="$regcall \
+                              -d ${DIM} \
+                              -p ${PRECISIONFLAG} \
+                              -j 1 \
+                              -t ${TRANSFORM_TYPE} \
+                              -f ${TARGET_IMAGE} \
+                              -m ${ATLAS_IMAGES[$i]} \
+                              -o ${OUTPUT_PREFIX}${BASENAME}_${i}_ > ${OUTPUT_PREFIX}${BASENAME}_${i}_log.txt"
+
+        labelXfrmCall="${ANTSPATH}/antsApplyTransforms \
+                              -d ${DIM} \
+                              --float 1 \
+                              -i ${ATLAS_LABELS[$i]} \
+                              -r ${TARGET_IMAGE} \
+                              -o ${OUTPUT_PREFIX}${BASENAME}_${i}_WarpedLabels.nii.gz \
+                              -n GenericLabel \
+                              -t ${OUTPUT_PREFIX}${BASENAME}_${i}_1Warp.nii.gz \
+                              -t ${OUTPUT_PREFIX}${BASENAME}_${i}_0GenericAffine.mat >> ${OUTPUT_PREFIX}${BASENAME}_${i}_log.txt"
+
+        copyImageHeaderCall="${ANTSPATH}/CopyImageHeaderInformation \
+                             ${TARGET_IMAGE} \
+                             ${OUTPUT_PREFIX}${BASENAME}_${i}_Warped.nii.gz \
+                             ${OUTPUT_PREFIX}${BASENAME}_${i}_Warped.nii.gz 1 1 1"
+
+        copyLabelsHeaderCall="${ANTSPATH}/CopyImageHeaderInformation \
+                              ${TARGET_IMAGE} \
+                              ${OUTPUT_PREFIX}${BASENAME}_${i}_WarpedLabels.nii.gz \
+                              ${OUTPUT_PREFIX}${BASENAME}_${i}_WarpedLabels.nii.gz 1 1 1"
+
+        rm -f $qscript
+
+        if [[ $DOQSUB -eq 5 ]];
+          then
+            # SLURM job scripts must start with a shebang
+            echo '#!/bin/sh' > $qscript
+          fi
+
+        echo "$registrationCall" >> $qscript
+        echo "$labelXfrmCall" >> $qscript
+        echo "$copyImageHeaderCall" >> $qscript
+        echo "$copyLabelsHeaderCall" >> $qscript
+
+      else
+
+        TMP_FILES=()
+
+        logFile="${OUTPUT_PREFIX}${BASENAME}_${i}_log.txt"
+
+        # Dilate regions and create masks
+
+        SUBSET_CONFIDENCE_MASK="${OUTPUT_PREFIX}${BASENAME}_${i}_ConfidenceMask.nii.gz"
+        CONFIDENCE_DILATED_MASK="${OUTPUT_PREFIX}${BASENAME}_${i}_ConfidenceDilatedMask.nii.gz"
+        PIECEWISE_MASKS=()
+        PIECEWISE_DILATED_MASKS=()
+        PIECEWISE_OUTPUT_PREFIX="${OUTPUT_PREFIX}${BASENAME}_${i}_PiecewiseLabel"
+
+        INITIAL_LABEL_IS_SPECIFIED=0
+
+        for (( j = 0; j < ${#PIECEWISE_LABELS[@]}; j++ ))
+          do
+
+            PIECEWISE_MASKS[$j]="${PIECEWISE_OUTPUT_PREFIX}${PIECEWISE_LABELS[$j]}.nii.gz"
+            PIECEWISE_DILATED_MASKS[$j]="${PIECEWISE_OUTPUT_PREFIX}Dilated${PIECEWISE_LABELS[$j]}.nii.gz"
+            thresholdCall="${ANTSPATH}/ThresholdImage ${DIM} ${ATLAS_LABELS[$i]} ${PIECEWISE_MASKS[$j]} ${PIECEWISE_LABELS[$j]} ${PIECEWISE_LABELS[$j]} 1 0"
+
+            echo "$thresholdCall" >> $qscript
+
+            distanceCall="${ANTSPATH}/ImageMath ${DIM} ${PIECEWISE_DILATED_MASKS[$j]} MaurerDistance ${PIECEWISE_MASKS[$j]} 1"
+            thresholdCall="${ANTSPATH}/ThresholdImage ${DIM} ${PIECEWISE_DILATED_MASKS[$j]} ${PIECEWISE_DILATED_MASKS[$j]} -1000000 ${PIECEWISE_DILATION_RADII[$j]} 1 0"
+
+            echo "$distanceCall" >> $qscript
+            echo "$thresholdCall" >> $qscript
+
+            if [[ $j -eq 0 ]]
+              then
+                echo "cp ${PIECEWISE_DILATED_MASKS[$j]} ${CONFIDENCE_DILATED_MASK}" >> $qscript
+              else
+                addCall="${ANTSPATH}/ImageMath ${DIM} ${CONFIDENCE_DILATED_MASK} max ${CONFIDENCE_DILATED_MASK} ${PIECEWISE_DILATED_MASKS[$j]}"
+                echo "$addCall" >> $qscript
+              fi
+
+            SUBSET_LABEL_IS_FOUND=0
+            for (( k = 0; k < ${#PIECEWISE_LABELS_SUBSET[@]}; k++ ))
+              do
+                if [[ ${PIECEWISE_LABELS[$j]} -eq ${PIECEWISE_LABELS_SUBSET[$k]} ]];
+                  then
+                    SUBSET_LABEL_IS_FOUND=1
+                    break
+                  fi
+              done
+
+            if [[ $SUBSET_LABEL_IS_FOUND -eq 0 ]];
+              then
+                continue
+              fi
+
+            if [[ $INITIAL_LABEL_IS_SPECIFIED -eq 0 ]]
+              then
+                echo "cp ${PIECEWISE_MASKS[$j]} ${SUBSET_CONFIDENCE_MASK}" >> $qscript
+                INITIAL_LABEL_IS_SPECIFIED=1
+              else
+                addCall="${ANTSPATH}/ImageMath ${DIM} ${SUBSET_CONFIDENCE_MASK} max ${SUBSET_CONFIDENCE_MASK} ${PIECEWISE_MASKS[$j]}"
+                echo "$addCall" >> $qscript
+              fi
+          done
+
+        if [[ ${ISOTROPIC_RESAMPLING} != 'NA' ]];
+          then
+            resampleCall="${ANTSPATH}/ResampleImage ${DIM} ${SUBSET_CONFIDENCE_MASK} ${SUBSET_CONFIDENCE_MASK} $ISOTROPIC_RESAMPLING_VECTOR 0 1"
+            echo "$resampleCall" >> $qscript
+          fi
+
+        TMP_FILES=( ${TMP_FILES[@]} ${PIECEWISE_MASKS[@]} ${PIECEWISE_DILATED_MASKS[@]} ${SUBSET_CONFIDENCE_MASK} ${CONFIDENCE_DILATED_MASK} )
+
+        # Perform initial linear registration of the whole images
+        # Note that we're registering the target image to the atlas image since the atlas
+        # image has the masks (i.e., labels)
+
+        INIT_OUTPUT_PREFIX=${OUTPUT_PREFIX}${BASENAME}_${i}_Init
+
+        registrationCallInit="${ANTSPATH}/antsRegistration -d 3 -v 1 -o $INIT_OUTPUT_PREFIX -r [${ATLAS_IMAGES[$i]},${TARGET_IMAGE},0]"
+        registrationCallInit="$registrationCallInit -t Rigid[0.15] -m MI[${ATLAS_IMAGES[$i]},${TARGET_IMAGE},1,32,Regular,0.25] -c [100x40x10,1e-6,10] -f 6x4x3 -s 3x2x1"
+        registrationCallInit="$registrationCallInit -t Similarity[0.15] -m MI[${ATLAS_IMAGES[$i]},${TARGET_IMAGE},1,32,Regular,0.25] -c [100x40x10,1e-6,10] -f 6x4x3 -s 3x2x1"
+        registrationCallInit="$registrationCallInit -t Affine[0.15] -m MI[${ATLAS_IMAGES[$i]},${TARGET_IMAGE},1,32,Regular,0.25] -c [100x40x10,1e-6,10] -f 6x4x3 -s 3x2x1  >> $logFile"
+
+        echo "$registrationCallInit" >> $qscript
+
+        # Register piecewise labels separately
+
+        PIECEWISE_TRANSFORM_WARPS=""
+
+        for (( j = 0; j < ${#PIECEWISE_LABELS[@]}; j++ ))
+          do
+
+            SUBSET_LABEL_IS_FOUND=0
+            for (( k = 0; k < ${#PIECEWISE_LABELS_SUBSET[@]}; k++ ))
+              do
+                if [[ ${PIECEWISE_LABELS[$j]} -eq ${PIECEWISE_LABELS_SUBSET[$k]} ]];
+                  then
+                    SUBSET_LABEL_IS_FOUND=1
+                    break
+                  fi
+              done
+
+            if [[ $SUBSET_LABEL_IS_FOUND -eq 0 ]];
+              then
+                continue
+              fi
+
+            PIECEWISE_OUTPUT_PREFIX=${OUTPUT_PREFIX}${BASENAME}_${i}_PiecewiseLabel${PIECEWISE_LABELS[$j]}_
+
+            registrationCallPiecewise="${ANTSPATH}/antsRegistration -d 3 -v 1 -z 0 -o $PIECEWISE_OUTPUT_PREFIX -r ${INIT_OUTPUT_PREFIX}0GenericAffine.mat -x ${PIECEWISE_DILATED_MASKS[$j]}"
+            registrationCallPiecewise="$registrationCallPiecewise -t Rigid[0.15] -m MI[${ATLAS_IMAGES[$i]},${TARGET_IMAGE},1,32,Regular,0.25] -c [100x100x50,1e-6,10] -f 6x4x3 -s 3x2x1"
+            registrationCallPiecewise="$registrationCallPiecewise -t Similarity[0.15] -m MI[${ATLAS_IMAGES[$i]},${TARGET_IMAGE},1,32,Regular,0.25] -c [100x100x50,1e-6,10] -f 6x4x3 -s 3x2x1"
+            registrationCallPiecewise="$registrationCallPiecewise -t Affine[0.15] -m MI[${ATLAS_IMAGES[$i]},${TARGET_IMAGE},1,32,Regular,0.25] -c [100x100x50,1e-6,10] -f 6x4x3 -s 3x2x1"
+            registrationCallPiecewise="$registrationCallPiecewise -t BSplineSyN[0.15,40,0] -m MI[${ATLAS_IMAGES[$i]},${TARGET_IMAGE},1,32,Regular,0.25] -c [100x40x0,1e-6,10] -f 6x4x1 -s 3x2x0  >> $logFile"
+
+            echo "$registrationCallPiecewise" >> $qscript
+
+            composeCallPiecewise="$WARP \
+                                 -d ${DIM} \
+                                 -v 1 \
+                                 -o [${PIECEWISE_OUTPUT_PREFIX}TotalWarp.nii.gz,1] \
+                                 -r ${ATLAS_IMAGES[$i]} \
+                                 -t ${PIECEWISE_OUTPUT_PREFIX}4Warp.nii.gz \
+                                 -t ${PIECEWISE_OUTPUT_PREFIX}3Affine.mat \
+                                 -t ${PIECEWISE_OUTPUT_PREFIX}2Similarity.mat \
+                                 -t ${PIECEWISE_OUTPUT_PREFIX}1Rigid.mat >> $logFile"
+            echo "$composeCallPiecewise" >> $qscript
+
+            TMP_FILES=( ${TMP_FILES[@]} ${PIECEWISE_OUTPUT_PREFIX}1Rigid.mat )
+            TMP_FILES=( ${TMP_FILES[@]} ${PIECEWISE_OUTPUT_PREFIX}2Similarity.mat )
+            TMP_FILES=( ${TMP_FILES[@]} ${PIECEWISE_OUTPUT_PREFIX}3Affine.mat )
+            TMP_FILES=( ${TMP_FILES[@]} ${PIECEWISE_OUTPUT_PREFIX}4Warp.nii.gz )
+            TMP_FILES=( ${TMP_FILES[@]} ${PIECEWISE_OUTPUT_PREFIX}4InverseWarp.nii.gz )
+            TMP_FILES=( ${TMP_FILES[@]} ${PIECEWISE_OUTPUT_PREFIX}TotalWarp.nii.gz )
+
+            componentCall="${ANTSPATH}/ConvertImage ${DIM} ${PIECEWISE_OUTPUT_PREFIX}TotalWarp.nii.gz ${PIECEWISE_OUTPUT_PREFIX}TotalWarp 10"
+            echo "$componentCall" >> $qscript
+
+            components=( 'xvec' 'yvec' 'zvec' )
+            for (( d = 0; d < ${DIM}; d++ ))
+              do
+                maskingCall="${ANTSPATH}/ImageMath 3 ${PIECEWISE_OUTPUT_PREFIX}TotalWarp${components[$d]}.nii.gz m ${PIECEWISE_OUTPUT_PREFIX}TotalWarp${components[$d]}.nii.gz ${PIECEWISE_MASKS[$j]}"
+                echo "$maskingCall" >> $qscript
+
+                if [[ ${ISOTROPIC_RESAMPLING} != 'NA' ]];
+                  then
+                    resampleCall="${ANTSPATH}/ResampleImage 3 ${PIECEWISE_OUTPUT_PREFIX}TotalWarp${components[$d]}.nii.gz ${PIECEWISE_OUTPUT_PREFIX}TotalWarp${components[$d]}.nii.gz $ISOTROPIC_RESAMPLING_VECTOR 0 0"
+                    echo "$resampleCall" >> $qscript
+                  fi
+
+                TMP_FILES=( ${TMP_FILES[@]} ${PIECEWISE_OUTPUT_PREFIX}TotalWarp${components[$d]}.nii.gz )
+              done
+
+            componentCall="${ANTSPATH}/ConvertImage ${DIM} ${PIECEWISE_OUTPUT_PREFIX}TotalWarp ${PIECEWISE_OUTPUT_PREFIX}TotalWarp.nii.gz 9"
+            echo "$componentCall" >> $qscript
+
+            PIECEWISE_TRANSFORM_WARPS="${PIECEWISE_TRANSFORM_WARPS} -t ${PIECEWISE_OUTPUT_PREFIX}TotalWarp.nii.gz"
+
+          done
+
+        # Compose all the piecewise warps
+
+        composeCall="${WARP} -d ${DIM} -v 1 \
+                         -o [${OUTPUT_PREFIX}${BASENAME}_${i}_TotalWarp.nii.gz,1] \
+                         -r ${SUBSET_CONFIDENCE_MASK} \
+                         ${PIECEWISE_TRANSFORM_WARPS} >> $logFile"
+        echo "$composeCall" >> $qscript
+
+        # Smooth the displacement field and estimate the inverse
+
+        smoothCall="${ANTSPATH}/SmoothDisplacementField ${DIM} ${OUTPUT_PREFIX}${BASENAME}_${i}_TotalWarp.nii.gz ${OUTPUT_PREFIX}${BASENAME}_${i}_TotalWarp.nii.gz 4x4x4 5 3 0 ${SUBSET_CONFIDENCE_MASK} >> $logFile"
+        echo "$smoothCall" >> $qscript
+        inverseSmoothCall="${ANTSPATH}/SmoothDisplacementField ${DIM} ${OUTPUT_PREFIX}${BASENAME}_${i}_TotalWarp.nii.gz ${OUTPUT_PREFIX}${BASENAME}_${i}_TotalInverseWarp.nii.gz 4x4x4 5 3 1 >> $logFile"
+        echo "$inverseSmoothCall" >> $qscript
+
+        # Resample to the full size
+
+        xfrmForwardCall="${WARP} -d ${DIM} -v 1 \
+                         -o [${OUTPUT_PREFIX}${BASENAME}_${i}_TotalWarp.nii.gz,1] \
+                         -r ${ATLAS_IMAGES[$i]} \
+                         -t ${OUTPUT_PREFIX}${BASENAME}_${i}_TotalWarp.nii.gz >> $logFile"
+        echo "$xfrmForwardCall" >> $qscript
+
+        xfrmInverseCall="${WARP} -d ${DIM} -v 1 \
+                         -o [${OUTPUT_PREFIX}${BASENAME}_${i}_TotalInverseWarp.nii.gz,1] \
+                         -r ${ATLAS_IMAGES[$i]} \
+                         -t ${OUTPUT_PREFIX}${BASENAME}_${i}_TotalInverseWarp.nii.gz >> $logFile"
+        echo "$xfrmInverseCall" >> $qscript
+
+        # Now do a more refined registration
+
+        registrationCallRefined="${ANTSPATH}/antsRegistration -d 3 -v 1 -z 0 -o ${OUTPUT_PREFIX}${BASENAME}_${i}_ -r ${OUTPUT_PREFIX}${BASENAME}_${i}_TotalWarp.nii.gz -r ${INIT_OUTPUT_PREFIX}0GenericAffine.mat -x ${CONFIDENCE_DILATED_MASK}"
+        registrationCallRefined="$registrationCallRefined -t BSplineSyN[0.15,40,0] -m CC[${ATLAS_IMAGES[$i]},${TARGET_IMAGE},1,2] -c [100x40x0,1e-6,10] -f 6x4x1 -s 2x1x0 >> $logFile"
+
+        echo "$registrationCallRefined" >> $qscript
+
+        atlasXfrmCall="${ANTSPATH}/antsApplyTransforms \
+                              -d ${DIM} \
+                              --float 1 \
+                              -i ${ATLAS_IMAGES[$i]} \
+                              -r ${TARGET_IMAGE} \
+                              -o ${OUTPUT_PREFIX}${BASENAME}_${i}_Warped.nii.gz \
+                              -n Linear \
+                              -t [${INIT_OUTPUT_PREFIX}0GenericAffine.mat,1] \
+                              -t ${OUTPUT_PREFIX}${BASENAME}_${i}_TotalInverseWarp.nii.gz \
+                              -t ${OUTPUT_PREFIX}${BASENAME}_${i}_2InverseWarp.nii.gz >> ${OUTPUT_PREFIX}${BASENAME}_${i}_log.txt"
+        echo "$atlasXfrmCall" >> $qscript
+
+        labelXfrmCall="${ANTSPATH}/antsApplyTransforms \
+                              -d ${DIM} \
+                              --float 1 \
+                              -i ${ATLAS_LABELS[$i]} \
+                              -r ${TARGET_IMAGE} \
+                              -o ${OUTPUT_PREFIX}${BASENAME}_${i}_WarpedLabels.nii.gz \
+                              -n GenericLabel \
+                              -t [${INIT_OUTPUT_PREFIX}0GenericAffine.mat,1] \
+                              -t ${OUTPUT_PREFIX}${BASENAME}_${i}_TotalInverseWarp.nii.gz \
+                              -t ${OUTPUT_PREFIX}${BASENAME}_${i}_2InverseWarp.nii.gz >> ${OUTPUT_PREFIX}${BASENAME}_${i}_log.txt"
+        echo "$labelXfrmCall" >> $qscript
+
+        TMP_FILES=( ${TMP_FILES[@]} ${INIT_OUTPUT_PREFIX}0GenericAffine.mat )
+        TMP_FILES=( ${TMP_FILES[@]} ${OUTPUT_PREFIX}${BASENAME}_${i}_TotalWarp.nii.gz ${OUTPUT_PREFIX}${BASENAME}_${i}_TotalInverseWarp.nii.gz )
+        TMP_FILES=( ${TMP_FILES[@]} ${OUTPUT_PREFIX}${BASENAME}_${i}_2Warp.nii.gz ${OUTPUT_PREFIX}${BASENAME}_${i}_2InverseWarp.nii.gz )
+
+        copyImageHeaderCall="${ANTSPATH}/CopyImageHeaderInformation \
+                             ${TARGET_IMAGE} \
+                             ${OUTPUT_PREFIX}${BASENAME}_${i}_Warped.nii.gz \
+                             ${OUTPUT_PREFIX}${BASENAME}_${i}_Warped.nii.gz 1 1 1"
+        echo "$copyImageHeaderCall" >> $qscript
+
+        copyLabelsHeaderCall="${ANTSPATH}/CopyImageHeaderInformation \
+                              ${TARGET_IMAGE} \
+                              ${OUTPUT_PREFIX}${BASENAME}_${i}_WarpedLabels.nii.gz \
+                              ${OUTPUT_PREFIX}${BASENAME}_${i}_WarpedLabels.nii.gz 1 1 1"
+        echo "$copyLabelsHeaderCall" >> $qscript
+
+        if [[ $KEEP_ALL_IMAGES -eq 0 ]];
+          then
+            for f in ${TMP_FILES[@]}
+              do
+                echo "rm -f $f" >> $qscript
+             done
+          fi
+
+      fi
 
     if [[ $DOQSUB -eq 1 ]];
       then
@@ -802,14 +1201,19 @@ if [[ $DOQSUB -eq 1 ]];
           then
             TARGET_MASK_IMAGE="${OUTPUT_PREFIX}TargetMaskImageOr.nii.gz"
 
-            maskCall="${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${EXISTING_WARPED_ATLAS_IMAGES[0]} ${EXISTING_WARPED_ATLAS_IMAGES[1]};"
-            for (( i = 2; i < ${#EXISTING_WARPED_ATLAS_IMAGES[@]}; i++ ))
+            maskCall="${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${EXISTING_WARPED_ATLAS_LABELS[0]} ${EXISTING_WARPED_ATLAS_LABELS[1]};"
+            for (( i = 2; i < ${#EXISTING_WARPED_ATLAS_LABELS[@]}; i++ ))
               do
-                maskCall="${maskCall} ${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${TARGET_MASK_IMAGE} ${EXISTING_WARPED_ATLAS_IMAGES[$i]};"
+                maskCall="${maskCall} ${ANTSPATH}/ImageMath ${DIM} ${TARGET_MASK_IMAGE} max ${TARGET_MASK_IMAGE} ${EXISTING_WARPED_ATLAS_LABELS[$i]};"
               done
             maskCall="${maskCall} ${ANTSPATH}/ThresholdImage ${DIM} ${TARGET_MASK_IMAGE} ${TARGET_MASK_IMAGE} 0 0 0 1"
 
-            jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"
+        elif [[ ${TARGET_MASK_IMAGE} == 'majorityvoting' ]];
+          then
+            MAJORITY_VOTING_IMAGE="${OUTPUT_PREFIX}TargetMaskImageMajorityVoting.nii.gz"
+            maskCall="${ANTSPATH}/ImageMath ${DIM} ${MAJORITY_VOTING_IMAGE} MajorityVoting 0.8 ${EXISTING_WARPED_ATLAS_LABELS[@]};"
+            jlfCall="${jlfCall} -x ${OUTPUT_PREFIX}TargetMaskImageMajorityVoting_Mask.nii.gz"
+
         elif [[ -f ${TARGET_MASK_IMAGE} ]];
           then
             jlfCall="${jlfCall} -x ${TARGET_MASK_IMAGE}"

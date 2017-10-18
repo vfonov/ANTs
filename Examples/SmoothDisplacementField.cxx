@@ -154,14 +154,19 @@ int SmoothDisplacementField( int argc, char *argv[] )
     bspliner->SetSplineOrder( splineOrder );
     bspliner->SetNumberOfFittingLevels( numberOfLevels );
     bspliner->SetEnforceStationaryBoundary( true );
+    bspliner->SetEstimateInverse( false );
 
     if( argc > 7 )
       {
+      bspliner->SetEstimateInverse( static_cast<bool>( atoi( argv[7] ) ) );
+      }
+
+    if( argc > 8 )
+      {
       typename BSplineFilterType::RealImageType::Pointer confidenceImage = ITK_NULLPTR;
-      ReadImage<typename BSplineFilterType::RealImageType>( confidenceImage, argv[7] );
+      ReadImage<typename BSplineFilterType::RealImageType>( confidenceImage, argv[8] );
       bspliner->SetConfidenceImage( confidenceImage );
       }
-    bspliner->SetEstimateInverse( false );
 
     itk::TimeProbe timer;
     timer.Start();
@@ -226,7 +231,7 @@ int SmoothDisplacementField( std::vector<std::string> args, std::ostream* /*out_
   // 'args' doesn't have the command name as first, argument, so add it manually;
   // 'args' may have adjacent arguments concatenated into one argument,
   // which the parser should handle
-  args.insert( args.begin(), "SmoothImage" );
+  args.insert( args.begin(), "SmoothDisplacementField" );
 
   int     argc = args.size();
   char* * argv = new char *[args.size() + 1];
@@ -267,7 +272,8 @@ private:
   if ( argc < 5 )
     {
     std::cout << argv[0] << " imageDimension inputField outputField variance_or_mesh_size_base_level "
-              << "[numberOfevels=1] [splineOrder=3] [confidenceImage]" << std::endl;
+              << "[numberOfevels=1] [splineOrder=3] [estimateInverse=0] [confidenceImage]" << std::endl;
+
     return EXIT_FAILURE;
     }
 
