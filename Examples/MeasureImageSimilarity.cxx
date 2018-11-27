@@ -21,15 +21,14 @@ int MeasureImageSimilarity( itk::ants::CommandLineParser *parser )
   typedef typename RegistrationHelperType::DisplacementFieldType          DisplacementFieldType;
   typedef typename DisplacementFieldType::PixelType                       DisplacementVectorType;
   typedef typename RegistrationHelperType::DisplacementFieldTransformType DisplacementFieldTransformType;
-  
+
   typedef itk::ImageToImageMetricv4<ImageType, ImageType, ImageType, TComputeType>  ImageMetricType;
   typedef itk::ImageMaskSpatialObject<ImageDimension>                               ImageMaskSpatialObjectType;
   typedef typename ImageMaskSpatialObjectType::ImageType                            MaskImageType;
 
 
   bool verbose = false;
-  typename itk::ants::CommandLineParser::OptionType::Pointer verboseOption =
-    parser->GetOption( "verbose" );
+  OptionType::Pointer verboseOption = parser->GetOption( "verbose" );
   if( verboseOption && verboseOption->GetNumberOfFunctions() )
     {
     verbose = parser->Convert<bool>( verboseOption->GetFunction( 0 )->GetName() );
@@ -41,8 +40,7 @@ int MeasureImageSimilarity( itk::ants::CommandLineParser *parser )
   typename ImageType::Pointer fixedImage = ITK_NULLPTR;
   typename ImageType::Pointer movingImage = ITK_NULLPTR;
 
-  typename itk::ants::CommandLineParser::OptionType::Pointer maskOption =
-    parser->GetOption( "masks" );
+  OptionType::Pointer maskOption = parser->GetOption( "masks" );
   if( maskOption && maskOption->GetNumberOfFunctions() )
     {
     if( verbose )
@@ -111,8 +109,7 @@ int MeasureImageSimilarity( itk::ants::CommandLineParser *parser )
       }
     }
 
-  itk::ants::CommandLineParser::OptionType::Pointer metricOption =
-    parser->GetOption( "metric" );
+  OptionType::Pointer metricOption = parser->GetOption( "metric" );
   if( !metricOption || metricOption->GetNumberOfFunctions() == 0 )
     {
     if( verbose )
@@ -393,12 +390,12 @@ int MeasureImageSimilarity( itk::ants::CommandLineParser *parser )
     }
 
   std::cout << imageMetric->GetValue() << std::endl;
-  
-  itk::ants::CommandLineParser::OptionType::Pointer outputOption = parser->GetOption( "output" );
+
+  OptionType::Pointer outputOption = parser->GetOption( "output" );
   if( outputOption && outputOption->GetNumberOfFunctions() )
     {
     const DisplacementVectorType zeroVector( 0.0 );
-    
+
     typename DisplacementFieldType::Pointer identityField = DisplacementFieldType::New();
     identityField->CopyInformation( fixedImage );
     identityField->SetRegions( fixedImage->GetLargestPossibleRegion() );
@@ -413,9 +410,9 @@ int MeasureImageSimilarity( itk::ants::CommandLineParser *parser )
     imageMetric->SetMovingTransform( identityDisplacementFieldTransform );
 
     imageMetric->Initialize();
-    
+
     typedef typename ImageMetricType::DerivativeType MetricDerivativeType;
-    const typename MetricDerivativeType::SizeValueType metricDerivativeSize = 
+    const typename MetricDerivativeType::SizeValueType metricDerivativeSize =
       fixedImage->GetLargestPossibleRegion().GetNumberOfPixels() * ImageDimension;
     MetricDerivativeType metricDerivative( metricDerivativeSize );
 
@@ -427,9 +424,9 @@ int MeasureImageSimilarity( itk::ants::CommandLineParser *parser )
     gradientField->CopyInformation( fixedImage );
     gradientField->SetRegions( fixedImage->GetLargestPossibleRegion() );
     gradientField->Allocate();
-  
+
     itk::ImageRegionIterator<DisplacementFieldType> ItG( gradientField, gradientField->GetRequestedRegion() );
-  
+
     itk::SizeValueType count = 0;
     for( ItG.GoToBegin(); !ItG.IsAtEnd(); ++ItG )
       {
@@ -449,8 +446,6 @@ int MeasureImageSimilarity( itk::ants::CommandLineParser *parser )
 
 void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
-  typedef itk::ants::CommandLineParser::OptionType OptionType;
-
   {
   std::string description =
     std::string( "Dimensionality of the fixed/moving image pair." );
@@ -532,7 +527,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   option->SetDescription( description );
   parser->AddOption( option );
   }
-  
+
   {
   std::string description = std::string( "Print the help menu (short version)." );
 
@@ -552,7 +547,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
   }
 }
 
-int MeasureImageSimilarity( std::vector<std::string> args, std::ostream* /*out_stream = NULL */ )
+int MeasureImageSimilarity( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
 {
 
   // put the arguments coming in as 'args' into standard (argc,argv) format;
@@ -595,7 +590,6 @@ int MeasureImageSimilarity( std::vector<std::string> args, std::ostream* /*out_s
   Cleanup_argv cleanup_argv( argv, argc + 1 );
 
   // antscout->set_stream( out_stream );
-  typedef itk::ants::CommandLineParser ParserType;
 
   ParserType::Pointer parser = ParserType::New();
   parser->SetCommand( argv[0] );
@@ -612,8 +606,7 @@ int MeasureImageSimilarity( std::vector<std::string> args, std::ostream* /*out_s
     }
 
   bool verbose = false;
-  itk::ants::CommandLineParser::OptionType::Pointer verboseOption =
-    parser->GetOption( "verbose" );
+  OptionType::Pointer verboseOption = parser->GetOption( "verbose" );
   if( verboseOption && verboseOption->GetNumberOfFunctions() )
     {
     verbose = parser->Convert<bool>( verboseOption->GetFunction( 0 )->GetName() );
@@ -637,7 +630,7 @@ int MeasureImageSimilarity( std::vector<std::string> args, std::ostream* /*out_s
 
   unsigned int dimension = 3;
 
-  ParserType::OptionType::Pointer dimOption = parser->GetOption( "dimensionality" );
+  OptionType::Pointer dimOption = parser->GetOption( "dimensionality" );
   if( dimOption && dimOption->GetNumberOfFunctions() )
     {
     dimension = parser->Convert<unsigned int>( dimOption->GetFunction( 0 )->GetName() );

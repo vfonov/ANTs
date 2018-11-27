@@ -78,7 +78,7 @@ typename ImageType::Pointer PreprocessImage( typename ImageType::ConstPointer  i
                                              typename ImageType::PixelType lowerScaleValue,
                                              typename ImageType::PixelType upperScaleValue,
                                              float winsorizeLowerQuantile, float winsorizeUpperQuantile,
-                                             typename ImageType::ConstPointer histogramMatchSourceImage = NULL )
+                                             typename ImageType::ConstPointer histogramMatchSourceImage = ITK_NULLPTR )
 {
   typedef itk::Statistics::ImageToHistogramFilter<ImageType>   HistogramFilterType;
   typedef typename HistogramFilterType::InputBooleanObjectType InputBooleanObjectType;
@@ -1825,6 +1825,11 @@ RegistrationHelper<TComputeType, VImageDimension>
         typename DisplacementFieldRegistrationType::Pointer displacementFieldRegistration =
           DisplacementFieldRegistrationType::New();
 
+	if ( this->m_RegistrationRandomSeed != 0 )
+	  {
+	  displacementFieldRegistration->MetricSamplingReinitializeSeed( this->m_RegistrationRandomSeed );
+	  }
+	
         if( this->m_RestrictDeformationOptimizerWeights.size() > currentStageNumber )
           {
           if( this->m_RestrictDeformationOptimizerWeights[currentStageNumber].size() == VImageDimension )
