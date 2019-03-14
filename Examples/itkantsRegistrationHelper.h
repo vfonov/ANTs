@@ -792,7 +792,7 @@ public:
 
 protected:
   RegistrationHelper();
-  virtual ~RegistrationHelper();
+  virtual ~RegistrationHelper() ITK_OVERRIDE;
 private:
 
   typename itk::ImageBase<VImageDimension>::Pointer GetShrinkImageOutputInformation(const itk::ImageBase<VImageDimension> * inputImageInformation,
@@ -823,6 +823,13 @@ private:
   {
     typename RegistrationMethodType::Pointer registrationMethod = RegistrationMethodType::New();
     typedef typename RegistrationMethodType::OutputTransformType  RegistrationMethodTransformType;
+
+    char* antsRandomSeed = getenv( "ANTS_RANDOM_SEED" );
+    if ( antsRandomSeed != NULL )
+      {
+      registrationMethod->MetricSamplingReinitializeSeed(
+        atoi( antsRandomSeed ) );
+      }
 
     for( unsigned int n = 0; n < stageMetricList.size(); n++ )
       {

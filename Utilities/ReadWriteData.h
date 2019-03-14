@@ -286,7 +286,7 @@ typename ImageType::Pointer ReadImage(char* fn )
     {
     std::cerr << "Exception caught during image reference file reading " << std::endl;
     std::cerr << e << std::endl;
-    return NULL;
+    return ITK_NULLPTR;
     }
 
   //typename ImageType::DirectionType dir;
@@ -587,7 +587,7 @@ ReadWarpFromFile( std::string warpfn, std::string ext)
   typename RealImageType::Pointer yvec = ReadImage<ImageType>( (char *)fn.c_str() );
   // std::cout << " done reading " << fn << std::endl;
   fn = warpfn + "z" + ext;
-  typename RealImageType::Pointer zvec = NULL;
+  typename RealImageType::Pointer zvec = ITK_NULLPTR;
   // std::cout << " done reading " << fn << std::endl;
   if( ImageDimension == 3 )
     {
@@ -719,12 +719,12 @@ class nullBuf
 : public std::streambuf
 {
 public:
-  virtual std::streamsize xsputn( const char * itkNotUsed( s ), std::streamsize n )
+  virtual std::streamsize xsputn( const char * itkNotUsed( s ), std::streamsize n ) ITK_OVERRIDE
     {
     return n;
     }
 
-  virtual int overflow( int itkNotUsed( c ) )
+  virtual int overflow( int itkNotUsed( c ) ) ITK_OVERRIDE
     {
     return 1;
     }
