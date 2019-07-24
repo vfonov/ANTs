@@ -397,15 +397,15 @@ public:
       }
     else if( curIter < 100 )
       {
-      currentFileName << "_Iter00" << curIter << ".nii.gz";
+      currentFileName << "_Iters" << curIter << ".mnc";
       }
     else if( curIter < 1000 )
       {
-      currentFileName << "_Iter0" << curIter << ".nii.gz";
+      currentFileName << "_Itert" << curIter << ".mnc";
       }
     else
       {
-      currentFileName << "_Iter" << curIter << ".nii.gz";
+      currentFileName << "_Iter" << curIter << ".mnc";
       }
     std::cout << "*"; // The star befor each DIAGNOSTIC shows that its output is writtent out.
     std::cout << currentFileName.str() << std::endl; // The star befor each DIAGNOSTIC shows that its output is writtent out.

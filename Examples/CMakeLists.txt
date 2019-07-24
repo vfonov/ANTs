@@ -130,7 +130,7 @@ set(MORE_ANTS_APPS
     CreateDTICohort
     antsAlignOrigin
     antsMotionCorrDiffusionDirection
-    antsSliceRegularizedRegistration
+#    antsSliceRegularizedRegistration
     ANTSIntegrateVectorField
     ANTSIntegrateVelocityField
     antsTransformInfo
