@@ -58,6 +58,25 @@ DoRegistration(typename ParserType::Pointer & parser)
     regHelper->SetLogStream( cnul );
     }
 
+  OptionType::Pointer fixRandomSeed = parser->GetOption( "random-seed" );
+  if( fixRandomSeed && fixRandomSeed->GetNumberOfFunctions() )
+    {
+    int randomSeed = parser->Convert<int>( fixRandomSeed->GetFunction(0)->GetName() );
+    regHelper->SetRegistrationRandomSeed(randomSeed);
+    }
+  else
+    {
+    char* randomSeedEnv = getenv( "ANTS_RANDOM_SEED" );
+    if ( randomSeedEnv != NULL )
+      {
+      regHelper->SetRegistrationRandomSeed( atoi( randomSeedEnv ) );
+      }
+    else
+      {
+      regHelper->SetRegistrationRandomSeed(0);
+      }
+    }
+
   OptionType::Pointer transformOption = parser->GetOption( "transform" );
   if( !transformOption || transformOption->GetNumberOfFunctions() == 0 )
     {
@@ -225,13 +244,13 @@ DoRegistration(typename ParserType::Pointer & parser)
         {
         std::stringstream currentFileName;
         if( useMincFormat )
-          {  
+          {
           currentFileName << outputPrefix << n << "DerivedInitialMovingTranslation.xfm";
           }
-        else 
+        else
           {
           currentFileName << outputPrefix << n << "DerivedInitialMovingTranslation.mat";
-          }  
+          }
 
         typename RegistrationHelperType::CompositeTransformType::TransformTypePointer currentTransform =
           compositeTransform->GetNthTransform( n );
@@ -267,8 +286,8 @@ DoRegistration(typename ParserType::Pointer & parser)
           {
           currentFileName << outputPrefix << n << "DerivedInitialFixedTranslation.xfm";
           }
-        else 
-          {  
+        else
+          {
           currentFileName << outputPrefix << n << "DerivedInitialFixedTranslation.mat";
           }
 
@@ -1318,8 +1337,8 @@ DoRegistration(typename ParserType::Pointer & parser)
         {
         compositeTransformFileName += std::string( ".xfm" );
         }
-      else 
-        {  
+      else
+        {
         compositeTransformFileName += std::string( "Composite.h5" );
         }
 
@@ -1328,8 +1347,8 @@ DoRegistration(typename ParserType::Pointer & parser)
         {
         inverseCompositeTransformFileName += std::string( "_inverse.xfm" );
         }
-      else 
-        {  
+      else
+        {
         inverseCompositeTransformFileName += std::string( "InverseComposite.h5" );
         }
 
@@ -1379,11 +1398,11 @@ DoRegistration(typename ParserType::Pointer & parser)
             {
             currentInverseFileName << outputPrefix << i << "_inverse" << transformTemplateName;
             }
-          else 
+          else
             {
             currentInverseFileName << outputPrefix << i << "Inverse" << transformTemplateName;
-            }  
- 
+            }
+
           // write inverse transform file
           itk::ants::WriteInverseTransform<TComputeType, VImageDimension>( dispTransform, currentInverseFileName.str() );
           }
@@ -1406,11 +1425,11 @@ DoRegistration(typename ParserType::Pointer & parser)
             {
             currentVelocityFieldFileName << outputPrefix << i << "_VelocityField.mnc";
             }
-          else 
+          else
             {
             currentVelocityFieldFileName << outputPrefix << i << "VelocityField.nii.gz";
-            }  
-          
+            }
+
           try
             {
             if( !tvVelocityFieldTransform.IsNull() )
