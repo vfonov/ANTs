@@ -15,8 +15,8 @@
 #define _itkExpectationBasedPointSetRegistrationFunction_hxx_
 
 #include "itkExpectationBasedPointSetRegistrationFunction.h"
-#include "itkExceptionObject.h"
-#include "vnl/vnl_math.h"
+#include "itkMacro.h"
+#include "itkMath.h"
 
 #include "itkBSplineScatteredDataPointSetToImageFilter.h"
 #include "itkPointSet.h"
@@ -26,7 +26,7 @@ namespace itk
 /*
  * Default constructor
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField, class TPointSet>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField, typename TPointSet>
 ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>
 ::ExpectationBasedPointSetRegistrationFunction()
 {
@@ -42,8 +42,8 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
   m_TimeStep = 1.0;
   m_DenominatorThreshold = 1e-9;
   m_EuclideanDistanceThreshold = 0.01;
-  this->SetMovingImage(ITK_NULLPTR);
-  this->SetFixedImage(ITK_NULLPTR);
+  this->SetMovingImage(nullptr);
+  this->SetFixedImage(nullptr);
   m_FixedImageSpacing.Fill( 1.0 );
   m_FixedImageOrigin.Fill( 0.0 );
   m_Normalizer = 1.0;
@@ -59,10 +59,10 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
   m_MovingImageGradientCalculator = MovingImageGradientCalculatorType::New();
   m_UseMovingImageGradient = false;
 
-  this->m_FixedPointSet = ITK_NULLPTR;
-  this->m_MovingPointSet = ITK_NULLPTR;
-  this->m_DerivativeFixedField = ITK_NULLPTR;
-  this->m_DerivativeMovingField = ITK_NULLPTR;
+  this->m_FixedPointSet = nullptr;
+  this->m_MovingPointSet = nullptr;
+  this->m_DerivativeFixedField = nullptr;
+  this->m_DerivativeMovingField = nullptr;
   this->m_IsPointSetMetric = true;
   this->m_UseSymmetricMatching = 100000;
   this->m_Iterations = 0;
@@ -71,7 +71,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
 /*
  * Standard "PrintSelf" method.
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField, class TPointSet>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField, typename TPointSet>
 void
 ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>
 ::PrintSelf(std::ostream& os, Indent indent) const
@@ -82,7 +82,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
 /**
  *
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField, class TPointSet>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField, typename TPointSet>
 void
 ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>
 ::SetEuclideanDistanceThreshold(double threshold)
@@ -93,7 +93,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
 /**
  *
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField, class TPointSet>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField, typename TPointSet>
 double
 ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>
 ::GetEuclideanDistanceThreshold() const
@@ -104,7 +104,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
 /*
  * Set the function state values before each iteration
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField, class TPointSet>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField, typename TPointSet>
 void
 ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>
 ::ExpectationLandmarkField(float weight, bool whichdirection)
@@ -119,7 +119,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
     sz1 = this->m_MovingPointSet->GetNumberOfPoints();
     }
 
-  typedef vnl_matrix<double> MatrixType;
+  using MatrixType = vnl_matrix<double>;
   MatrixType EucDist(sz1, sz2);
   EucDist.fill(0);
 
@@ -209,18 +209,18 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
       double prob = 0;
       if( convok )
         {
-        float      mag = 0.0;
+        double      mag = 0.0;
         VectorType force;
         for( int j = 0; j < ImageDimension; j++ )
           {
           distance[j] = movingpoint[j] - fixedpoint[j];
-          mag += distance[j] / spacing[j] * distance[j] / spacing[j];
+          mag += static_cast<double>( itk::Math::sqr( distance[j] / spacing[j] ) );
           force[j] = distance[j] * inweight;
           }
-        float sigma = this->m_FixedPointSetSigma;
+        auto sigma = static_cast<double>( this->m_FixedPointSetSigma );
         if( !whichdirection )
           {
-          sigma = this->m_MovingPointSetSigma;
+          sigma = static_cast<double>( this->m_MovingPointSetSigma );
           }
         // KW -- rename 'prob' to '_prob' because of 'shadow variable' warning.
         double _prob = 1.0 / sqrt(3.14186 * 2.0 * sigma * sigma) * exp(-1.0 * mag / (2.0 * sigma * sigma) );
@@ -245,7 +245,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
         }
       EucDist(ii, jj) = prob;
       }
-    if( min < 1.e5 )
+    if( min < static_cast<float>( 1.e5 ) )
       {
       this->m_LandmarkEnergy += min;
       }
@@ -256,14 +256,14 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
     {
     for( unsigned int jj = 0; jj < sz2; jj++ )
       {
-      float total = 0;
+      double total = 0.0;
       for( unsigned int ii = 0; ii < sz1; ii++ )
         {
         total += sinkhorn(ii, jj);
         }
-      if( total <= 0 )
+      if( total <= itk::NumericTraits<double>::ZeroValue() )
         {
-        total = 1;
+        total = itk::NumericTraits<double>::OneValue();
         }
       for( unsigned int ii = 0; ii < sz1; ii++ )
         {
@@ -272,14 +272,14 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
       }
     for( unsigned int ii = 0; ii < sz1; ii++ )
       {
-      float total = 0;
+      double total = 0;
       for( unsigned int jj = 0; jj < sz2; jj++ )
         {
         total += sinkhorn(ii, jj);
         }
-      if( total <= 0 )
+      if( total <= itk::NumericTraits<double>::ZeroValue() )
         {
-        total = 1;
+        total = itk::NumericTraits<double>::OneValue();
         }
       for( unsigned int jj = 0; jj < sz2; jj++ )
         {
@@ -333,18 +333,18 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
     convok = this->GetFixedImage()->TransformPhysicalPointToIndex(fpt, fixedindex);
     if( convok )
       {
-      float      mag = 0.0;
+      double      mag = 0.0;
       VectorType force;
       for( int j = 0; j < ImageDimension; j++ )
         {
         distance[j] = mpt[j] - fixedpoint[j];
-        mag += distance[j] / spacing[j] * distance[j] / spacing[j];
+        mag += static_cast<double>( itk::Math::sqr( distance[j] / spacing[j] ) );
         force[j] = distance[j] * inweight;
         }
-      float sigma = this->m_FixedPointSetSigma;
+      auto sigma = static_cast<double>( this->m_FixedPointSetSigma );
       if( !whichdirection )
         {
-        sigma = this->m_MovingPointSetSigma;
+        sigma = static_cast<double>( this->m_MovingPointSetSigma );
         }
       double prob = 1.0 / sqrt(3.14186 * 2.0 * sigma * sigma) * exp(-1.0 * mag / (2.0 * sigma * sigma) );
       force = force * prob;
@@ -360,12 +360,12 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
     mag=0;
     }
 */
-      if( mag > maxerr )
+      if( mag > static_cast<double>( maxerr ) )
         {
-        maxerr = mag;
+        maxerr = static_cast<float>( mag );
         }
-      energy += mag;
-      std::cout << " ii " << ii << " force " << force << " mag " << sqrt(mag) << " mpt " << mpt << " fpt "
+      energy += static_cast<float>( mag );
+      std::cout << " ii " << ii << " force " << force << " mag " << std::sqrt(mag) << " mpt " << mpt << " fpt "
                        << fixedpoint <<  " nrg " << energy / (float)ii << std::endl;
       lmField->SetPixel(fixedindex, force + lmField->GetPixel(fixedindex) );
       }
@@ -379,7 +379,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
 /*
  * Set the function state values before each iteration
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField, class TPointSet>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField, typename TPointSet>
 void
 ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>
 ::InitializeIteration()
@@ -422,7 +422,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
   this->m_DerivativeMovingField->SetOrigin( this->GetMovingImage()->GetOrigin() );
 
 // acquire labels
-  if( this->m_LabelSet.size() < 1 )
+  if( this->m_LabelSet.empty() )
     {
     this->m_LabelSet.clear();
     unsigned long sz1 = this->m_FixedPointSet->GetNumberOfPoints();
@@ -459,7 +459,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
   for( it = this->m_LabelSet.begin(); it != this->m_LabelSet.end(); ++it )
     {
     lct++;
-    PointDataType label = (PointDataType) * it;
+    auto label = (PointDataType) * it;
 //     std::cout << " doing label " << label << std::endl;
     this->SetUpKDTrees(label);
     bool dobsp = false;
@@ -473,7 +473,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
 /*
  * Compute update at a specify neighbourhood
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField, class TPointSet>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField, typename TPointSet>
 typename ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>
 ::PixelType
 ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>
@@ -493,7 +493,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
 /*
  * Compute update at a specify neighbourhood
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField, class TPointSet>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField, typename TPointSet>
 typename ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>
 ::PixelType
 ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>
@@ -508,12 +508,12 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
 /*
  * Update the metric and release the per-thread-global data.
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField, class TPointSet>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField, typename TPointSet>
 void
 ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>
 ::ReleaseGlobalDataPointer( void *gd ) const
 {
-  GlobalDataStruct * globalData = (GlobalDataStruct *) gd;
+  auto * globalData = (GlobalDataStruct *) gd;
 
   m_SumOfSquaredDifference  += globalData->m_SumOfSquaredDifference;
   m_NumberOfPixelsProcessed += globalData->m_NumberOfPixelsProcessed;
@@ -533,7 +533,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
  * Set the function state values before each iteration
  */
 
-template <class TFixedImage, class TMovingImage, class TDisplacementField, class TPointSet>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField, typename TPointSet>
 void
 ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>::SetUpKDTrees(
   long whichlabel)
@@ -609,7 +609,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
 /*
  * Set the function state values before each iteration
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField, class TPointSet>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField, typename TPointSet>
 void
 ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField, TPointSet>
 ::FastExpectationLandmarkField(float weight, bool whichdirection, long /* whichlabel */, bool dobspline)
@@ -698,18 +698,17 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
       double probtotal = 0.0;
       for( unsigned int dd = 0;   dd < KNeighbors; dd++ )
         {
-        PointType             movingpoint;
         unsigned long         wpt = neighbors[dd];
         MeasurementVectorType npt = mkdtree->GetOutput()->GetMeasurementVector(wpt);
-        float                 _mag = 0;
+        double                 _mag = 0;
         for( unsigned int qq = 0; qq < ImageDimension; qq++ )
           {
-          _mag += (fixedpoint[qq] - npt[qq]) * (fixedpoint[qq] - npt[qq]);
+          _mag += static_cast<double>( itk::Math::sqr(fixedpoint[qq] - npt[qq]) );
           }
-        float sigma = this->m_FixedPointSetSigma;
+        auto sigma = static_cast<double>( this->m_FixedPointSetSigma );
         if( !whichdirection )
           {
-          sigma = this->m_MovingPointSetSigma;
+          sigma = static_cast<double>( this->m_MovingPointSetSigma );
           }
         double prob = 1.0 / sqrt(3.14186 * 2.0 * sigma * sigma) * exp(-1.0 * _mag / (2.0 * sigma * sigma) );
         probtotal += prob;
@@ -719,7 +718,6 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
         {
         for( unsigned int dd = 0;   dd < KNeighbors; dd++ )
           {
-          PointType             movingpoint;
           unsigned long         wpt = neighbors[dd];
           MeasurementVectorType npt = mkdtree->GetOutput()->GetMeasurementVector(wpt);
           double                pp = probabilities(dd) / probtotal;
@@ -727,7 +725,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
             {
             for( unsigned int j = 0; j < ImageDimension; j++ )
               {
-              mpt[j] += pp * npt[j];
+              mpt[j] += static_cast<typename ImagePointType::CoordRepType>( pp ) * static_cast<typename ImagePointType::CoordRepType>( npt[j] );
               }
             }
           //
@@ -737,19 +735,19 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
           }
         }
 
-      float mag = 0.0;
+      double mag = 0.0;
       typename BSplinePointSetType::PointType bpoint;
       for( unsigned int j = 0; j < ImageDimension; j++ )
         {
-        distance[j] = mpt[j] - fixedpoint[j];
-        mag += distance[j] / spacing[j] * distance[j] / spacing[j];
+        distance[j] = static_cast<typename VectorType::ComponentType>( mpt[j] ) - static_cast<typename VectorType::ComponentType>( fixedpoint[j] );
+        mag += static_cast<double>( itk::Math::sqr( static_cast<double>( distance[j] ) / static_cast<double>( spacing[j] ) ) );
         force[j] = distance[j] * inweight;
         bpoint[j] = fixedpoint[j];
         }
-      float sigma = this->m_FixedPointSetSigma;
+      auto sigma = static_cast<double>( this->m_FixedPointSetSigma );
       if( !whichdirection )
         {
-        sigma = this->m_MovingPointSetSigma;
+        sigma = static_cast<double>( this->m_MovingPointSetSigma );
         }
       double prob = 1.0 / sqrt(3.14186 * 2.0 * sigma * sigma) * exp(-1.0 * mag / (2.0 * sigma * sigma) );
       force = force * prob;
@@ -763,11 +761,11 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
       this->m_bcount++;
 
       mag = sqrt(mag);
-      if( mag > maxerr )
+      if( mag > static_cast<double>( maxerr ) )
         {
-        maxerr = mag;
+        maxerr = static_cast<float>( mag );
         }
-      energy += mag;
+      energy += static_cast<float>( mag );
       lmField->SetPixel(fixedindex, force + lmField->GetPixel(fixedindex) );
       }
     }
@@ -826,7 +824,7 @@ ExpectationBasedPointSetRegistrationFunction<TFixedImage, TMovingImage, TDisplac
         RealType distance = 0.0;
         for( unsigned int d = 0; d < PointDimension; d++ )
           {
-          distance += vnl_math_sqr( ItM.Value()[d] + vector[d]
+          distance += itk::Math::sqr ( ItM.Value()[d] + vector[d]
             - ItF.Value()[d] );
           }
         this->m_Energy += ItW.Value() * std::sqrt( distance );

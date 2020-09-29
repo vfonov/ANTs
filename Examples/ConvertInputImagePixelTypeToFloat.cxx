@@ -17,8 +17,8 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
-#include <stdio.h>
-#include <limits.h>
+#include <cstdio>
+#include <climits>
 #include "itkImage.h"
 #include "itkImageFileWriter.h"
 #include "itkImageFileReader.h"
@@ -27,17 +27,17 @@
 
 namespace ants
 {
-template <unsigned int ImageDimension, class TPIXELTYPE>
+template <unsigned int ImageDimension, typename TPIXELTYPE>
 int ConvertTypeToFloat( int argc, char *argv[] )
 {
-  typedef  TPIXELTYPE                                inPixelType;
-  typedef  float                                     floatPixelType;
-  typedef  float                                     outPixelType;
-  typedef itk::Image<inPixelType, ImageDimension>    ImageType;
-  typedef itk::Image<floatPixelType, ImageDimension> IntermediateType;
-  typedef itk::Image<outPixelType, ImageDimension>   OutImageType;
-  typedef itk::ImageFileReader<ImageType>            readertype;
-  typedef itk::ImageFileWriter<OutImageType>         writertype;
+  using inPixelType = TPIXELTYPE;
+  using floatPixelType = float;
+  using outPixelType = float;
+  using ImageType = itk::Image<inPixelType, ImageDimension>;
+  using IntermediateType = itk::Image<floatPixelType, ImageDimension>;
+  using OutImageType = itk::Image<outPixelType, ImageDimension>;
+  using readertype = itk::ImageFileReader<ImageType>;
+  using writertype = itk::ImageFileWriter<OutImageType>;
 
   typename readertype::Pointer reader = readertype::New();
   if( argc < 2 )
@@ -48,11 +48,11 @@ int ConvertTypeToFloat( int argc, char *argv[] )
   reader->SetFileName(argv[1]);
   reader->Update();
 
-  typedef itk::CastImageFilter<ImageType, IntermediateType> castertype;
+  using castertype = itk::CastImageFilter<ImageType, IntermediateType>;
   typename   castertype::Pointer caster = castertype::New();
   caster->SetInput(reader->GetOutput() );
   caster->Update();
-  typedef itk::CastImageFilter<IntermediateType, OutImageType> castertype2;
+  using castertype2 = itk::CastImageFilter<IntermediateType, OutImageType>;
   typename castertype2::Pointer caster2 = castertype2::New();
   caster2->SetInput(caster->GetOutput() );
   caster2->Update();
@@ -74,7 +74,7 @@ int ConvertTypeToFloat( int argc, char *argv[] )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ConvertInputImagePixelTypeToFloat( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int ConvertInputImagePixelTypeToFloat( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -91,7 +91,7 @@ int ConvertInputImagePixelTypeToFloat( std::vector<std::string> args, std::ostre
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -144,13 +144,13 @@ private:
   unsigned int typeoption = 0;
   if( argc > 3 )
     {
-    typeoption = atoi(argv[3]);
+    typeoption = std::stoi(argv[3]);
     }
   // Get the image dimension
   std::string               fn = std::string(argv[1]);
   itk::ImageIOBase::Pointer imageIO =
     itk::ImageIOFactory::CreateImageIO(
-      fn.c_str(), itk::ImageIOFactory::ReadMode);
+      fn.c_str(), itk::ImageIOFactory::FileModeEnum::ReadMode);
   imageIO->SetFileName(fn.c_str() );
   imageIO->ReadImageInformation();
 

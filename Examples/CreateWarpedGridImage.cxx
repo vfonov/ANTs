@@ -14,30 +14,34 @@ namespace ants
 template <unsigned int ImageDimension>
 int CreateWarpedGridImage( int argc, char *argv[] )
 {
-  typedef float                                  RealType;
-  typedef itk::Image<RealType, ImageDimension>   RealImageType;
-  typedef itk::Vector<RealType, ImageDimension>  VectorType;
-  typedef itk::Image<VectorType, ImageDimension> VectorImageType;
+  using RealType = float;
+  using RealImageType = itk::Image<RealType, ImageDimension>;
+  using VectorType = itk::Vector<RealType, ImageDimension>;
+  using VectorImageType = itk::Image<VectorType, ImageDimension>;
 
   /**
    * Read in vector field
    */
-  typedef itk::ImageFileReader<VectorImageType> ReaderType;
+  using ReaderType = itk::ImageFileReader<VectorImageType>;
   typename ReaderType::Pointer reader = ReaderType::New();
   reader->SetFileName( argv[2] );
   reader->Update();
 
-  typedef itk::GridImageSource<RealImageType> GridSourceType;
+  using GridSourceType = itk::GridImageSource<RealImageType>;
   typename GridSourceType::Pointer gridder = GridSourceType::New();
   gridder->SetSpacing( reader->GetOutput()->GetSpacing() );
   gridder->SetOrigin( reader->GetOutput()->GetOrigin() );
   gridder->SetSize( reader->GetOutput()->GetLargestPossibleRegion().GetSize() );
 
-  typename GridSourceType::ArrayType gridSpacing;
-  typename GridSourceType::ArrayType gridSigma;
-  typename GridSourceType::BoolArrayType which;
+  using ArrayType = typename GridSourceType::ArrayType;
+  using BoolArrayType = typename GridSourceType::BoolArrayType;
+
+  ArrayType gridSpacing;
+  ArrayType gridSigma;
+  BoolArrayType which;
+
   which.Fill( false );
-  for( unsigned int i = 0; i < 2; i++ )
+  for( itk::SizeValueType i = 0; i < 2; i++ )
     {
     which[i] = true;
     }
@@ -53,17 +57,19 @@ int CreateWarpedGridImage( int argc, char *argv[] )
       }
     else
       {
-      for( unsigned int i = 0; i < ImageDimension; i++ )
+      for( itk::SizeValueType i = 0; i < ImageDimension; i++ )
         {
         which[i] = static_cast<bool>( directions[i] );
         }
       }
     }
-  for( unsigned int i = 0; i < ImageDimension; i++ )
+  for( itk::SizeValueType i = 0; i < ImageDimension; i++ )
     {
-    gridSpacing[i] = reader->GetOutput()->GetLargestPossibleRegion().GetSize()[i]
-      * reader->GetOutput()->GetSpacing()[i] / 25.0;
-    gridSigma[i] = gridSpacing[i] / 10.0;
+    gridSpacing[i] = static_cast<typename ArrayType::ValueType>(
+      reader->GetOutput()->GetLargestPossibleRegion().GetSize()[i] )
+      * static_cast<typename ArrayType::ValueType>( reader->GetOutput()->GetSpacing()[i] ) /
+      static_cast<typename ArrayType::ValueType>( 25.0 );
+    gridSigma[i] = gridSpacing[i] / static_cast<typename ArrayType::ValueType>( 10.0 );
     }
   if( argc > 5 )
     {
@@ -76,7 +82,7 @@ int CreateWarpedGridImage( int argc, char *argv[] )
       }
     else
       {
-      for( unsigned int i = 0; i < ImageDimension; i++ )
+      for( itk::SizeValueType i = 0; i < ImageDimension; i++ )
         {
         gridSpacing[i] = spacing[i];
         gridSigma[i] = gridSpacing[i] / 10.0;
@@ -85,8 +91,8 @@ int CreateWarpedGridImage( int argc, char *argv[] )
     }
   if( argc > 6 )
     {
-    std::vector<RealType> sigma
-      = ConvertVector<RealType>( std::string( argv[6] ) );
+    std::vector<typename ArrayType::ValueType> sigma
+      = ConvertVector<typename ArrayType::ValueType>( std::string( argv[6] ) );
     if( sigma.size() != ImageDimension )
       {
       std::cout << "Incorrect sigma size." << std::endl;
@@ -94,9 +100,9 @@ int CreateWarpedGridImage( int argc, char *argv[] )
       }
     else
       {
-      for( unsigned int i = 0; i < ImageDimension; i++ )
+      for( itk::SizeValueType i = 0; i < ImageDimension; i++ )
         {
-        gridSigma[i] = sigma[i] / 10.0;
+        gridSigma[i] = sigma[i] / static_cast<typename ArrayType::ValueType>( 10.0 );
         }
       }
     }
@@ -110,10 +116,8 @@ int CreateWarpedGridImage( int argc, char *argv[] )
   grid->SetOrigin(reader->GetOutput()->GetOrigin() );
   grid->SetSpacing(reader->GetOutput()->GetSpacing() );
 
-  typedef itk::MatrixOffsetTransformBase<double, ImageDimension,
-                                         ImageDimension>
-    TransformType;
-  typedef itk::WarpImageMultiTransformFilter<RealImageType, RealImageType, VectorImageType, TransformType> WarperType;
+  using TransformType = itk::MatrixOffsetTransformBase<double, ImageDimension, ImageDimension>;
+  using WarperType = itk::WarpImageMultiTransformFilter<RealImageType, RealImageType, VectorImageType, TransformType>;
   typename WarperType::Pointer  warper = WarperType::New();
   warper->SetInput(grid);
   warper->SetEdgePaddingValue( 0);
@@ -123,7 +127,7 @@ int CreateWarpedGridImage( int argc, char *argv[] )
   warper->Update();
 
   std::string file = std::string( argv[3] );
-  typedef itk::ImageFileWriter<RealImageType> ImageWriterType;
+  using ImageWriterType = itk::ImageFileWriter<RealImageType>;
   typename ImageWriterType::Pointer gridWriter = ImageWriterType::New();
   gridWriter->SetFileName( file.c_str() );
   gridWriter->SetInput( warper->GetOutput() );
@@ -134,7 +138,7 @@ int CreateWarpedGridImage( int argc, char *argv[] )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int CreateWarpedGridImage( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int CreateWarpedGridImage( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -152,7 +156,7 @@ int CreateWarpedGridImage( std::vector<std::string> args, std::ostream* /*out_st
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -191,7 +195,7 @@ private:
     return EXIT_FAILURE;
     }
 
-  switch( atoi( argv[1] ) )
+  switch( std::stoi( argv[1] ) )
     {
     case 2:
       {

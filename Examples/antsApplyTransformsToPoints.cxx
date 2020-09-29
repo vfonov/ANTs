@@ -23,19 +23,19 @@
 
 namespace ants
 {
-template <unsigned int Dimension, class RealType>
+template <unsigned int Dimension, typename RealType>
 int antsApplyTransformsToPoints(
   itk::ants::CommandLineParser::Pointer & parser )
 {
-  typedef vnl_matrix<RealType> MatrixType;
+  using MatrixType = vnl_matrix<RealType>;
   MatrixType points_out;
   MatrixType points_in;
-  typedef itk::Image<RealType, 2>                       ImageType;
-  typedef itk::CSVArray2DFileReader<RealType>              ReaderType;
-  typedef itk::CSVArray2DDataObject<RealType>              DataFrameObjectType;
-  typedef typename DataFrameObjectType::StringVectorType StringVectorType;
+  using ImageType = itk::Image<RealType, 2>;
+  using ReaderType = itk::CSVArray2DFileReader<RealType>;
+  using DataFrameObjectType = itk::CSVArray2DDataObject<RealType>;
+  using StringVectorType = typename DataFrameObjectType::StringVectorType;
   StringVectorType colheadernames;
-  typename ImageType::Pointer pointimage = ITK_NULLPTR;
+  typename ImageType::Pointer pointimage = nullptr;
 
   itk::ants::CommandLineParser::OptionType::Pointer antsrOption =
     parser->GetOption( "forantsr" );
@@ -136,9 +136,9 @@ int antsApplyTransformsToPoints(
      */
     // Register the matrix offset transform base class to the
     // transform factory for compatibility with the current ANTs.
-    typedef itk::MatrixOffsetTransformBase<RealType, Dimension, Dimension> MatrixOffsetTransformType;
+    using MatrixOffsetTransformType = itk::MatrixOffsetTransformBase<RealType, Dimension, Dimension>;
     itk::TransformFactory<MatrixOffsetTransformType>::RegisterTransform();
-    typedef itk::MatrixOffsetTransformBase<RealType, Dimension, Dimension> MatrixOffsetTransformType;
+    using MatrixOffsetTransformType = itk::MatrixOffsetTransformBase<RealType, Dimension, Dimension>;
     itk::TransformFactory<MatrixOffsetTransformType>::RegisterTransform();
 
     /**
@@ -146,12 +146,12 @@ int antsApplyTransformsToPoints(
      */
     // Register the matrix offset transform base class to the
     // transform factory for compatibility with the current ANTs.
-    typedef itk::AffineTransform<RealType, Dimension> AffineTransformType;
+    using AffineTransformType = itk::AffineTransform<RealType, Dimension>;
     typename AffineTransformType::Pointer aff =
       AffineTransformType::New();
     aff->SetIdentity();
 
-    typedef itk::CompositeTransform<RealType, Dimension> CompositeTransformType;
+    using CompositeTransformType = itk::CompositeTransform<RealType, Dimension>;
     typename CompositeTransformType::InputPointType point_in;
     typename CompositeTransformType::OutputPointType point_out;
     typename itk::ants::CommandLineParser::OptionType::Pointer
@@ -207,7 +207,7 @@ int antsApplyTransformsToPoints(
       if( strcmp(exto.c_str(), ".csv" ) == 0 )
         {
         StringVectorType ColumnHeaders = colheadernames;
-        typedef itk::CSVNumericObjectFileWriter<RealType, 1, 1> WriterType;
+        using WriterType = itk::CSVNumericObjectFileWriter<RealType, 1, 1>;
         typename WriterType::Pointer writer = WriterType::New();
         writer->SetFileName( outputFileName );
         writer->SetInput( &points_out );
@@ -380,7 +380,7 @@ static void antsApplyTransformsToPointsInitializeCommandLineOptions( itk::ants::
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int antsApplyTransformsToPoints( std::vector<std::string> args, std::ostream * /*out_stream = ITK_NULLPTR */ )
+int antsApplyTransformsToPoints( std::vector<std::string> args, std::ostream * /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -397,7 +397,7 @@ int antsApplyTransformsToPoints( std::vector<std::string> args, std::ostream * /
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {

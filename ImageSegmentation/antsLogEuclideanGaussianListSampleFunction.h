@@ -29,8 +29,8 @@ namespace Statistics
  * \brief
  */
 
-template <class TListSample, class TOutput = double, class TCoordRep = double>
-class LogEuclideanGaussianListSampleFunction
+template <typename TListSample, typename TOutput = double, typename TCoordRep = double>
+class LogEuclideanGaussianListSampleFunction final
   : public       ListSampleFunction<TListSample, TOutput, TCoordRep>
 {
 public:
@@ -57,14 +57,14 @@ public:
 
   /** Helper functions */
 
-  void SetInputListSample( const InputListSampleType * ptr ) ITK_OVERRIDE;
+  void SetInputListSample( const InputListSampleType * ptr ) override;
 
-  TOutput Evaluate( const InputMeasurementVectorType& measurement ) const ITK_OVERRIDE;
+  TOutput Evaluate( const InputMeasurementVectorType& measurement ) const override;
 
 protected:
   LogEuclideanGaussianListSampleFunction();
-  virtual ~LogEuclideanGaussianListSampleFunction() ITK_OVERRIDE;
-  void PrintSelf( std::ostream& os, Indent indent ) const ITK_OVERRIDE;
+  ~LogEuclideanGaussianListSampleFunction() override;
+  void PrintSelf( std::ostream& os, Indent indent ) const override;
 
   void GenerateData();
 

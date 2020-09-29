@@ -31,8 +31,8 @@ namespace Statistics
  *
  */
 
-template <class TScalarListSample>
-class GrubbsRosnerListSampleFilter
+template <typename TScalarListSample>
+class GrubbsRosnerListSampleFilter final
   : public       ListSampleToListSampleFilter<TScalarListSample, TScalarListSample>
 {
 public:
@@ -86,15 +86,15 @@ public:
 //   itkGetConstMacro( Outliers, InstanceIdentifierContainerType );
 protected:
   GrubbsRosnerListSampleFilter();
-  virtual ~GrubbsRosnerListSampleFilter() ITK_OVERRIDE;
+  ~GrubbsRosnerListSampleFilter() override;
 
-  void PrintSelf( std::ostream& os, Indent indent ) const ITK_OVERRIDE;
+  void PrintSelf( std::ostream& os, Indent indent ) const override;
 
-  void GenerateData() ITK_OVERRIDE;
+  void GenerateData() override;
 
 private:
-  GrubbsRosnerListSampleFilter( const Self & ); // purposely not implemented
-  void operator=( const Self & );               // purposely not implemented
+  GrubbsRosnerListSampleFilter( const Self & ) = delete;
+  void operator=( const Self & ) = delete;
 
   InstanceIdentifierType FindMaximumNonOutlierDeviationValue( RealType, RealType );
   bool                   IsMeasurementAnOutlier( RealType, RealType, RealType, unsigned long );

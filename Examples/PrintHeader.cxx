@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 
 #include <fstream>
-#include <stdio.h>
+#include <cstdio>
 #include "itkImage.h"
 #include "itkImageFileWriter.h"
 #include "itkImageFileReader.h"
@@ -34,7 +34,7 @@ namespace ants
 {
 using namespace std;
 /** below code from Paul Yushkevich's c3d */
-template <class AnyType>
+template <typename AnyType>
 bool
 try_print_metadata(itk::MetaDataDictionary & mdd, std::string key)
 {
@@ -110,9 +110,9 @@ get_rai_code(itk::SpatialOrientation::ValidCoordinateOrientationFlags code)
 template <unsigned int ImageDimension>
 int PrintHeader(int argc, char *argv[])
 {
-  typedef  float                                     inPixelType;
-  typedef itk::Image<inPixelType, ImageDimension>    ImageType;
-  typedef itk::ImageFileReader<ImageType>            readertype;
+  using inPixelType = float;
+  using ImageType = itk::Image<inPixelType, ImageDimension>;
+  using readertype = itk::ImageFileReader<ImageType>;
 
   typename readertype::Pointer reader = readertype::New();
   if( argc < 2 )
@@ -127,7 +127,7 @@ int PrintHeader(int argc, char *argv[])
 
   if( argc > 2 )
     {
-    switch( atoi( argv[2] ) )
+    switch( std::stoi( argv[2] ) )
       {
       case 0:
         {
@@ -236,9 +236,9 @@ int PrintHeader(int argc, char *argv[])
   double iMax = vox[0], iMin = vox[0], iMean = vox[0];
   for( size_t i = 1; i < n; i++ )
     {
-    iMax = (iMax > vox[i]) ? iMax : vox[i];
-    iMin = (iMin < vox[i]) ? iMin : vox[i];
-    iMean += vox[i];
+    iMax = ( iMax > static_cast<double>( vox[i] ) ) ? iMax : static_cast<double>( vox[i] );
+    iMin = ( iMin < static_cast<double>( vox[i] ) ) ? iMin : static_cast<double>( vox[i] );
+    iMean += static_cast<double>( vox[i] );
     }
   iMean /= n;
 
@@ -284,11 +284,11 @@ int PrintHeader(int argc, char *argv[])
         // For some weird reason, some of the strings returned by this method
         // contain '\0' characters. We will replace them by spaces
         std::ostringstream sout("");
-        for( unsigned int i = 0; i < v_string.length(); i++ )
+        for(char i : v_string)
           {
-          if( v_string[i] >= ' ' )
+          if( i >= ' ' )
             {
-            sout << v_string[i];
+            sout << i;
             }
           }
         v_string = sout.str();
@@ -388,7 +388,7 @@ bool FileExists(string strFilename)
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int PrintHeader( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int PrintHeader( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -406,7 +406,7 @@ int PrintHeader( std::vector<std::string> args, std::ostream* /*out_stream = ITK
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -456,7 +456,7 @@ private:
     }
   itk::ImageIOBase::Pointer imageIO =
     itk::ImageIOFactory::CreateImageIO(
-      fn.c_str(), itk::ImageIOFactory::ReadMode);
+      fn.c_str(), itk::ImageIOFactory::FileModeEnum::ReadMode);
   imageIO->SetFileName(fn.c_str() );
   try
     {
@@ -488,6 +488,11 @@ private:
     case 4:
       {
       PrintHeader<4>(argc, argv);
+      }
+      break;
+    case 5:
+      {
+      PrintHeader<5>(argc, argv);
       }
       break;
     default:

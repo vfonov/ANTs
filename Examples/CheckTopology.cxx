@@ -16,12 +16,12 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
-#include <stdio.h>
-#include <time.h>
+#include <cstdio>
+#include <ctime>
 
 #include "itkDiscreteGaussianImageFilter.h"
 #include "itkImage.h"
-#include "itkExceptionObject.h"
+#include "itkMacro.h"
 #include "ReadWriteData.h"
 #include "itkRandomImageSource.h"
 #include "itkImageRandomConstIteratorWithIndex.h"
@@ -78,12 +78,12 @@ float vtkComputeTopology(vtkPolyData* pd)
   return g;
 }
 
-template <class TImage>
+template <typename TImage>
 float GetImageTopology(typename TImage::Pointer image)
 {
-  typedef TImage      ImageType;
+  using ImageType = TImage;
   double aaParm = 0.024;
-  typedef BinaryImageToMeshFilter<ImageType> FilterType;
+  using FilterType = BinaryImageToMeshFilter<ImageType>;
   typename  FilterType::Pointer fltMesh = FilterType::New();
   fltMesh->SetInput(image);
   fltMesh->SetAntiAliasMaxRMSError(aaParm);
@@ -98,11 +98,11 @@ float GetImageTopology(typename TImage::Pointer image)
   return genus;
 }
 
-template <class TImage>
+template <typename TImage>
 void
 NormalizeImage(typename TImage::Pointer image)
 {
-  typedef itk::ImageRegionIteratorWithIndex<TImage> Iterator;
+  using Iterator = itk::ImageRegionIteratorWithIndex<TImage>;
   float    max = 0;
   Iterator vfIter2( image,  image->GetLargestPossibleRegion() );
   for(  vfIter2.GoToBegin(); !vfIter2.IsAtEnd(); ++vfIter2 )
@@ -112,9 +112,9 @@ NormalizeImage(typename TImage::Pointer image)
       max = vfIter2.Get();
       }
     }
-  if( max == 0 )
+  if( itk::Math::FloatAlmostEqual( max, itk::NumericTraits<float>::ZeroValue() ) )
     {
-    max = 1;
+    max = itk::NumericTraits<float>::OneValue();
     }
   for(  vfIter2.GoToBegin(); !vfIter2.IsAtEnd(); ++vfIter2 )
     {
@@ -122,13 +122,13 @@ NormalizeImage(typename TImage::Pointer image)
     }
 }
 
-template <class TImage>
+template <typename TImage>
 typename TImage::Pointer SmoothImage( typename TImage::Pointer image, float sig )
 {
-  typedef TImage ImageType;
+  using ImageType = TImage;
   enum { ImageDimension = ImageType::ImageDimension };
 
-  typedef itk::DiscreteGaussianImageFilter<ImageType, ImageType> dgf;
+  using dgf = itk::DiscreteGaussianImageFilter<ImageType, ImageType>;
   typename dgf::Pointer filter = dgf::New();
   filter->SetVariance(sig);
   filter->SetUseImageSpacingOff();
@@ -138,18 +138,18 @@ typename TImage::Pointer SmoothImage( typename TImage::Pointer image, float sig 
   return filter->GetOutput();
 }
 
-template <class TImage>
+template <typename TImage>
 // std::vector<unsigned int>
 typename TImage::Pointer
 GetLargestComponent(typename TImage::Pointer image)
 {
   enum { ImageDimension = TImage::ImageDimension };
 
-  typedef int                                                                      InternalPixelType;
-  typedef itk::Image<InternalPixelType, ImageDimension>                            InternalImageType;
-  typedef itk::BinaryThresholdImageFilter<TImage, InternalImageType>               ThresholdFilterType;
-  typedef itk::ConnectedComponentImageFilter<InternalImageType, InternalImageType> FilterType;
-  typedef itk::RelabelComponentImageFilter<InternalImageType, InternalImageType>   RelabelType;
+  using InternalPixelType = int;
+  using InternalImageType = itk::Image<InternalPixelType, ImageDimension>;
+  using ThresholdFilterType = itk::BinaryThresholdImageFilter<TImage, InternalImageType>;
+  using FilterType = itk::ConnectedComponentImageFilter<InternalImageType, InternalImageType>;
+  using RelabelType = itk::RelabelComponentImageFilter<InternalImageType, InternalImageType>;
 
   typename ThresholdFilterType::Pointer threshold = ThresholdFilterType::New();
   typename FilterType::Pointer filter = FilterType::New();
@@ -165,7 +165,7 @@ GetLargestComponent(typename TImage::Pointer image)
   filter->SetInput(threshold->GetOutput() );
   // if (argc > 5)
     {
-    int fullyConnected = 1;  // atoi( argv[5] );
+    int fullyConnected = 1;  // std::stoi( argv[5] );
     filter->SetFullyConnected( fullyConnected );
     }
   relabel->SetInput( filter->GetOutput() );
@@ -186,7 +186,7 @@ GetLargestComponent(typename TImage::Pointer image)
 
   typename TImage::Pointer Clusters = AllocImage<TImage>(image, 0);
 
-  typedef itk::ImageRegionIteratorWithIndex<InternalImageType> Iterator;
+  using Iterator = itk::ImageRegionIteratorWithIndex<InternalImageType>;
   Iterator vfIter( relabel->GetOutput(),  relabel->GetOutput()->GetLargestPossibleRegion() );
 
   float                     maximum = relabel->GetNumberOfObjects();
@@ -272,7 +272,7 @@ int CheckTopology( std::vector<std::string> args, std::ostream* )
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = 0;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -315,9 +315,9 @@ private:
     {
     thresh = atof(argv[3]);
     }
-  typedef float PixelType;
-  const unsigned int ImageDimension = 3; // AvantsImageDimension;
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
+  using PixelType = float;
+  constexpr unsigned int ImageDimension = 3; // AvantsImageDimension;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
 
   ImageType::Pointer image = ImageType::New();
   ReadImage<ImageType>(image, argv[1]);
@@ -330,7 +330,7 @@ private:
     float              G = 1;
     float              smooth = 1;
     ImageType::Pointer simage;
-    while( G != 0 && smooth < 20 )
+    while( ! itk::Math::FloatAlmostEqual( G, itk::NumericTraits<float>::ZeroValue() ) && smooth < 20 )
       {
       simage = SmoothImage<ImageType>(image, smooth);
       NormalizeImage<ImageType>(simage);
@@ -349,14 +349,14 @@ private:
     float        err = 1.e9;
     float        lasterr = 1.e10;
     float        derr = lasterr - err;
-    while( G2 == 0 && derr > 0 )
+    while( itk::Math::FloatAlmostEqual( G2, itk::NumericTraits<float>::ZeroValue() ) && derr > itk::NumericTraits<float>::ZeroValue() )
       {
       lasterr = err;
       err = 0;
       ImageType::Pointer out = ants::Morphological<ImageType>(simage, 3, 0, 1);
       ImageType::Pointer bigimage = GetLargestComponent<ImageType>(out);
       G2 = GetImageTopology<ImageType>(bigimage);
-      typedef itk::ImageRegionIteratorWithIndex<ImageType> ImageIteratorType;
+      using ImageIteratorType = itk::ImageRegionIteratorWithIndex<ImageType>;
       ImageIteratorType iter( bigimage, bigimage->GetLargestPossibleRegion() );
       iter.GoToBegin();
       while( !iter.IsAtEnd() )
@@ -368,7 +368,7 @@ private:
       mct++;
       derr = lasterr - err;
       std::cout << " G2 " <<  G2 << " at morph " << mct << " err " << err << std::endl;
-      if( G2 == 0 && derr > 0 )
+      if( itk::Math::FloatAlmostEqual( G2, itk::NumericTraits<float>::ZeroValue() ) && derr > itk::NumericTraits<float>::ZeroValue() )
         {
         simage = GetLargestComponent<ImageType>(out);
         }

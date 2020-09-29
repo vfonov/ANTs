@@ -21,11 +21,11 @@ namespace ants
 template <unsigned int ImageDimension>
 int GetConnectedComponentsFeatureImages(int itkNotUsed( argc ), char* argv[] )
 {
-  typedef int PixelType;
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
-  typedef itk::Image<float, ImageDimension> RealImageType;
+  using PixelType = int;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  using RealImageType = itk::Image<float, ImageDimension>;
 
-  typename ImageType::Pointer inputImage = ITK_NULLPTR;
+  typename ImageType::Pointer inputImage = nullptr;
   ReadImage<ImageType>( inputImage, argv[2] );
 
   // Output images:
@@ -50,17 +50,17 @@ int GetConnectedComponentsFeatureImages(int itkNotUsed( argc ), char* argv[] )
   float prefactor = 1.0;
   for( unsigned int d = 0; d < ImageDimension; d++ )
     {
-    prefactor *= spacing[d];
+    prefactor *= static_cast<float>( spacing[d] );
     }
 
-  typedef itk::RelabelComponentImageFilter<ImageType, ImageType> RelabelerType;
+  using RelabelerType = itk::RelabelComponentImageFilter<ImageType, ImageType>;
   typename RelabelerType::Pointer relabeler = RelabelerType::New();
   relabeler->SetInput( inputImage );
   relabeler->Update();
 
   for( unsigned int i = 1; i <= relabeler->GetNumberOfObjects(); i++ )
     {
-    typedef itk::BinaryThresholdImageFilter<ImageType, ImageType> ThresholderType;
+    using ThresholderType = itk::BinaryThresholdImageFilter<ImageType, ImageType>;
     typename ThresholderType::Pointer thresholder = ThresholderType::New();
     thresholder->SetInput( relabeler->GetOutput() );
     thresholder->SetLowerThreshold( i );
@@ -69,7 +69,7 @@ int GetConnectedComponentsFeatureImages(int itkNotUsed( argc ), char* argv[] )
     thresholder->SetOutsideValue( 0 );
     thresholder->Update();
 
-    typedef itk::ConnectedComponentImageFilter<ImageType, ImageType> ConnectedComponentType;
+    using ConnectedComponentType = itk::ConnectedComponentImageFilter<ImageType, ImageType>;
     typename ConnectedComponentType::Pointer filter = ConnectedComponentType::New();
     filter->SetInput( thresholder->GetOutput() );
     filter->Update();
@@ -78,7 +78,7 @@ int GetConnectedComponentsFeatureImages(int itkNotUsed( argc ), char* argv[] )
     relabeler2->SetInput( filter->GetOutput() );
     relabeler2->Update();
 
-    typedef itk::LabelGeometryImageFilter<ImageType, RealImageType> GeometryFilterType;
+    using GeometryFilterType = itk::LabelGeometryImageFilter<ImageType, RealImageType>;
     typename GeometryFilterType::Pointer geometry = GeometryFilterType::New();
     geometry->SetInput( relabeler2->GetOutput() );
     geometry->CalculatePixelIndicesOff();
@@ -86,7 +86,7 @@ int GetConnectedComponentsFeatureImages(int itkNotUsed( argc ), char* argv[] )
     geometry->CalculateOrientedLabelRegionsOff();
     geometry->Update();
 
-    typedef itk::LabelPerimeterEstimationCalculator<ImageType> AreaFilterType;
+    using AreaFilterType = itk::LabelPerimeterEstimationCalculator<ImageType>;
     typename AreaFilterType::Pointer area = AreaFilterType::New();
     area->SetImage( relabeler2->GetOutput() );
     area->Compute();
@@ -112,7 +112,7 @@ int GetConnectedComponentsFeatureImages(int itkNotUsed( argc ), char* argv[] )
         float volume = prefactor * static_cast<float>( geometry->GetVolume( label ) );
 
         outputImages[0]->SetPixel( index, volume );
-        outputImages[1]->SetPixel( index, area->GetPerimeter( label ) / volume );
+        outputImages[1]->SetPixel( index, static_cast<float>( area->GetPerimeter( label ) ) / volume );
         outputImages[2]->SetPixel( index, geometry->GetEccentricity( label ) );
         outputImages[3]->SetPixel( index, geometry->GetElongation( label ) );
         }
@@ -144,7 +144,7 @@ int GetConnectedComponentsFeatureImages(int itkNotUsed( argc ), char* argv[] )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int GetConnectedComponentsFeatureImages( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int GetConnectedComponentsFeatureImages( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -162,7 +162,7 @@ int GetConnectedComponentsFeatureImages( std::vector<std::string> args, std::ost
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -196,7 +196,7 @@ private:
     }
 
   int returnStatus=EXIT_FAILURE;
-  switch( atoi( argv[1] ) )
+  switch( std::stoi( argv[1] ) )
    {
    case 2:
      returnStatus = GetConnectedComponentsFeatureImages<2>( argc, argv );

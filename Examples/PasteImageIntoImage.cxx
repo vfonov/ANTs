@@ -16,13 +16,13 @@ namespace ants
 template <unsigned int ImageDimension>
 int PasteImageIntoImage( unsigned int argc, char *argv[] )
 {
-  typedef float                                 PixelType;
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
+  using PixelType = float;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
 
   std::vector<unsigned int> startIndex =
     ConvertVector<unsigned int>( std::string( argv[5] ) );
 
-  typedef itk::ImageFileReader<ImageType> ReaderType;
+  using ReaderType = itk::ImageFileReader<ImageType>;
   typename ReaderType::Pointer reader1 = ReaderType::New();
   reader1->SetFileName( argv[2] );
   reader1->Update();
@@ -36,10 +36,10 @@ int PasteImageIntoImage( unsigned int argc, char *argv[] )
     {
     backgroundValue = static_cast<PixelType>( atof( argv[6] ) );
     }
-  unsigned int writeOver = 1;
+  bool writeOver = true;
   if( argc > 7 )
     {
-    writeOver = static_cast<unsigned int>( atoi( argv[7] ) );
+    writeOver = static_cast<bool>( std::stoi( argv[7] ) );
     }
   PixelType conflictLabel = -1;
   if( argc > 8 )
@@ -57,16 +57,16 @@ int PasteImageIntoImage( unsigned int argc, char *argv[] )
       {
       index[d] += startIndex[d];
       }
-    if( paintValue != backgroundValue )
+    if( ! itk::Math::FloatAlmostEqual( paintValue, backgroundValue ) )
       {
       if( reader1->GetOutput()->GetLargestPossibleRegion().IsInside( index ) )
         {
         PixelType canvasValue = reader1->GetOutput()->GetPixel( index );
-        if( canvasValue == backgroundValue || writeOver == 1 )
+        if( itk::Math::FloatAlmostEqual( canvasValue, backgroundValue ) || writeOver )
           {
           reader1->GetOutput()->SetPixel( index, paintValue );
           }
-        else if( canvasValue != backgroundValue && writeOver == 0 )
+        else if( ! itk::Math::FloatAlmostEqual( canvasValue, backgroundValue ) && ! writeOver )
           {
           continue;
           }
@@ -78,7 +78,7 @@ int PasteImageIntoImage( unsigned int argc, char *argv[] )
       }
     }
 
-  typedef itk::ImageFileWriter<ImageType> WriterType;
+  using WriterType = itk::ImageFileWriter<ImageType>;
   typename WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( argv[4] );
   writer->SetInput( reader1->GetOutput() );
@@ -89,7 +89,7 @@ int PasteImageIntoImage( unsigned int argc, char *argv[] )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int PasteImageIntoImage( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int PasteImageIntoImage( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -107,7 +107,7 @@ int PasteImageIntoImage( std::vector<std::string> args, std::ostream* /*out_stre
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -156,7 +156,7 @@ private:
     return EXIT_FAILURE;
     }
 
-  switch( atoi( argv[1] ) )
+  switch( std::stoi( argv[1] ) )
     {
     case 2:
       {

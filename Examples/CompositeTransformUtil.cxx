@@ -24,8 +24,7 @@ void RegisterMatOff()
     MatOffRegistered[VImageDimension - 2] = true;
     // Register the matrix offset transform base class to the
     // transform factory for compatibility with the current ANTs.
-    typedef itk::MatrixOffsetTransformBase<double, VImageDimension,
-                                           VImageDimension> MatrixOffsetTransformType;
+    using MatrixOffsetTransformType = itk::MatrixOffsetTransformBase<double, VImageDimension, VImageDimension>;
     itk::TransformFactory<MatrixOffsetTransformType>::RegisterTransform();
     }
 }
@@ -50,16 +49,14 @@ template <unsigned int VImageDimension>
 int
 Disassemble(itk::TransformBaseTemplate<double> *transform, const std::string & transformName, const std::string & prefix)
 {
-  typedef itk::CompositeTransform<double, VImageDimension>                  CompositeTransformType;
-  typedef typename CompositeTransformType::TransformTypePointer             TransformPointer;
-  typedef typename itk::DisplacementFieldTransform<double, VImageDimension> DisplacementFieldTransformType;
+  using CompositeTransformType = itk::CompositeTransform<double, VImageDimension>;
+  using TransformPointer = typename CompositeTransformType::TransformTypePointer;
+  using DisplacementFieldTransformType = typename itk::DisplacementFieldTransform<double, VImageDimension>;
 
-  CompositeTransformType *composite = dynamic_cast<CompositeTransformType *>(transform);
-  if( composite == ITK_NULLPTR )
+  auto *composite = dynamic_cast<CompositeTransformType *>(transform);
+  if( composite == nullptr )
     {
-    std::cout << "Transform File " << transformName << " is a "
-             << transform->GetNameOfClass() << " not a Composite Transform."
-             << std::endl;
+    std::cout << "Transform File " << transformName << " is not a Composite Transform." << std::endl;
     return EXIT_FAILURE;
     }
 
@@ -67,13 +64,13 @@ Disassemble(itk::TransformBaseTemplate<double> *transform, const std::string & t
   for( unsigned int i = 0; i < numTransforms; ++i )
     {
     TransformPointer                curXfrm = composite->GetNthTransform(i);
-    DisplacementFieldTransformType *dispXfrm =
+    auto *dispXfrm =
       dynamic_cast<DisplacementFieldTransformType *>(curXfrm.GetPointer() );
     std::stringstream fname;
     fname << std::setfill('0') << std::setw(2) << i
           << "_" << prefix << "_"
           << curXfrm->GetNameOfClass();
-    if( dispXfrm != ITK_NULLPTR )
+    if( dispXfrm != nullptr )
       {
       fname << ".nii.gz";    // if it's a displacement field transform
       }
@@ -128,8 +125,8 @@ Assemble(const std::string & CompositeName,
          const std::vector<std::string> & transformNames,
          const typename itk::Transform<double, VImageDimension, VImageDimension>::Pointer & firstTransform)
 {
-  typedef itk::CompositeTransform<double, VImageDimension> CompositeTransformType;
-  typedef typename CompositeTransformType::TransformType   TransformType;
+  using CompositeTransformType = itk::CompositeTransform<double, VImageDimension>;
+  using TransformType = typename CompositeTransformType::TransformType;
   typename CompositeTransformType::Pointer composite = CompositeTransformType::New();
   composite->AddTransform(firstTransform);
   for( unsigned int i = 1; i < transformNames.size(); ++i )
@@ -167,7 +164,7 @@ static int Assemble(const std::string & CompositeName,
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int CompositeTransformUtil( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */)
+int CompositeTransformUtil( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */)
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -184,7 +181,7 @@ int CompositeTransformUtil( std::vector<std::string> args, std::ostream* /*out_s
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -262,7 +259,7 @@ private:
     }
   while( argc != 0 );
 
-  if( transformNames.size() < 1 )
+  if( transformNames.empty() )
     {
     std::cout << "Missing transform names to "
              << "assemble into a composite transform"

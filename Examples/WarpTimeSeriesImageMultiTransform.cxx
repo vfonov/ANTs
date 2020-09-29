@@ -20,7 +20,7 @@ static bool WarpTimeSeriesImageMultiTransform_ParseInput(int argc, char * *argv,
   opt_queue.clear();
   opt_queue.reserve(argc - 2);
 
-  misc_opt.reference_image_filename = ITK_NULLPTR;
+  misc_opt.reference_image_filename = nullptr;
   misc_opt.use_NN_interpolator = false;
   misc_opt.use_TightestBoundingBox = false;
   misc_opt.use_RotationHeader = false;
@@ -76,7 +76,7 @@ static bool WarpTimeSeriesImageMultiTransform_ParseInput(int argc, char * *argv,
       }
     else if( strcmp(argv[ind], "--reference-image-header") == 0 || strcmp(argv[ind], "-rh") == 0 )
       {
-      if( misc_opt.reference_image_filename == ITK_NULLPTR )
+      if( misc_opt.reference_image_filename == nullptr )
         {
         std::cout
           << "reference image filename is not given yet. Specify it with -R before --reference-image-header / -rh."
@@ -102,7 +102,7 @@ static bool WarpTimeSeriesImageMultiTransform_ParseInput(int argc, char * *argv,
       std::string prefix = argv[ind];
       std::string path, name, ext;
       FilePartsWithgz(prefix, path, name, ext);
-      if( ext == "" )
+      if( ext.empty() )
         {
         ext = ".nii.gz";
         }
@@ -140,7 +140,7 @@ static bool WarpTimeSeriesImageMultiTransform_ParseInput(int argc, char * *argv,
       std::string prefix = argv[ind];
       std::string path, name, ext;
       FilePartsWithgz(prefix, path, name, ext);
-      if( ext == "" )
+      if( ext.empty() )
         {
         ext = ".nii.gz";
         }
@@ -216,10 +216,10 @@ static bool WarpTimeSeriesImageMultiTransform_ParseInput(int argc, char * *argv,
   return true;
 }
 
-template <class AffineTransformPointer>
+template <typename AffineTransformPointer>
 void GetIdentityTransform(AffineTransformPointer & aff)
 {
-  typedef typename AffineTransformPointer::ObjectType AffineTransform;
+  using AffineTransform = typename AffineTransformPointer::ObjectType;
   aff = AffineTransform::New();
   aff->SetIdentity();
 }
@@ -228,18 +228,12 @@ template <int ImageDimension>
 void WarpImageMultiTransformFourD(char *moving_image_filename, char *output_image_filename,
                                   TRAN_OPT_QUEUE & opt_queue, MISC_OPT & misc_opt)
 {
-  typedef itk::Image<float,
-                     ImageDimension>                              VectorImageType; // 4D contains functional image
-  typedef itk::Image<float, ImageDimension
-                     - 1>                                         ImageType; // 3D image domain -R option
-  typedef itk::Vector<float, ImageDimension
-                      - 1>                                        VectorType; // 3D warp
-  typedef itk::Image<VectorType, ImageDimension
-                     - 1>                                         DisplacementFieldType; // 3D Field
-  typedef itk::MatrixOffsetTransformBase<double, ImageDimension - 1, ImageDimension
-                                         - 1>                     AffineTransformType;
-  typedef itk::WarpImageMultiTransformFilter<ImageType, ImageType, DisplacementFieldType,
-                                             AffineTransformType> WarperType;
+  using VectorImageType = itk::Image<float, ImageDimension>; // 4D contains functional image
+  using ImageType = itk::Image<float, ImageDimension - 1>; // 3D image domain -R option
+  using VectorType = itk::Vector<float, ImageDimension - 1>; // 3D warp
+  using DisplacementFieldType = itk::Image<VectorType, ImageDimension - 1>; // 3D Field
+  using AffineTransformType = itk::MatrixOffsetTransformBase<double, ImageDimension - 1, ImageDimension - 1>;
+  using WarperType = itk::WarpImageMultiTransformFilter<ImageType, ImageType, DisplacementFieldType, AffineTransformType>;
 
   itk::TransformFactory<AffineTransformType>::RegisterTransform();
 
@@ -254,7 +248,7 @@ void WarpImageMultiTransformFourD(char *moving_image_filename, char *output_imag
     ReadImage<ImageType>( img_ref, misc_opt.reference_image_filename );
     }
 
-  typedef itk::ExtractImageFilter<VectorImageType, ImageType> ExtractFilterType;
+  using ExtractFilterType = itk::ExtractImageFilter<VectorImageType, ImageType>;
 
   // ORIENTATION ALERT -- the way this code sets up
   // transformedvecimage doesn't really make complete sense to me. In
@@ -306,16 +300,14 @@ void WarpImageMultiTransformFourD(char *moving_image_filename, char *output_imag
 
     if( misc_opt.use_NN_interpolator )
       {
-      typedef typename itk::NearestNeighborInterpolateImageFunction<ImageType,
-                                                                    typename WarperType::CoordRepType>
-        NNInterpolateType;
+      using NNInterpolateType = typename itk::NearestNeighborInterpolateImageFunction<ImageType, typename WarperType::CoordRepType>;
       typename NNInterpolateType::Pointer interpolator_NN = NNInterpolateType::New();
       std::cout <<  " Use Nearest Neighbor interpolation " << std::endl;
       warper->SetInterpolator(interpolator_NN);
       }
 
-    typedef itk::TransformFileReader                    TranReaderType;
-    typedef itk::ImageFileReader<DisplacementFieldType> FieldReaderType;
+    using TranReaderType = itk::TransformFileReader;
+    using FieldReaderType = itk::ImageFileReader<DisplacementFieldType>;
 
     unsigned int transcount = 0;
     const int    kOptQueueSize = opt_queue.size();
@@ -403,7 +395,7 @@ void WarpImageMultiTransformFourD(char *moving_image_filename, char *output_imag
         }
       }
 
-    if( timedim % vnl_math_max(timedims / 10, static_cast<unsigned int>(1) ) == 0 )
+    if( timedim % std::max(timedims / 10, static_cast<unsigned int>(1) ) == 0 )
       {
       std::cout << (float) timedim / (float)timedims * 100 << " % done ... " << std::flush;
       }
@@ -437,7 +429,7 @@ void WarpImageMultiTransformFourD(char *moving_image_filename, char *output_imag
     warper->DetermineFirstDeformNoInterp();
     warper->Update();
 
-    typedef itk::ImageRegionIteratorWithIndex<ImageType> Iterator;
+    using Iterator = itk::ImageRegionIteratorWithIndex<ImageType>;
     Iterator vfIter2(  warper->GetOutput(), warper->GetOutput()->GetLargestPossibleRegion() );
     for(  vfIter2.GoToBegin(); !vfIter2.IsAtEnd(); ++vfIter2 )
       {
@@ -466,24 +458,18 @@ template <int ImageDimension>
 void WarpImageMultiTransform(char *moving_image_filename, char *output_image_filename,
                              TRAN_OPT_QUEUE & opt_queue, MISC_OPT & misc_opt)
 {
-  typedef itk::VectorImage<float,
-                           ImageDimension>                        VectorImageType;
-  typedef itk::Image<float,
-                     ImageDimension>                              ImageType;
-  typedef itk::Vector<float,
-                      ImageDimension>                             VectorType;
-  typedef itk::Image<VectorType,
-                     ImageDimension>                              DisplacementFieldType;
-  typedef itk::MatrixOffsetTransformBase<double, ImageDimension,
-                                         ImageDimension>          AffineTransformType;
-  typedef itk::WarpImageMultiTransformFilter<ImageType, ImageType, DisplacementFieldType,
-                                             AffineTransformType> WarperType;
+  using VectorImageType = itk::VectorImage<float, ImageDimension>;
+  using ImageType = itk::Image<float, ImageDimension>;
+  using VectorType = itk::Vector<float, ImageDimension>;
+  using DisplacementFieldType = itk::Image<VectorType, ImageDimension>;
+  using AffineTransformType = itk::MatrixOffsetTransformBase<double, ImageDimension, ImageDimension>;
+  using WarperType = itk::WarpImageMultiTransformFilter<ImageType, ImageType, DisplacementFieldType, AffineTransformType>;
 
   itk::TransformFactory<AffineTransformType>::RegisterTransform();
 
   typename VectorImageType::Pointer img_mov;
   typename itk::ImageIOBase::Pointer imageIO =
-    itk::ImageIOFactory::CreateImageIO(moving_image_filename, itk::ImageIOFactory::ReadMode);
+    itk::ImageIOFactory::CreateImageIO(moving_image_filename, itk::ImageIOFactory::FileModeEnum::ReadMode);
   imageIO->SetFileName(moving_image_filename);
   imageIO->ReadImageInformation();
   //    std::cout << " Dimension " << imageIO->GetNumberOfDimensions()  << " Components "
@@ -509,7 +495,7 @@ void WarpImageMultiTransform(char *moving_image_filename, char *output_image_fil
   img_output->FillBuffer( vec );
   for( unsigned int tensdim = 0;  tensdim < veclength;  tensdim++ )
     {
-    typedef itk::VectorIndexSelectionCastImageFilter<VectorImageType, ImageType> IndexSelectCasterType;
+    using IndexSelectCasterType = itk::VectorIndexSelectionCastImageFilter<VectorImageType, ImageType>;
     typename IndexSelectCasterType::Pointer fieldCaster = IndexSelectCasterType::New();
     fieldCaster->SetInput( img_mov );
     fieldCaster->SetIndex( tensdim );
@@ -527,16 +513,14 @@ void WarpImageMultiTransform(char *moving_image_filename, char *output_image_fil
 
     if( misc_opt.use_NN_interpolator )
       {
-      typedef typename itk::NearestNeighborInterpolateImageFunction<ImageType,
-                                                                    typename WarperType::CoordRepType>
-        NNInterpolateType;
+      using NNInterpolateType = typename itk::NearestNeighborInterpolateImageFunction<ImageType, typename WarperType::CoordRepType>;
       typename NNInterpolateType::Pointer interpolator_NN = NNInterpolateType::New();
       std::cout << "Haha" << std::endl;
       warper->SetInterpolator(interpolator_NN);
       }
 
-    typedef itk::TransformFileReader                    TranReaderType;
-    typedef itk::ImageFileReader<DisplacementFieldType> FieldReaderType;
+    using TranReaderType = itk::TransformFileReader;
+    using FieldReaderType = itk::ImageFileReader<DisplacementFieldType>;
 
     unsigned int transcount = 0;
     const int    kOptQueueSize = opt_queue.size();
@@ -626,7 +610,7 @@ void WarpImageMultiTransform(char *moving_image_filename, char *output_image_fil
     warper->DetermineFirstDeformNoInterp();
     warper->Update();
 
-    typedef itk::ImageRegionIteratorWithIndex<VectorImageType> Iterator;
+    using Iterator = itk::ImageRegionIteratorWithIndex<VectorImageType>;
     Iterator vfIter2( img_output, img_output->GetLargestPossibleRegion() );
     for(  vfIter2.GoToBegin(); !vfIter2.IsAtEnd(); ++vfIter2 )
       {
@@ -640,7 +624,7 @@ void WarpImageMultiTransform(char *moving_image_filename, char *output_image_fil
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int WarpTimeSeriesImageMultiTransform( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int WarpTimeSeriesImageMultiTransform( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -658,7 +642,7 @@ int WarpTimeSeriesImageMultiTransform( std::vector<std::string> args, std::ostre
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -740,12 +724,12 @@ private:
     }
 
   TRAN_OPT_QUEUE opt_queue;
-  char *         moving_image_filename = ITK_NULLPTR;
-  char *         output_image_filename = ITK_NULLPTR;
+  char *         moving_image_filename = nullptr;
+  char *         output_image_filename = nullptr;
 
   MISC_OPT misc_opt;
 
-  int  kImageDim = atoi(argv[1]);
+  int  kImageDim = std::stoi(argv[1]);
 
   const bool is_parsing_ok =
     WarpTimeSeriesImageMultiTransform_ParseInput(argc - 2, argv + 2, moving_image_filename, output_image_filename,

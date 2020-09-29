@@ -46,7 +46,7 @@ namespace itk {
 template<typename TInputImage,
   typename TOutputImage = TInputImage,
   typename TMaskImage = Image<unsigned char, TInputImage::ImageDimension> >
-class AdaptiveNonLocalMeansDenoisingImageFilter :
+class AdaptiveNonLocalMeansDenoisingImageFilter final :
   public NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>
 {
 public:
@@ -162,20 +162,20 @@ public:
 
 protected:
   AdaptiveNonLocalMeansDenoisingImageFilter();
-  virtual ~AdaptiveNonLocalMeansDenoisingImageFilter() ITK_OVERRIDE {}
+  ~AdaptiveNonLocalMeansDenoisingImageFilter() override = default;
 
-  void PrintSelf( std::ostream & os, Indent indent ) const ITK_OVERRIDE;
+  void PrintSelf( std::ostream & os, Indent indent ) const override;
 
-  void ThreadedGenerateData( const RegionType &, ThreadIdType ) ITK_OVERRIDE;
+  void ThreadedGenerateData( const RegionType &, ThreadIdType ) override;
 
-  void BeforeThreadedGenerateData() ITK_OVERRIDE;
+  void BeforeThreadedGenerateData() override;
 
-  void AfterThreadedGenerateData() ITK_OVERRIDE;
+  void AfterThreadedGenerateData() override;
 
 private:
 
-  AdaptiveNonLocalMeansDenoisingImageFilter( const Self& ) ITK_DELETED_FUNCTION;
-  void operator=( const Self& ) ITK_DELETED_FUNCTION;
+  AdaptiveNonLocalMeansDenoisingImageFilter( const Self& ) = delete;
+  void operator=( const Self& ) = delete;
 
   RealType CalculateCorrectionFactor( RealType );
 

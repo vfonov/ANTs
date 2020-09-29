@@ -20,16 +20,15 @@ namespace ants
 template <unsigned int ImageDimension>
 int SuperResolution( unsigned int argc, char *argv[] )
 {
-  typedef float                                   RealType;
-  typedef itk::Image<RealType, ImageDimension>    ImageType;
+  using RealType = float;
+  using ImageType = itk::Image<RealType, ImageDimension>;
 
-  typedef itk::Vector<RealType, 1>                         ScalarType;
-  typedef itk::Image<ScalarType, ImageDimension>           ScalarImageType;
-  typedef itk::PointSet<ScalarType, ImageDimension>        PointSetType;
-  typedef itk::BSplineScatteredDataPointSetToImageFilter
-    <PointSetType, ScalarImageType>                        BSplineFilterType;
+  using ScalarType = itk::Vector<RealType, 1>;
+  using ScalarImageType = itk::Image<ScalarType, ImageDimension>;
+  using PointSetType = itk::PointSet<ScalarType, ImageDimension>;
+  using BSplineFilterType = itk::BSplineScatteredDataPointSetToImageFilter<PointSetType, ScalarImageType>;
 
-  typename ImageType::Pointer domainImage = ITK_NULLPTR;
+  typename ImageType::Pointer domainImage = nullptr;
   ReadImage<ImageType>( domainImage, argv[3] );
 
   typename BSplineFilterType::Pointer bspliner = BSplineFilterType::New();
@@ -47,7 +46,7 @@ int SuperResolution( unsigned int argc, char *argv[] )
 
   bool useGradientWeighting = true;
   RealType gradientSigma = atof( argv[4] );
-  if( gradientSigma < 0.0 )
+  if( gradientSigma < itk::NumericTraits<RealType>::ZeroValue() )
     {
     useGradientWeighting = false;
     }
@@ -101,7 +100,7 @@ int SuperResolution( unsigned int argc, char *argv[] )
   unsigned int N = 0;
   for( unsigned int n = 7; n < argc; n++ )
     {
-    typename ImageType::Pointer inputImage = ITK_NULLPTR;
+    typename ImageType::Pointer inputImage = nullptr;
     ReadImage<ImageType>( inputImage, argv[n] );
 
     itk::ImageRegionConstIteratorWithIndex<ImageType> It( inputImage, inputImage->GetRequestedRegion() );
@@ -145,7 +144,7 @@ int SuperResolution( unsigned int argc, char *argv[] )
   const itk::SizeValueType numberOfPixels = bufferedRegion.GetNumberOfPixels();
   const bool filterHandlesMemory = false;
 
-  typedef itk::ImportImageFilter<RealType, ImageDimension> ImporterType;
+  using ImporterType = itk::ImportImageFilter<RealType, ImageDimension>;
   typename ImporterType::Pointer importer = ImporterType::New();
   importer->SetImportPointer( domainImage->GetBufferPointer(), numberOfPixels, filterHandlesMemory );
   importer->SetRegion( domainImage->GetBufferedRegion() );
@@ -159,18 +158,18 @@ int SuperResolution( unsigned int argc, char *argv[] )
   N = 0;
   for( unsigned int n = 7; n < argc; n++ )
     {
-    typename ImageType::Pointer inputImage = ITK_NULLPTR;
+    typename ImageType::Pointer inputImage = nullptr;
     ReadImage<ImageType>( inputImage, argv[n] );
 
-    typename ImageType::Pointer gradientImage = ITK_NULLPTR;
+    typename ImageType::Pointer gradientImage = nullptr;
     if( useGradientWeighting )
       {
-      typedef itk::GradientMagnitudeRecursiveGaussianImageFilter<ImageType, ImageType> GradientFilterType;
+      using GradientFilterType = itk::GradientMagnitudeRecursiveGaussianImageFilter<ImageType, ImageType>;
       typename GradientFilterType::Pointer gradientFilter = GradientFilterType::New();
       gradientFilter->SetSigma( gradientSigma );
       gradientFilter->SetInput( inputImage );
 
-      typedef itk::RescaleIntensityImageFilter<ImageType, ImageType> RescaleFilterType;
+      using RescaleFilterType = itk::RescaleIntensityImageFilter<ImageType, ImageType>;
       typename RescaleFilterType::Pointer rescaler = RescaleFilterType::New();
       rescaler->SetOutputMinimum( 0.0 );
       rescaler->SetOutputMaximum( 1.0 );
@@ -212,7 +211,7 @@ int SuperResolution( unsigned int argc, char *argv[] )
         {
         weight = gradientImage->GetPixel( It.GetIndex() );
         }
-      if( weight == 0.0 )
+      if( itk::Math::FloatAlmostEqual( weight, itk::NumericTraits<RealType>::ZeroValue() ) )
         {
         continue;
         }
@@ -259,13 +258,13 @@ int SuperResolution( unsigned int argc, char *argv[] )
 
   std::cout << "Elapsed Time:  " << timer.GetMean() << std::endl;
 
-  typedef itk::VectorIndexSelectionCastImageFilter<ScalarImageType, ImageType> SelectorType;
+  using SelectorType = itk::VectorIndexSelectionCastImageFilter<ScalarImageType, ImageType>;
   typename SelectorType::Pointer selector = SelectorType::New();
   selector->SetInput( bspliner->GetOutput() );
   selector->SetIndex( 0 );
   selector->Update();
 
-  typedef itk::AddImageFilter<ImageType> AdderType;
+  using AdderType = itk::AddImageFilter<ImageType>;
   typename AdderType::Pointer adder = AdderType::New();
   adder->SetInput( selector->GetOutput() );
   adder->SetConstant2( averageIntensity );
@@ -278,7 +277,7 @@ int SuperResolution( unsigned int argc, char *argv[] )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int SuperResolution( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int SuperResolution( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -296,7 +295,7 @@ int SuperResolution( std::vector<std::string> args, std::ostream* /*out_stream =
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -338,7 +337,7 @@ private:
     return EXIT_FAILURE;
     }
 
-  const int ImageDimension = static_cast<int>( atoi( argv[1] ) );
+  const int ImageDimension = static_cast<int>( std::stoi( argv[1] ) );
 
   switch( ImageDimension )
      {

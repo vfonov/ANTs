@@ -50,8 +50,8 @@ namespace itk
  * \sa CrossCorrelationRegistrationFilter
  * \ingroup FiniteDifferenceFunctions
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField>
-class CrossCorrelationRegistrationFunction :
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField>
+class CrossCorrelationRegistrationFunction final :
   public         AvantsPDEDeformableRegistrationFunction<TFixedImage,
                                                          TMovingImage, TDisplacementField>
 {
@@ -100,7 +100,7 @@ public:
   typedef typename BinaryImageType::Pointer                    BinaryImagePointer;
 
   /** Inherit some enums from the superclass. */
-  itkStaticConstMacro(ImageDimension, unsigned int, Superclass::ImageDimension);
+  static constexpr unsigned int ImageDimension = Superclass::ImageDimension;
 
   /** Inherit some enums from the superclass. */
   typedef typename Superclass::PixelType        PixelType;
@@ -143,14 +143,14 @@ public:
                                                               typename TDisplacementField::PixelType vec );
 
   /** This class uses a constant timestep of 1. */
-  TimeStepType ComputeGlobalTimeStep(void * /* GlobalData */) const ITK_OVERRIDE
+  TimeStepType ComputeGlobalTimeStep(void * /* GlobalData */) const override
   {
     return m_TimeStep;
   }
 
   /** Return a pointer to a global data structure that is passed to
    * this object from the solver at each calculation.  */
-  void * GetGlobalDataPointer() const ITK_OVERRIDE
+  void * GetGlobalDataPointer() const override
   {
     GlobalDataStruct *global = new GlobalDataStruct();
 
@@ -158,7 +158,7 @@ public:
   }
 
   /** Release memory for global data structure. */
-  void ReleaseGlobalDataPointer( void *GlobalData ) const ITK_OVERRIDE
+  void ReleaseGlobalDataPointer( void *GlobalData ) const override
   {
     //HACK: This code is suspicous and a possible source of
     //      very difficult to diagnose failures.
@@ -170,7 +170,7 @@ public:
   }
 
   /** Set the object's state before each iteration. */
-  void InitializeIteration() ITK_OVERRIDE;
+  void InitializeIteration() override;
 
   double ComputeCrossCorrelation()
   {
@@ -187,7 +187,7 @@ public:
         double    sff = finitediffimages[3]->GetPixel(oindex);
         double    smm = finitediffimages[4]->GetPixel(oindex);
         double    cc = 0;
-        if( fabs(sff * smm) > 0 )
+        if( std::fabs(sff * smm) > 0 )
           {
           cc += sfm * sfm / (sff * smm); ct++;
           }
@@ -199,7 +199,7 @@ public:
           }
         totalcc += cc;
         }
-      this->m_Energy = totalcc / (float)ct * (-1.0);
+      this->m_Energy = totalcc / static_cast<double>( ct ) * (-1.0);
       return this->m_Energy;
       }
     else
@@ -224,7 +224,7 @@ public:
     unsigned int j = 0;
     for( j = 0; j < ImageDimension; j++ )
       {
-      fixedGradientSquaredMagnitude += vnl_math_sqr( fixedGradient[j] );
+      fixedGradientSquaredMagnitude += itk::Math::sqr ( fixedGradient[j] );
       }
     double    movingValue;
     PointType mappedPoint;
@@ -232,7 +232,7 @@ public:
       {
       mappedPoint[j] = double( index[j] ) * m_FixedImageSpacing[j]
         + m_FixedImageOrigin[j];
-      mappedPoint[j] += vec[j];
+      mappedPoint[j] += static_cast<double>( vec[j] );
       }
     if( m_MovingImageInterpolator->IsInsideBuffer( mappedPoint ) )
       {
@@ -247,15 +247,15 @@ public:
       return update;
       }
     double speedValue = fixedValue - movingValue;
-    if( fabs(speedValue) < this->m_RobustnessParameter )
+    if( std::fabs( speedValue ) < static_cast<double>( this->m_RobustnessParameter ) )
       {
-      speedValue = 0;
+      speedValue = itk::NumericTraits<double>::ZeroValue();
       }
-    double denominator = vnl_math_sqr( speedValue ) / m_Normalizer
+    double denominator = itk::Math::sqr ( speedValue ) / static_cast<double>( m_Normalizer )
       + fixedGradientSquaredMagnitude;
     double DenominatorThreshold = 1e-9;
     double IntensityDifferenceThreshold = 0.001;
-    if( vnl_math_abs(speedValue) < IntensityDifferenceThreshold ||
+    if( itk::Math::abs (speedValue) < IntensityDifferenceThreshold ||
         denominator < DenominatorThreshold )
       {
       for( j = 0; j < ImageDimension; j++ )
@@ -278,7 +278,7 @@ public:
 
   VectorType ComputeUpdate(const NeighborhoodType & neighborhood,
                                    void * /* globalData */,
-                                   const FloatOffsetType & /* offset */ = FloatOffsetType(0.0) ) ITK_OVERRIDE
+                                   const FloatOffsetType & /* offset */ = FloatOffsetType(0.0) ) override
   {
     VectorType update;
 
@@ -296,7 +296,7 @@ public:
 
   VectorType ComputeUpdateInv(const NeighborhoodType & neighborhood,
                                       void * /* globalData */,
-                                      const FloatOffsetType & /* offset */ = FloatOffsetType(0.0) ) ITK_OVERRIDE
+                                      const FloatOffsetType & /* offset */ = FloatOffsetType(0.0) ) override
   {
     VectorType update;
 
@@ -341,11 +341,9 @@ public:
 
 protected:
   CrossCorrelationRegistrationFunction();
-  virtual ~CrossCorrelationRegistrationFunction() ITK_OVERRIDE
-  {
-  }
+  ~CrossCorrelationRegistrationFunction() override = default;
 
-  void PrintSelf(std::ostream& os, Indent indent) const ITK_OVERRIDE;
+  void PrintSelf(std::ostream& os, Indent indent) const override;
 
   /** FixedImage image neighborhood iterator type. */
   typedef ConstNeighborhoodIterator<FixedImageType> FixedImageNeighborhoodIteratorType;
@@ -357,8 +355,8 @@ protected:
     FixedImageNeighborhoodIteratorType m_FixedImageIterator;
     };
 private:
-  CrossCorrelationRegistrationFunction(const Self &); // purposely not implemented
-  void operator=(const Self &);                       // purposely not implemented
+  CrossCorrelationRegistrationFunction(const Self &) = delete;
+  void operator=(const Self &) = delete;
 
   /** Cache fixed image information. */
   typename TFixedImage::SpacingType                  m_FixedImageSpacing;

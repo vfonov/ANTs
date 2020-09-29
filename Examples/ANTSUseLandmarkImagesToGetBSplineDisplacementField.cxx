@@ -20,11 +20,11 @@ namespace ants
 template <unsigned int ImageDimension>
 int LandmarkBasedDisplacementFieldTransformInitializer( int argc, char *argv[] )
 {
-  typedef float                                 RealType;
-  typedef unsigned int                          LabelType;
-  typedef itk::Image<LabelType, ImageDimension> LabelImageType;
+  using RealType = float;
+  using LabelType = unsigned int;
+  using LabelImageType = itk::Image<LabelType, ImageDimension>;
 
-  typedef itk::ImageFileReader<LabelImageType> ImageReaderType;
+  using ImageReaderType = itk::ImageFileReader<LabelImageType>;
   typename ImageReaderType::Pointer fixedReader = ImageReaderType::New();
   fixedReader->SetFileName( argv[1] );
   fixedReader->Update();
@@ -41,7 +41,7 @@ int LandmarkBasedDisplacementFieldTransformInitializer( int argc, char *argv[] )
 
   const bool filterHandlesMemory = false;
 
-  typedef itk::ImportImageFilter<LabelType, ImageDimension> ImporterType;
+  using ImporterType = itk::ImportImageFilter<LabelType, ImageDimension>;
   typename ImporterType::Pointer importer = ImporterType::New();
   importer->SetImportPointer( const_cast<LabelType *>( fixedImage->GetBufferPointer() ), numberOfPixels, filterHandlesMemory );
   importer->SetRegion( fixedImage->GetBufferedRegion() );
@@ -59,10 +59,10 @@ int LandmarkBasedDisplacementFieldTransformInitializer( int argc, char *argv[] )
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-  typedef itk::Vector<RealType, ImageDimension>  VectorType;
-  typedef itk::Image<VectorType, ImageDimension> DisplacementFieldType;
+  using VectorType = itk::Vector<RealType, ImageDimension>;
+  using DisplacementFieldType = itk::Image<VectorType, ImageDimension>;
 
-  typedef itk::PointSet<LabelType, ImageDimension> PointSetType;
+  using PointSetType = itk::PointSet<LabelType, ImageDimension>;
 
   typename PointSetType::Pointer fixedPoints = PointSetType::New();
   fixedPoints->Initialize();
@@ -133,7 +133,7 @@ int LandmarkBasedDisplacementFieldTransformInitializer( int argc, char *argv[] )
           {
           center[d] += point[d];
           }
-        N += 1.0;
+        N += 1.0f;
         }
       ++ItP;
       ++ItD;
@@ -168,7 +168,7 @@ int LandmarkBasedDisplacementFieldTransformInitializer( int argc, char *argv[] )
           {
           center[d] += point[d];
           }
-        N += 1.0;
+        N += 1.0f;
         }
       ++ItP;
       ++ItD;
@@ -246,15 +246,14 @@ int LandmarkBasedDisplacementFieldTransformInitializer( int argc, char *argv[] )
 
   // Now match up the center points
 
-  typedef itk::PointSet<VectorType, ImageDimension> DisplacementFieldPointSetType;
-  typedef itk::BSplineScatteredDataPointSetToImageFilter
-    <DisplacementFieldPointSetType, DisplacementFieldType> BSplineFilterType;
-  typedef typename BSplineFilterType::WeightsContainerType WeightsContainerType;
+  using DisplacementFieldPointSetType = itk::PointSet<VectorType, ImageDimension>;
+  using BSplineFilterType = itk::BSplineScatteredDataPointSetToImageFilter<DisplacementFieldPointSetType, DisplacementFieldType>;
+  using WeightsContainerType = typename BSplineFilterType::WeightsContainerType;
 
   typename WeightsContainerType::Pointer weights = WeightsContainerType::New();
   weights->Initialize();
   const typename WeightsContainerType::Element boundaryWeight = 1.0e10;
-  const typename WeightsContainerType::Element weight = 1.0;
+  typename WeightsContainerType::Element weight = 1.0;
 
   typename DisplacementFieldPointSetType::Pointer fieldPoints = DisplacementFieldPointSetType::New();
   fieldPoints->Initialize();
@@ -299,7 +298,7 @@ int LandmarkBasedDisplacementFieldTransformInitializer( int argc, char *argv[] )
 
         if( useWeights )
           {
-          std::vector<LabelType>::const_iterator it = std::find( userLabels.begin(), userLabels.end(), mItD.Value() );
+          auto it = std::find( userLabels.begin(), userLabels.end(), mItD.Value() );
           if( it != userLabels.end() )
             {
             weights->InsertElement( count, labelWeights[it - userLabels.begin()] );
@@ -330,7 +329,7 @@ int LandmarkBasedDisplacementFieldTransformInitializer( int argc, char *argv[] )
   bool enforceStationaryBoundary = true;
   if( argc > 7 )
     {
-    enforceStationaryBoundary = static_cast<bool>( atoi( argv[7] ) );
+    enforceStationaryBoundary = static_cast<bool>( std::stoi( argv[7] ) );
     }
   if( enforceStationaryBoundary )
     {
@@ -370,12 +369,12 @@ int LandmarkBasedDisplacementFieldTransformInitializer( int argc, char *argv[] )
 
   typename BSplineFilterType::Pointer bspliner = BSplineFilterType::New();
 
-  unsigned int numberOfLevels = atoi( argv[5] );
+  unsigned int numberOfLevels = std::stoi( argv[5] );
 
   unsigned int splineOrder = 3;
   if( argc > 6 )
     {
-    splineOrder = atoi( argv[6] );
+    splineOrder = std::stoi( argv[6] );
     }
 
   std::vector<unsigned int> meshSize = ConvertVector<unsigned int>( std::string( argv[4] ) );
@@ -413,7 +412,7 @@ int LandmarkBasedDisplacementFieldTransformInitializer( int argc, char *argv[] )
   bspliner->SetPointWeights( weights );
   bspliner->Update();
 
-  typedef itk::VectorLinearInterpolateImageFunction<DisplacementFieldType, RealType> InterpolatorType;
+  using InterpolatorType = itk::VectorLinearInterpolateImageFunction<DisplacementFieldType, RealType>;
   typename InterpolatorType::Pointer interpolator = InterpolatorType::New();
   interpolator->SetInputImage( bspliner->GetOutput() );
 
@@ -458,7 +457,7 @@ int LandmarkBasedDisplacementFieldTransformInitializer( int argc, char *argv[] )
     ++mIt;
     }
 
-  typedef itk::ImageFileWriter<DisplacementFieldType> WriterType;
+  using WriterType = itk::ImageFileWriter<DisplacementFieldType>;
   typename WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( argv[3] );
   writer->SetInput( bspliner->GetOutput() );
@@ -468,7 +467,7 @@ int LandmarkBasedDisplacementFieldTransformInitializer( int argc, char *argv[] )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ANTSUseLandmarkImagesToGetBSplineDisplacementField( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */)
+int ANTSUseLandmarkImagesToGetBSplineDisplacementField( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */)
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -485,7 +484,7 @@ int ANTSUseLandmarkImagesToGetBSplineDisplacementField( std::vector<std::string>
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -541,7 +540,7 @@ private:
   // Get the image dimension
   std::string               fn = std::string(argv[1]);
   itk::ImageIOBase::Pointer imageIO =
-    itk::ImageIOFactory::CreateImageIO(fn.c_str(), itk::ImageIOFactory::ReadMode);
+    itk::ImageIOFactory::CreateImageIO(fn.c_str(), itk::ImageIOFactory::FileModeEnum::ReadMode);
   imageIO->SetFileName(fn.c_str() );
   imageIO->ReadImageInformation();
 

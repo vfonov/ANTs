@@ -23,27 +23,27 @@ namespace ants
 {
 
 
-template <class TFilter>
+template <typename TFilter>
 class CommandProgressUpdate : public itk::Command
 {
 public:
-  typedef  CommandProgressUpdate                      Self;
-  typedef  itk::Command                               Superclass;
-  typedef  itk::SmartPointer<CommandProgressUpdate>  Pointer;
+  using Self = CommandProgressUpdate<TFilter>;
+  using Superclass = itk::Command;
+  using Pointer = itk::SmartPointer<CommandProgressUpdate<TFilter> >;
   itkNewMacro( CommandProgressUpdate );
 protected:
 
-  CommandProgressUpdate() : m_CurrentProgress( 0 ) {};
+  CommandProgressUpdate()  = default;;
 
-  typedef TFilter FilterType;
+  using FilterType = TFilter;
 
-  unsigned int m_CurrentProgress;
+  unsigned int m_CurrentProgress{ 0 };
 
 public:
 
-  void Execute(itk::Object *caller, const itk::EventObject & event) ITK_OVERRIDE
+  void Execute(itk::Object *caller, const itk::EventObject & event) override
     {
-    const TFilter * filter = dynamic_cast<const TFilter *>( caller );
+    const auto * filter = dynamic_cast<const TFilter *>( caller );
 
     if( typeid( event ) == typeid( itk::IterationEvent ) )
       {
@@ -55,7 +55,7 @@ public:
       this->m_CurrentProgress = 0;
       }
 
-    itk::ProcessObject *po = dynamic_cast<itk::ProcessObject *>( caller );
+    auto *po = dynamic_cast<itk::ProcessObject *>( caller );
     if (! po) return;
 //    std::cout << po->GetProgress() << std::endl;
     if( typeid( event ) == typeid ( itk::ProgressEvent )  )
@@ -75,9 +75,9 @@ public:
       }
     }
 
-  void Execute(const itk::Object * object, const itk::EventObject & event) ITK_OVERRIDE
+  void Execute(const itk::Object * object, const itk::EventObject & event) override
     {
-    const TFilter * filter = dynamic_cast<const TFilter *>( object );
+    const auto * filter = dynamic_cast<const TFilter *>( object );
 
     if( typeid( event ) == typeid( itk::IterationEvent ) )
       {
@@ -89,7 +89,7 @@ public:
       this->m_CurrentProgress = 0;
       }
 
-    itk::ProcessObject *po = dynamic_cast<itk::ProcessObject *>(
+    auto *po = dynamic_cast<itk::ProcessObject *>(
       const_cast<itk::Object *>( object ) );
     if (! po) return;
 
@@ -114,9 +114,9 @@ public:
 template <unsigned int ImageDimension>
 int NonLocalSuperResolution( itk::ants::CommandLineParser *parser )
 {
-  typedef float RealType;
+  using RealType = float;
 
-  typedef typename itk::ants::CommandLineParser::OptionType   OptionType;
+  using OptionType = typename itk::ants::CommandLineParser::OptionType;
 
   bool verbose = false;
   typename itk::ants::CommandLineParser::OptionType::Pointer verboseOption =
@@ -132,8 +132,8 @@ int NonLocalSuperResolution( itk::ants::CommandLineParser *parser )
              << ImageDimension << "-dimensional images." << std::endl << std::endl;
     }
 
-  typedef itk::Image<RealType, ImageDimension> ImageType;
-  typename ImageType::Pointer inputImage = ITK_NULLPTR;
+  using ImageType = itk::Image<RealType, ImageDimension>;
+  typename ImageType::Pointer inputImage = nullptr;
 
   typename OptionType::Pointer inputImageOption = parser->GetOption( "input-image" );
   if( inputImageOption && inputImageOption->GetNumberOfFunctions() )
@@ -150,16 +150,16 @@ int NonLocalSuperResolution( itk::ants::CommandLineParser *parser )
     return EXIT_FAILURE;
     }
 
-  typename ImageType::Pointer referenceImage = ITK_NULLPTR;
+  typename ImageType::Pointer referenceImage = nullptr;
   typename OptionType::Pointer referenceImageOption = parser->GetOption( "reference-image" );
-  typename ImageType::Pointer interpolatedImage = ITK_NULLPTR;
+  typename ImageType::Pointer interpolatedImage = nullptr;
   typename OptionType::Pointer interpolatedImageOption = parser->GetOption( "interpolated-image" );
 
   if( referenceImageOption && referenceImageOption->GetNumberOfFunctions() )
     {
     std::string inputFile = referenceImageOption->GetFunction( 0 )->GetName();
 
-    typedef itk::ImageFileReader<ImageType> ReaderType;
+    using ReaderType = itk::ImageFileReader<ImageType>;
     typename ReaderType::Pointer reader = ReaderType::New();
     reader->SetFileName( inputFile.c_str() );
 
@@ -171,7 +171,7 @@ int NonLocalSuperResolution( itk::ants::CommandLineParser *parser )
       {
       std::string inputFile = interpolatedImageOption->GetFunction( 0 )->GetName();
 
-      typedef itk::ImageFileReader<ImageType> ReaderType;
+      using ReaderType = itk::ImageFileReader<ImageType>;
       typename ReaderType::Pointer reader = ReaderType::New();
       reader->SetFileName( inputFile.c_str() );
 
@@ -188,7 +188,7 @@ int NonLocalSuperResolution( itk::ants::CommandLineParser *parser )
     return EXIT_FAILURE;
     }
 
-  typedef itk::NonLocalSuperresolutionImageFilter<ImageType, ImageType> SuperresoluterType;
+  using SuperresoluterType = itk::NonLocalSuperresolutionImageFilter<ImageType, ImageType>;
   typename SuperresoluterType::Pointer superresoluter = SuperresoluterType::New();
 
   superresoluter->SetLowResolutionInputImage( inputImage );
@@ -340,7 +340,7 @@ int NonLocalSuperResolution( itk::ants::CommandLineParser *parser )
 
   if( verbose )
     {
-    typedef CommandProgressUpdate<SuperresoluterType> CommandType;
+    using CommandType = CommandProgressUpdate<SuperresoluterType>;
     typename CommandType::Pointer observer = CommandType::New();
     superresoluter->AddObserver( itk::ProgressEvent(), observer );
     superresoluter->AddObserver( itk::IterationEvent(), observer );
@@ -387,7 +387,7 @@ int NonLocalSuperResolution( itk::ants::CommandLineParser *parser )
 
 void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
-  typedef itk::ants::CommandLineParser::OptionType OptionType;
+  using OptionType = itk::ants::CommandLineParser::OptionType;
 
   {
   std::string description =
@@ -579,7 +579,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int NonLocalSuperResolution( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int NonLocalSuperResolution( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -597,7 +597,7 @@ int NonLocalSuperResolution( std::vector<std::string> args, std::ostream* /*out_
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -717,7 +717,7 @@ private:
       return EXIT_FAILURE;
       }
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(
-        filename.c_str(), itk::ImageIOFactory::ReadMode );
+        filename.c_str(), itk::ImageIOFactory::FileModeEnum::ReadMode );
     dimension = imageIO->GetNumberOfDimensions();
     }
 

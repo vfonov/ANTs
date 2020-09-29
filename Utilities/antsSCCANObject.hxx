@@ -24,7 +24,7 @@
 #include <vnl/algo/vnl_matrix_inverse.h>
 #include <vnl/algo/vnl_generalized_eigensystem.h>
 #include "antsSCCANObject.h"
-#include <time.h>
+#include <ctime>
 #include "itkCSVNumericObjectFileWriter.h"
 #include "itkCSVArray2DDataObject.h"
 #include "itkCSVArray2DFileReader.h"
@@ -40,7 +40,7 @@ namespace itk
 {
 namespace ants
 {
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 antsSCCANObject<TInputImage, TRealType>::antsSCCANObject()
 {
   this->m_UseL1 = true;
@@ -57,9 +57,9 @@ antsSCCANObject<TInputImage, TRealType>::antsSCCANObject()
   this->m_PinvTolerance = 1.e-6;
   this->m_PercentVarianceForPseudoInverse = 0.9;
   this->m_MaximumNumberOfIterations = 20;
-  this->m_MaskImageP = ITK_NULLPTR;
-  this->m_MaskImageQ = ITK_NULLPTR;
-  this->m_MaskImageR = ITK_NULLPTR;
+  this->m_MaskImageP = nullptr;
+  this->m_MaskImageQ = nullptr;
+  this->m_MaskImageR = nullptr;
   this->m_KeepPositiveP = true;
   this->m_KeepPositiveQ = true;
   this->m_KeepPositiveR = true;
@@ -77,7 +77,7 @@ antsSCCANObject<TInputImage, TRealType>::antsSCCANObject()
   this->m_PriorWeight = 0;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename TInputImage::Pointer
 antsSCCANObject<TInputImage, TRealType>
 ::ConvertVariateToSpatialImage(  typename antsSCCANObject<TInputImage,
@@ -100,7 +100,7 @@ antsSCCANObject<TInputImage, TRealType>
   Iterator mIter(mask, mask->GetLargestPossibleRegion() );
   for(  mIter.GoToBegin(); !mIter.IsAtEnd(); ++mIter )
     {
-    if( mIter.Get() >= 0.5 )
+    if( mIter.Get() >= static_cast<typename TInputImage::PixelType>( 0.5 ) )
       {
       vecind++;
       }
@@ -115,12 +115,12 @@ antsSCCANObject<TInputImage, TRealType>
   unsigned long maskct = 0;
   for(  mIter.GoToBegin(); !mIter.IsAtEnd(); ++mIter )
     {
-    if( mIter.Get() >= 0.5 )
+    if( mIter.Get() >= static_cast<typename TInputImage::PixelType>( 0.5 ) )
       {
       TRealType val = 0;
       if( vecind < w_p.size() )
         {
-	val = w_p( vecind ) * avgwt + weights->GetPixel(mIter.GetIndex());
+	       val = static_cast<TRealType>( w_p( vecind ) ) * avgwt + static_cast<RealType>( weights->GetPixel(mIter.GetIndex()) );
         }
       else
         {
@@ -128,7 +128,7 @@ antsSCCANObject<TInputImage, TRealType>
         if ( ! this->m_Silent )  std::cout << " this is likely a mask problem --- exiting! " << std::endl;
         std::exception();
         }
-      if ( threshold_at_zero && ( fabs(val) > this->m_Epsilon  ) )
+      if ( threshold_at_zero && ( std::fabs(val) > this->m_Epsilon  ) )
         {
         weights->SetPixel( mIter.GetIndex(), 1 );
         }
@@ -150,7 +150,7 @@ antsSCCANObject<TInputImage, TRealType>
 }
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename TInputImage::Pointer
 antsSCCANObject<TInputImage, TRealType>
 ::ConvertVariateToSpatialImage4D(  typename antsSCCANObject<TInputImage,
@@ -233,7 +233,7 @@ antsSCCANObject<TInputImage, TRealType>
 }
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType
 antsSCCANObject<TInputImage, TRealType>
 ::CurvatureSparseness(
@@ -271,9 +271,9 @@ antsSCCANObject<TInputImage, TRealType>
         x[kk] = 0;
         zct++;
         }
-      else if( vnl_math_abs( x[kk] ) > 1.e-6 )
+      else if( itk::Math::abs ( x[kk] ) > 1.e-6 )
         {
-        kappa += vnl_math_abs( grad );
+        kappa += itk::Math::abs ( grad );
         x[kk] = x[kk] + grad;
         nzct++;
         }
@@ -312,7 +312,7 @@ antsSCCANObject<TInputImage, TRealType>
   return gradvec.two_norm();
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename antsSCCANObject<TInputImage, TRealType>::VectorType
 antsSCCANObject<TInputImage, TRealType>
 ::ClusterThresholdVariate(  typename antsSCCANObject<TInputImage,
@@ -423,7 +423,7 @@ antsSCCANObject<TInputImage, TRealType>
 }
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename antsSCCANObject<TInputImage, TRealType>::VectorType
 antsSCCANObject<TInputImage, TRealType>
 ::ClusterThresholdVariate4D(  typename antsSCCANObject<TInputImage,
@@ -540,7 +540,7 @@ antsSCCANObject<TInputImage, TRealType>
 
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename antsSCCANObject<TInputImage, TRealType>::VectorType
 antsSCCANObject<TInputImage, TRealType>
 ::ConvertImageToVariate(  typename TInputImage::Pointer image, typename TInputImage::Pointer mask )
@@ -581,7 +581,7 @@ antsSCCANObject<TInputImage, TRealType>
   return vec;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename antsSCCANObject<TInputImage, TRealType>::VectorType
 antsSCCANObject<TInputImage, TRealType>
 ::ConvertImageToVariate4D(  typename TInputImage::Pointer image, typename TInputImage::Pointer mask )
@@ -638,7 +638,7 @@ antsSCCANObject<TInputImage, TRealType>
 }
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename antsSCCANObject<TInputImage, TRealType>::VectorType
 antsSCCANObject<TInputImage, TRealType>
 ::InitializeV( typename antsSCCANObject<TInputImage, TRealType>::MatrixType p, unsigned long seed )
@@ -666,13 +666,13 @@ antsSCCANObject<TInputImage, TRealType>
   return w_p;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename antsSCCANObject<TInputImage, TRealType>::VectorType
 antsSCCANObject<TInputImage, TRealType>
 ::SpatiallySmoothVector( typename antsSCCANObject<TInputImage, TRealType>::VectorType vec,
                          typename TInputImage::Pointer mask, bool surface  )
 {
-  if( mask.IsNull() || vnl_math_abs( this->m_Smoother ) < 1.e-9 )
+  if( mask.IsNull() || itk::Math::abs ( this->m_Smoother ) < 1.e-9 )
     {
     return vec;
     }
@@ -691,7 +691,7 @@ antsSCCANObject<TInputImage, TRealType>
       TInputImage > FilterType;
     typename FilterType::Pointer filter = FilterType::New();
     filter->SetInput( image );
-    filter->SetNumberOfIterations( vnl_math_abs( this->m_Smoother ) );
+    filter->SetNumberOfIterations( itk::Math::abs ( this->m_Smoother ) );
     TRealType mytimestep = spacingsize / std::pow( 2.0 , static_cast<double>(ImageDimension+1) );
     TRealType reftimestep = 0.5 / std::pow( 2.0 , static_cast<double>(ImageDimension+1) );
     if ( mytimestep > reftimestep ) mytimestep = reftimestep;
@@ -741,7 +741,7 @@ antsSCCANObject<TInputImage, TRealType>
     }
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename antsSCCANObject<TInputImage, TRealType>::VectorType
 antsSCCANObject<TInputImage, TRealType>
 ::ComputeVectorLaplacian( typename antsSCCANObject<TInputImage, TRealType>::VectorType vec,
@@ -770,7 +770,7 @@ antsSCCANObject<TInputImage, TRealType>
   return gradvec;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename antsSCCANObject<TInputImage, TRealType>::VectorType
 antsSCCANObject<TInputImage, TRealType>
 ::ComputeVectorGradMag( typename antsSCCANObject<TInputImage, TRealType>::VectorType vec,
@@ -795,7 +795,7 @@ antsSCCANObject<TInputImage, TRealType>
   return gradvec;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename antsSCCANObject<TInputImage, TRealType>::MatrixType
 antsSCCANObject<TInputImage, TRealType>
 ::NormalizeMatrix( typename antsSCCANObject<TInputImage, TRealType>::MatrixType p, bool makepositive )
@@ -834,7 +834,7 @@ antsSCCANObject<TInputImage, TRealType>
   return np;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename antsSCCANObject<TInputImage, TRealType>::MatrixType
 antsSCCANObject<TInputImage, TRealType>
 ::VNLPseudoInverse( typename antsSCCANObject<TInputImage, TRealType>::MatrixType rin, bool take_sqrt )
@@ -882,7 +882,7 @@ antsSCCANObject<TInputImage, TRealType>
 
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 void
 antsSCCANObject<TInputImage, TRealType>
 ::SoftClustThreshold( typename antsSCCANObject<TInputImage, TRealType>::VectorType &  v_in,
@@ -894,7 +894,7 @@ antsSCCANObject<TInputImage, TRealType>
     RealType val = v_in(i);
     if ( keep_positive && val < 0 ) val = 0 ;
     // if ( keep_positive && val < 0 ) val *= ( -1 );
-    if( vnl_math_abs( val ) < soft_thresh )
+    if( itk::Math::abs ( val ) < soft_thresh )
       {
       v_in(i) = 0;
       }
@@ -915,21 +915,21 @@ antsSCCANObject<TInputImage, TRealType>
 
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 void
 antsSCCANObject<TInputImage, TRealType>
 ::ReSoftThreshold( typename antsSCCANObject<TInputImage, TRealType>::VectorType &
                    v_in, TRealType fractional_goal, bool keep_positive )
 {
-  //  if ( ! this->m_Silent )  std::cout <<" resoft " << fractional_goal << std::endl;
-  if( fabs(fractional_goal) >= 1 || fabs( (float)(v_in.size() ) * fractional_goal) <= 1 )
+  TRealType abs_fractional_goal = static_cast<TRealType>( std::fabs( fractional_goal ) );
+  if( abs_fractional_goal >= itk::NumericTraits<TRealType>::OneValue() || static_cast<TRealType>( v_in.size() ) * abs_fractional_goal  <= itk::NumericTraits<TRealType>::OneValue() )
     {
     return;
     }
   RealType maxv = v_in.max_value();
-  if( fabs(v_in.min_value() ) > maxv )
+  if( static_cast<RealType>( std::fabs( v_in.min_value() ) ) > maxv )
     {
-    maxv = fabs(v_in.min_value() );
+    maxv = static_cast<RealType>( std::fabs( v_in.min_value() ) );
     }
   RealType     lambg = this->m_Epsilon;
   RealType     frac = 0;
@@ -947,7 +947,7 @@ antsSCCANObject<TInputImage, TRealType>
   unsigned int maxits = 1000;
   for( its = 0; its < maxits; its++ )
     {
-    soft_thresh = (its / (float)maxits) * maxv;
+    soft_thresh = static_cast<RealType>( its ) / static_cast<RealType>( maxits ) * maxv;
     ct = 0;
     for( unsigned int i = 0; i < v_in.size(); i++ )
       {
@@ -965,7 +965,7 @@ antsSCCANObject<TInputImage, TRealType>
         ct++;
         }
       }
-    frac = (float)(v_in.size() - ct) / (float)v_in.size();
+    frac = static_cast<RealType>( v_in.size() - ct ) / static_cast<RealType>( v_in.size() );
     //    if ( ! this->m_Silent )  std::cout << " cur " << frac << " goal "  << fractional_goal << " st " << soft_thresh << " th " <<
     // minthresh
     // << std::endl;
@@ -1013,7 +1013,7 @@ antsSCCANObject<TInputImage, TRealType>
   return;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 void
 antsSCCANObject<TInputImage, TRealType>
 ::ConstantProbabilityThreshold( typename antsSCCANObject<TInputImage, TRealType>::VectorType &
@@ -1060,7 +1060,7 @@ antsSCCANObject<TInputImage, TRealType>
   unsigned int maxits = 1000;
   for( its = 0; its < maxits; its++ )
     {
-    soft_thresh = (its / (float)maxits) * maxv;
+    soft_thresh = static_cast<RealType>( its ) / static_cast<RealType>( maxits ) * maxv;
     probability = 0;
     for( unsigned int i = 0; i < v_in.size(); i++ )
       {
@@ -1137,7 +1137,7 @@ antsSCCANObject<TInputImage, TRealType>
   return;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename antsSCCANObject<TInputImage, TRealType>::VectorType
 antsSCCANObject<TInputImage, TRealType>
 ::TrueCCAPowerUpdate( TRealType penalty1,
@@ -1173,7 +1173,7 @@ antsSCCANObject<TInputImage, TRealType>
   return wpnew;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 void
 antsSCCANObject<TInputImage, TRealType>
 ::UpdatePandQbyR()
@@ -1212,7 +1212,7 @@ antsSCCANObject<TInputImage, TRealType>
     }
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 void antsSCCANObject<TInputImage, TRealType>
 ::RunDiagnostics( unsigned int n_vecs )
 {
@@ -1281,7 +1281,7 @@ void antsSCCANObject<TInputImage, TRealType>
     }
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseCCA(unsigned int /* nvecs */)
 {
@@ -1399,7 +1399,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return this->m_CanonicalCorrelations[0];
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparsePartialCCA(unsigned int /* nvecs */)
 {
@@ -1506,7 +1506,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return this->m_CanonicalCorrelations[0];
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 void antsSCCANObject<TInputImage, TRealType>
 ::SortResults(unsigned int n_vecs)
 {
@@ -1615,7 +1615,7 @@ void antsSCCANObject<TInputImage, TRealType>
   this->m_CanonicalCorrelations = newcorrs;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseArnoldiSVD_z(unsigned int n_vecs )
 {
@@ -1805,7 +1805,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return fabs(this->m_CanonicalCorrelations[0]);
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType
 antsSCCANObject<TInputImage, TRealType>
 ::ReconstructionError( typename antsSCCANObject<TInputImage, TRealType>::MatrixType mymat,
@@ -1833,7 +1833,7 @@ antsSCCANObject<TInputImage, TRealType>
   return ( onenorm - reconerr ) / onenorm;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseReconPrior(unsigned int n_vecs, bool prior)
 {
@@ -1850,7 +1850,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
       RealType fnz = 0;
       for( unsigned int y = 0; y < this->m_OriginalMatrixPriorROI.cols(); y++ )
 	      {
-      	if( vnl_math_abs( priorrow( y ) ) > 1.e-10 )
+      	if( itk::Math::abs ( priorrow( y ) ) > 1.e-10 )
           {
       	  fnz += 1;
       	  }
@@ -1947,7 +1947,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return 1.0 / reconerr;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::IHTPowerIterationPrior( typename antsSCCANObject<TInputImage, TRealType>::MatrixType& A,
                           typename antsSCCANObject<TInputImage, TRealType>::VectorType& evec,
@@ -1975,12 +1975,12 @@ TRealType antsSCCANObject<TInputImage, TRealType>
       we use a conjugate gradient version of this optimization.
   */
   VectorType prior( priorin );
-  if( evec.two_norm() ==  0 )
+  if( itk::Math::FloatAlmostEqual( evec.two_norm(), itk::NumericTraits<typename VectorType::abs_t>::ZeroValue() ) )
     {
     evec = this->InitializeV( this->m_MatrixP, false );
     }
   evec = evec / evec.two_norm();
-  if( inner_product( prior, evec ) == 0 )
+  if( itk::Math::FloatAlmostEqual( inner_product( prior, evec ), itk::NumericTraits<RealType>::ZeroValue() ) )
     {
     evec.update( prior, 0  );
     this->SparsifyP( evec  );
@@ -2050,7 +2050,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
     }
   // if ( ! this->m_Silent )  std::cout << "rayleigh-quotient: " << rayquo << " in " << powerits << " num " << maxorth;
   evec = bestevec;
-  if( inner_product( prior, evec ) == 0 )
+  if( itk::Math::FloatAlmostEqual( inner_product( prior, evec ), itk::NumericTraits<RealType>::ZeroValue() ) )
     {
     evec.update( prior, 0  );
     this->SparsifyP( evec  );
@@ -2059,7 +2059,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return rayquo;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseReconB(   typename antsSCCANObject<TInputImage,
                                            TRealType>::MatrixType& matrixB,
@@ -2110,7 +2110,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
 }
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseRecon(unsigned int n_vecs)
 {
@@ -2130,12 +2130,12 @@ TRealType antsSCCANObject<TInputImage, TRealType>
       RealType fnz = 0;
       for( unsigned int y = 0; y < this->m_OriginalMatrixPriorROI.cols(); y++ )
       	{
-      	if(vnl_math_abs( priorrow( y ) ) > 1.e-8 )
+      	if(itk::Math::abs ( priorrow( y ) ) > 1.e-8 )
           {
       	  fnz += 1;
       	  }
       	}
-      if ( vnl_math_abs( this->m_FractionNonZeroP ) < 1.e-11 )
+      if ( itk::Math::abs ( this->m_FractionNonZeroP ) < 1.e-11 )
         sparsenessparams( x ) = 1.0 * (RealType) fnz / (RealType) this->m_OriginalMatrixPriorROI.cols();
       priorrow = priorrow/priorrow.two_norm();
       this->m_MatrixPriorROI.set_row( x , priorrow );
@@ -2175,7 +2175,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
         RealType maxval = 0;
     	  for( unsigned int j = 0; j < n_vecs; j++ )
     	    {
-    	    RealType myval = vnl_math_abs( this->m_VariatesP( i, j ) );
+    	    RealType myval = itk::Math::abs ( this->m_VariatesP( i, j ) );
     	    if (  myval > maxval )
     	      {
     	      maxvals( i ) = j;
@@ -2327,7 +2327,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
 
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::IHTPowerIterationHome( typename antsSCCANObject<TInputImage, TRealType>::MatrixType& A,
                          typename antsSCCANObject<TInputImage, TRealType>::VectorType& evec,
@@ -2340,7 +2340,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
       d.dx ( x^t A^t A x  ) =   A^t A x  ,   x \leftarrow  x / \| x \|
       we use a conjugate gradient version of this optimization.
   */
-  if( evec.two_norm() ==  0 )
+  if( itk::Math::FloatAlmostEqual( evec.two_norm(), itk::NumericTraits<typename VectorType::abs_t>::ZeroValue() ) )
     {
     evec = this->InitializeV( this->m_MatrixP, true );
     }
@@ -2399,7 +2399,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return rayquo;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseReconHome(unsigned int n_vecs)
 {
@@ -2507,7 +2507,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return 1.0 / reconerr;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseArnoldiSVDGreedy(unsigned int n_vecs)
 {
@@ -2659,7 +2659,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
           VectorType voxels = this->m_MatrixP.get_column( vox );
           RealType  lmerror = this->ConjGrad(  A ,  lmsol , voxels , 0 , 100 );
           VectorType proj =   A * lmsol;
-          if ( vnl_math_isnan( lmerror ) ) { lmerror = 0 ; proj.fill(0); }
+          if ( std::isnan( lmerror ) ) { lmerror = 0 ; proj.fill(0); }
           reconmat.set_column( vox , proj );
           totalerr += lmerror;
           }
@@ -2730,7 +2730,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
     vexlist.push_back( vex );
     this->SortResults(n_vecs);
     convcrit = ( this->ComputeEnergySlope(vexlist, 10) );
-    if( bestvex == vexlist[loop] )
+    if( itk::Math::FloatAlmostEqual( bestvex, vexlist[loop] ) )
       {
       convcrit = 0;
       }
@@ -2752,7 +2752,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return fabs(this->m_CanonicalCorrelations[0]);
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseArnoldiSVD_x(unsigned int n_vecs)
 {
@@ -2921,7 +2921,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return fabs(this->m_CanonicalCorrelations[0]);
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::ConjGrad( typename antsSCCANObject<TInputImage,
                                      TRealType>::MatrixType& A,
@@ -3002,7 +3002,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return ( soln - b_in).one_norm() / b_in.size();
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::EvaluateEnergy( typename antsSCCANObject<TInputImage, TRealType>::MatrixType& A,
                   typename antsSCCANObject<TInputImage, TRealType>::VectorType&  x_k,
@@ -3018,7 +3018,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return e;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::GoldenSection( typename antsSCCANObject<TInputImage, TRealType>::MatrixType& A,
                  typename antsSCCANObject<TInputImage, TRealType>::VectorType&  x_k,
@@ -3076,7 +3076,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
     }
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::LineSearch( typename antsSCCANObject<TInputImage, TRealType>::MatrixType& A,
               typename antsSCCANObject<TInputImage, TRealType>::VectorType& x_k,
@@ -3110,7 +3110,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return bestalph;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseNLConjGrad( typename antsSCCANObject<TInputImage,
                                              TRealType>::MatrixType& A,
@@ -3228,7 +3228,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return minerr / A.rows();
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseNLPreConjGrad( typename antsSCCANObject<TInputImage,
                                                 TRealType>::MatrixType& A,
@@ -3267,7 +3267,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
          ( ( deltaminerr > 1.e-10 ) && ( minerr > convcrit ) && ( ct < maxits ) )
          )
     {
-    //    RealType spgoal = 100.0 * ( 1 - vnl_math_abs( this->m_FractionNonZeroP ) );
+    //    RealType spgoal = 100.0 * ( 1 - itk::Math::abs ( this->m_FractionNonZeroP ) );
     RealType alpha_denom = inner_product( p_k,  A.transpose() * ( A * p_k ) );
     RealType iprk = inner_product( r_k, z_k );
     RealType alpha_k = iprk / alpha_denom;
@@ -3299,7 +3299,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
       }
     VectorType yk = r_k1 - r_k;
     RealType   temp = inner_product( z_k, r_k );
-    if( vnl_math_abs( temp ) < 1.e-9 )
+    if( itk::Math::abs ( temp ) < 1.e-9 )
       {
       temp = 1;
       }
@@ -3320,7 +3320,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return finalerr;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::PowerIteration( typename antsSCCANObject<TInputImage,
                                            TRealType>::MatrixType& A,
@@ -3353,7 +3353,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return inner_product( A * evec, A * evec );
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::IHTPowerIteration( typename antsSCCANObject<TInputImage, TRealType>::MatrixType& A,
                      typename antsSCCANObject<TInputImage, TRealType>::VectorType& evecin,
@@ -3368,8 +3368,8 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   */
   A = A - A.min_value();
   VectorType evec = evecin;
-  unsigned int maxcoltoorth = ( unsigned int ) ( 1.0 / vnl_math_abs( this->m_FractionNonZeroP ) ) - 1;
-  if( evecin.two_norm() ==  0 )
+  unsigned int maxcoltoorth = ( unsigned int ) ( 1.0 / itk::Math::abs ( this->m_FractionNonZeroP ) ) - 1;
+  if( itk::Math::FloatAlmostEqual( evecin.two_norm(), itk::NumericTraits<typename VectorType::abs_t>::ZeroValue() ) )
     {
     evec = this->InitializeV( this->m_MatrixP, false );
     }
@@ -3446,13 +3446,13 @@ TRealType antsSCCANObject<TInputImage, TRealType>
 
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::IHTPowerIterationU( typename antsSCCANObject<TInputImage, TRealType>::MatrixType& A,
                      typename antsSCCANObject<TInputImage, TRealType>::VectorType& evecin,
                      unsigned int maxits, unsigned int maxorth )
 {
-  unsigned int maxcoltoorth = ( unsigned int ) ( 1.0 / vnl_math_abs( this->m_FractionNonZeroP ) ) - 1;
+  unsigned int maxcoltoorth = ( unsigned int ) ( 1.0 / itk::Math::abs ( this->m_FractionNonZeroP ) ) - 1;
   VectorType proj = evecin;
   RealType   rayquo = 0;
   RealType     bestrayquo = 0;
@@ -3519,12 +3519,12 @@ TRealType antsSCCANObject<TInputImage, TRealType>
 
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::RidgeCCA(unsigned int n_vecs)
 {
-  RealType taup = vnl_math_abs( this->m_FractionNonZeroP );
-  RealType tauq = vnl_math_abs( this->m_FractionNonZeroQ );
+  RealType taup = itk::Math::abs ( this->m_FractionNonZeroP );
+  RealType tauq = itk::Math::abs ( this->m_FractionNonZeroQ );
 
   if ( ! this->m_Silent )  std::cout << " ridge cca : taup " << taup << " tauq " << tauq << std::endl;
 
@@ -3621,7 +3621,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return this->m_CanonicalCorrelations[0];
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::RidgeRegression( typename antsSCCANObject<TInputImage,
                                             TRealType>::MatrixType& A,
@@ -3679,7 +3679,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return minerr;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::CGSPCA(unsigned int n_vecs )
 {
@@ -3769,7 +3769,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return this->m_CanonicalCorrelations[0];
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 void antsSCCANObject<TInputImage, TRealType>
 ::DeleteRow( typename antsSCCANObject<TInputImage,
                                       TRealType>::MatrixType& p_in,  unsigned int row )
@@ -3794,7 +3794,7 @@ void antsSCCANObject<TInputImage, TRealType>
   return;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 void antsSCCANObject<TInputImage, TRealType>
 ::LASSO_alg(  typename antsSCCANObject<TInputImage, TRealType>::MatrixType& X,
               typename antsSCCANObject<TInputImage, TRealType>::VectorType& y,
@@ -3858,7 +3858,7 @@ void antsSCCANObject<TInputImage, TRealType>
     } // iterations
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::LASSO_Cross()
 {
@@ -3975,7 +3975,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return predictionerror;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::LASSO( unsigned int n_vecs )
 {
@@ -4036,7 +4036,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return this->m_CanonicalCorrelations( 0 );
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseConjGradRidgeRegression( typename antsSCCANObject<TInputImage,
                                                           TRealType>::MatrixType& A,
@@ -4045,7 +4045,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
                                  unsigned int maxits, bool makesparse )
 {
   x_k.fill( 0 );
-  RealType spgoal = 100.0 * ( 1 - vnl_math_abs( this->m_FractionNonZeroP ) );
+  RealType spgoal = 100.0 * ( 1 - itk::Math::abs ( this->m_FractionNonZeroP ) );
   RealType lambda = 1.e2;
   if ( ! this->m_Silent )  std::cout << "SparseConjGradRidgeRegression: lambda " << lambda << " Soft? " <<   this->m_UseL1 << " fnp "
                    << this->m_FractionNonZeroP << std::endl;
@@ -4154,7 +4154,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return minerr;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::IHTRegression( typename antsSCCANObject<TInputImage,
                                           TRealType>::MatrixType& A,
@@ -4254,7 +4254,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return minerr;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::MatchingPursuit( typename antsSCCANObject<TInputImage,
                                             TRealType>::MatrixType& A,
@@ -4276,15 +4276,15 @@ TRealType antsSCCANObject<TInputImage, TRealType>
     VectorType corrb( x_k );
     for( unsigned int mm = 0; mm < A.cols(); mm++ )
       {
-      corrb( mm ) = vnl_math_abs( this->PearsonCorr( resid, A.get_column( mm ) ) );
+      corrb( mm ) = itk::Math::abs ( this->PearsonCorr( resid, A.get_column( mm ) ) );
       }
-    this->ReSoftThreshold( corrb, vnl_math_abs( this->m_FractionNonZeroP ), true );
+    this->ReSoftThreshold( corrb, itk::Math::abs ( this->m_FractionNonZeroP ), true );
 
     /** this debiases the solution */
     unsigned int nzct = 0;
     for( unsigned int mm = 0; mm < A.cols(); mm++ )
       {
-      if( vnl_math_abs( corrb( mm ) ) > 0 )
+      if( itk::Math::abs ( corrb( mm ) ) > 0 )
         {
         this->m_Indicator( mm, mm ) = 1;
         }
@@ -4300,7 +4300,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
         x_k( mm ) = lmsolv( nzct ); nzct++;
         }
       }
-    this->ReSoftThreshold( x_k, vnl_math_abs( this->m_FractionNonZeroP ), true );
+    this->ReSoftThreshold( x_k, itk::Math::abs ( this->m_FractionNonZeroP ), true );
     this->ClusterThresholdVariate( x_k, this->m_MaskImageP, this->m_MinClusterSizeP );
 
     this->m_Intercept = this->ComputeIntercept(  A, x_k, this->m_OriginalB );
@@ -4321,7 +4321,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return minerr;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::NetworkDecomposition(unsigned int n_vecs )
 {
@@ -4367,7 +4367,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
     unsigned int foldct = 0;
     for( unsigned int f = 0; f < this->m_MatrixP.rows(); f++ )
       {
-      if( folds( f ) == fold )
+      if( itk::Math::FloatAlmostEqual( folds( f ), static_cast<RealType>( fold ) ) )
         {
         foldct++;
         }
@@ -4381,7 +4381,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
     unsigned int dont_leave_out = 0;
     for( unsigned int f = 0; f < this->m_MatrixP.rows(); f++ )
       {
-      if( folds( f ) == fold )
+      if( itk::Math::FloatAlmostEqual( folds( f ), static_cast<RealType>( fold ) ) )
         {
         p_leave_out.set_row( leave_out, this->m_MatrixP.get_row( f ) );
         r_leave_out.set_row( leave_out, this->m_MatrixR.get_row( f ) );
@@ -4430,7 +4430,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
       }
     VectorType   original_b =  matrixR.get_column( 0 );
     unsigned int colind = extra_cols;
-    RealType     minerr1;
+    //NOT USED: RealType     minerr1;
     bool         addcol = false;
     matrixP = this->NormalizeMatrix( matrixP );
     while(  colind < this->m_VariatesP.cols()  )
@@ -4470,7 +4470,8 @@ TRealType antsSCCANObject<TInputImage, TRealType>
         //	randv.fill( 0 );
         // minerr1 = this->RidgeRegression(  matrixP ,  randv, bp, 1.e4 , 100 , false );/** biased but ok */
         // minerr1 = this->ConjGrad(  matrixP ,  randv, matrixP * bp , 0, 10000 );      this->SparsifyP( randv );
-        minerr1 = this->IHTRegression(  matrixP,  randv, bp, 0, 500, 0, true, true ); /** good */
+        //NOT USED: minerr1 =
+        this->IHTRegression(  matrixP,  randv, bp, 0, 500, 0, true, true ); /** good */
         if( cl < this->m_VariatesP.cols() )
           {
           this->m_VariatesP.set_column( cl, randv );
@@ -4511,7 +4512,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
         {
         for( unsigned int f = 0; f < this->m_MatrixP.rows(); f++ )
           {
-          if( folds( f ) == fold )
+          if( itk::Math::FloatAlmostEqual( folds( f ), static_cast<RealType>( fold ) ) )
             {
             this->m_CanonicalCorrelations( f ) = soln( fleave_out );
             RealType temp = fabs( soln( fleave_out ) - r_leave_out.get_column( 0 ) ( fleave_out ) );
@@ -4634,12 +4635,12 @@ TRealType antsSCCANObject<TInputImage, TRealType>
 
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseArnoldiSVD_Other( typename antsSCCANObject<TInputImage, TRealType>::MatrixType& A )
 {
-  if ( vnl_math_abs(this->m_RowSparseness) <= 1.e-9 ) return 0;
-  unsigned int maxrowtoorth = ( unsigned int ) ( 1.0 / vnl_math_abs( this->m_RowSparseness ) ) - 0;
+  if ( itk::Math::abs (this->m_RowSparseness) <= 1.e-9 ) return 0;
+  unsigned int maxrowtoorth = ( unsigned int ) ( 1.0 / itk::Math::abs ( this->m_RowSparseness ) ) - 0;
   unsigned int maxloop = 10;
   unsigned int loop = 0;
   double       convcrit = 1;
@@ -4688,7 +4689,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
 
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::BasicSVD()
 {
@@ -4783,7 +4784,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return this->m_CanonicalCorrelations[0];
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparseArnoldiSVD(unsigned int n_vecs )
 {
@@ -4896,7 +4897,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return fabs(this->m_CanonicalCorrelations[0]);
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::ComputeSPCAEigenvalues(unsigned int n_vecs, TRealType trace, bool orth )
 {
@@ -4948,7 +4949,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
         eigenvalue_i *= ip;
         }
       }
-    if( eigenvalue_i == 0 )
+    if( itk::Math::FloatAlmostEqual( eigenvalue_i, 0.0 ) )
       {
       this->m_VariatesP.set_column( i, this->InitializeV( this->m_MatrixP ) );
       }
@@ -4989,7 +4990,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return 0;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 typename antsSCCANObject<TInputImage, TRealType>::MatrixType
 antsSCCANObject<TInputImage, TRealType>
 ::GetCovMatEigenvectors( typename antsSCCANObject<TInputImage, TRealType>::MatrixType rin  )
@@ -5026,11 +5027,11 @@ antsSCCANObject<TInputImage, TRealType>
     }
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 bool antsSCCANObject<TInputImage, TRealType>
 ::CCAUpdate( unsigned int n_vecs, bool allowchange  , bool normbycov , unsigned int k )
 {
-  // srand (time(ITK_NULLPTR));
+  // srand (time(nullptr));
   RealType gsteP = this->m_GradStepP;
   RealType gsteQ = this->m_GradStepQ;
   this->m_FractionNonZeroP = this->m_SparsenessP( k );
@@ -5238,10 +5239,10 @@ bool antsSCCANObject<TInputImage, TRealType>
     this->m_CanonicalCorrelations[k] = this->PearsonCorr( proj1, proj2  );
     }
   // this->SortResults( n_vecs );
-  return this->m_CanonicalCorrelations.mean();
+  return ! itk::Math::FloatAlmostEqual( this->m_CanonicalCorrelations.mean(), 0.0 );
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::InitializeSCCA_simple( unsigned int n_vecs )
 {
@@ -5295,8 +5296,8 @@ TRealType antsSCCANObject<TInputImage, TRealType>
     this->SparsifyOther( qvec2 );
     qvec2 = qvec2 * this->m_MatrixQ;
     if (  qvec2.two_norm() > this->m_Epsilon ) qvec2 = qvec2 / qvec2.two_norm();
-    if ( vnl_math_abs(  this->PearsonCorr(  this->m_MatrixP * vec2,  this->m_MatrixQ * qvec2 )  ) >
-	 vnl_math_abs(  this->PearsonCorr(  this->m_MatrixP * vec,  this->m_MatrixQ * qvec )  ) )
+    if ( itk::Math::abs (  this->PearsonCorr(  this->m_MatrixP * vec2,  this->m_MatrixQ * qvec2 )  ) >
+	 itk::Math::abs (  this->PearsonCorr(  this->m_MatrixP * vec,  this->m_MatrixQ * qvec )  ) )
       {
       vec = vec2;
       qvec = qvec2;
@@ -5323,16 +5324,16 @@ TRealType antsSCCANObject<TInputImage, TRealType>
       }
     this->SparsifyP( vec );
     this->SparsifyQ( qvec );
-    RealType locor = vnl_math_abs( this->PearsonCorr(  this->m_MatrixP * vec,  this->m_MatrixQ * qvec ) );
-    if ( vnl_math_isnan( qvec.two_norm() ) )
+    RealType locor = itk::Math::abs ( this->PearsonCorr(  this->m_MatrixP * vec,  this->m_MatrixQ * qvec ) );
+    if ( std::isnan( qvec.two_norm() ) )
       {
       qvec = this->m_VariatesQ.get_column( kk );
-      locor = vnl_math_abs( this->PearsonCorr(  this->m_MatrixP * vec,  this->m_MatrixQ * qvec ) );
+      locor = itk::Math::abs ( this->PearsonCorr(  this->m_MatrixP * vec,  this->m_MatrixQ * qvec ) );
       }
-    if ( vnl_math_isnan( vec.two_norm() ) )
+    if ( std::isnan( vec.two_norm() ) )
       {
       vec = this->m_VariatesP.get_column( kk );
-      locor = vnl_math_abs( this->PearsonCorr(  this->m_MatrixP * vec,  this->m_MatrixQ * qvec ) );
+      locor = itk::Math::abs ( this->PearsonCorr(  this->m_MatrixP * vec,  this->m_MatrixQ * qvec ) );
       }
     this->m_VariatesP.set_column( kk, vec  );
     this->m_VariatesQ.set_column( kk, qvec );
@@ -5343,7 +5344,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
 }
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::InitializeSCCA( unsigned int n_vecs, unsigned int seeder )
 {
@@ -5378,7 +5379,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
     this->m_VariatesP.set_column( kk, vec );
     this->m_VariatesQ.set_column( kk, qvec );
     this->NormalizeWeights( kk );
-    totalcorr += vnl_math_abs( this->PearsonCorr(  this->m_MatrixP * vec,  this->m_MatrixQ * qvec ) );
+    totalcorr += itk::Math::abs ( this->PearsonCorr(  this->m_MatrixP * vec,  this->m_MatrixQ * qvec ) );
     }
   return totalcorr*0.5;
   //  this->CCAUpdate( n_vecs , false );
@@ -5388,7 +5389,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
 
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::SparsePartialArnoldiCCA(unsigned int n_vecs_in)
 {
@@ -5510,7 +5511,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   unsigned int       innerloop = 1;
   unsigned int       loop = 0;
   RealType           energy = 0;
-  RealType           lastenergy = 0;
+  //NOT USED: RealType           lastenergy = 0;
   VectorType gradstepsp( n_vecs , basegradstep );
   VectorType gradstepsq( n_vecs , basegradstep );
   if ( this->m_Covering == 0 || this->m_Covering == 2 )
@@ -5533,9 +5534,9 @@ TRealType antsSCCANObject<TInputImage, TRealType>
     // Arnoldi Iteration SCCA
     bool normbycov = true;
     bool changedgrad = this->CCAUpdate( n_vecs_in, true , normbycov, k );
-    lastenergy = energy;
-    energy = this->m_CanonicalCorrelations.one_norm() / ( float ) n_vecs_in;
-    if( this->m_GradStep < 1.e-12 ) // || ( vnl_math_abs( energy - lastenergy ) < this->m_Epsilon  && !changedgrad ) )
+    //NOT USED: lastenergy = energy;
+    energy = static_cast<RealType>( this->m_CanonicalCorrelations.one_norm() ) / static_cast<RealType>( n_vecs_in );
+    if( this->m_GradStep < 1.e-12 ) // || ( itk::Math::abs ( energy - lastenergy ) < this->m_Epsilon  && !changedgrad ) )
       {
       if ( ! this->m_Silent )  std::cout << " this->m_GradStep : " << this->m_GradStep << " energy : " << energy << " changedgrad : " << changedgrad << std::endl;
       }
@@ -5642,7 +5643,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
 */
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::IHTCCA(unsigned int n_vecs_in)
 {
@@ -5734,7 +5735,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
     energy = this->m_CanonicalCorrelations.one_norm() / n_vecs;
     if ( ! this->m_Silent )  std::cout << " Loop " << loop << " Corrs : " << this->m_CanonicalCorrelations << " CorrMean : " << energy
                      << std::endl;
-    if( vnl_math_abs( energy - lastenergy ) < 1.e-8 || energy < lastenergy )
+    if( itk::Math::abs ( energy - lastenergy ) < 1.e-8 || energy < lastenergy )
       {
       energyincreases = false;
       }
@@ -5761,7 +5762,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
     }
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 void antsSCCANObject<TInputImage, TRealType>
 ::WhitenDataSetForRunSCCANMultiple(unsigned int nvecs)
 {
@@ -5794,16 +5795,13 @@ void antsSCCANObject<TInputImage, TRealType>
       this->m_MatrixRp = this->NormalizeMatrix(this->m_OriginalMatrixR);
       }
     this->m_MatrixRp = ProjectionMatrix(this->m_MatrixRp);
-    if( this->m_Debug && this->m_VariatesP.cols() > 1 )
+    if( this->m_Debug && this->m_VariatesP.cols() > 1 && ! this->m_Silent )
       {
-      if ( ! this->m_Silent )  std::cout << " corr-pre "
-                       << this->PearsonCorr( (this->m_OriginalMatrixP * this->m_VariatesP).get_column(0),
-                            (this->m_OriginalMatrixP
-                             * this->m_VariatesP).get_column(1) ) << std::endl; if ( ! this->m_Silent )  std::cout << " corr-post "
-                                                                                                 << this->PearsonCorr( (
-                              this->
-                              m_MatrixP
-                              * this->m_VariatesP).get_column(0),
+        std::cout << " corr-pre "
+                  << this->PearsonCorr( (this->m_OriginalMatrixP * this->m_VariatesP).get_column(0),
+                            (this->m_OriginalMatrixP * this->m_VariatesP).get_column(1) ) << std::endl;
+	std::cout << " corr-post "
+                  << this->PearsonCorr( ( this-> m_MatrixP * this->m_VariatesP).get_column(0),
                             (this->m_MatrixP * this->m_VariatesP).get_column(1) ) << std::endl;
       }
 
@@ -5846,7 +5844,7 @@ void antsSCCANObject<TInputImage, TRealType>
 }
 
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 void antsSCCANObject<TInputImage, TRealType>
 ::NormalizeWeights(const unsigned int k )
 {
@@ -5858,7 +5856,7 @@ void antsSCCANObject<TInputImage, TRealType>
   this->m_VariatesQ.set_column( k, this->m_WeightsQ );
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 void antsSCCANObject<TInputImage, TRealType>
 ::NormalizeWeightsByCovariance(const unsigned int k, const TRealType taup, const TRealType tauq)
 {
@@ -5909,7 +5907,7 @@ void antsSCCANObject<TInputImage, TRealType>
     }
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType
 antsSCCANObject<TInputImage, TRealType>
 ::RunSCCAN2multiple( unsigned int n_vecs )
@@ -6163,7 +6161,7 @@ antsSCCANObject<TInputImage, TRealType>
   return this->m_CanonicalCorrelations[0]; // corrsum;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType antsSCCANObject<TInputImage, TRealType>
 ::RunSCCAN2()
 {
@@ -6236,7 +6234,7 @@ TRealType antsSCCANObject<TInputImage, TRealType>
   return truecorr;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 TRealType
 antsSCCANObject<TInputImage, TRealType>
 ::RunSCCAN3()
@@ -6317,7 +6315,7 @@ antsSCCANObject<TInputImage, TRealType>
   return truecorr;
 }
 
-template <class TInputImage, class TRealType>
+template <typename TInputImage, typename TRealType>
 void
 antsSCCANObject<TInputImage, TRealType>
 ::MRFFilterVariateMatrix()

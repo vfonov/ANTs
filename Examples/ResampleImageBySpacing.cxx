@@ -27,7 +27,7 @@ namespace ants
 {
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ResampleImageBySpacing( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int ResampleImageBySpacing( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   args.insert( args.begin(), "ResampleImageBySpacing" );
   int     argc = args.size();
@@ -38,7 +38,7 @@ int ResampleImageBySpacing( std::vector<std::string> args, std::ostream* /*out_s
     std::strncpy( argv[i], args[i].c_str(), args[i].length() );
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   class Cleanup_argv
   {
 public:
@@ -80,17 +80,17 @@ private:
     return EXIT_FAILURE;
     }
 
-  unsigned int Dimension = atoi(argv[1]);
+  unsigned int Dimension = std::stoi(argv[1]);
 
   if( Dimension == 2 )
     {
-    typedef   float InputPixelType;
-    typedef   float InternalPixelType;
-    typedef   float OutputPixelType;
+    using InputPixelType = float;
+    using InternalPixelType = float;
+    using OutputPixelType = float;
 
-    typedef itk::Image<InputPixelType,    2> InputImageType;
-    typedef itk::Image<InternalPixelType, 2> InternalImageType;
-    typedef itk::Image<OutputPixelType,   2> OutputImageType;
+    using InputImageType = itk::Image<InputPixelType, 2>;
+    using InternalImageType = itk::Image<InternalPixelType, 2>;
+    using OutputImageType = itk::Image<OutputPixelType, 2>;
 
     InputImageType::Pointer inputImage;
     ReadImage<InputImageType>( inputImage, argv[2] );
@@ -105,7 +105,7 @@ private:
 
     std::cout <<  " spacing " << spacing << " dim " << 2 << std::endl;
 
-    bool dosmooth = 1;
+    bool dosmooth = true;
     if( argc > 4 )
       {
       spacing[0] = atof(argv[4]);
@@ -116,17 +116,17 @@ private:
       }
     if( argc > 6 )
       {
-      dosmooth = atoi(argv[6]);
+      dosmooth = std::stoi(argv[6]);
       }
     int addvox = 0;
     if( argc > 7 )
       {
-      addvox = atoi(argv[7]);
+      addvox = std::stoi(argv[7]);
       }
     bool nn = false;
     if( argc > 8 )
       {
-      nn = atoi(argv[7]);
+      nn = std::stoi(argv[7]);
       }
 
     std::cout <<  " spacing2 " << spacing << std::endl;
@@ -136,9 +136,7 @@ private:
       {
       for( int sm = 0; sm < 2; sm++ )
         {
-        typedef itk::RecursiveGaussianImageFilter<
-            OutputImageType,
-            OutputImageType> GaussianFilterType;
+        using GaussianFilterType = itk::RecursiveGaussianImageFilter<OutputImageType, OutputImageType>;
 
         GaussianFilterType::Pointer smootherX = GaussianFilterType::New();
         smootherX->SetInput( smoothedImage );
@@ -168,17 +166,14 @@ private:
     // InternalImageType::ConstPointer smoothedImage = reader->GetOutput();
     // smoothedImage =SmoothImage<ImageType>(reader->GetOutput() , );
 
-    typedef itk::ResampleImageFilter<
-        InternalImageType, OutputImageType>  ResampleFilterType;
+    using ResampleFilterType = itk::ResampleImageFilter<InternalImageType, OutputImageType>;
 
     ResampleFilterType::Pointer resampler = ResampleFilterType::New();
 
-    typedef itk::IdentityTransform<double, 2> TransformType;
+    using TransformType = itk::IdentityTransform<double, 2>;
 
-    typedef itk::LinearInterpolateImageFunction<
-        InternalImageType, double>  InterpolatorType;
-    typedef itk::NearestNeighborInterpolateImageFunction<
-        InternalImageType, double>  InterpolatorType2;
+    using InterpolatorType = itk::LinearInterpolateImageFunction<InternalImageType, double>;
+    using InterpolatorType2 = itk::NearestNeighborInterpolateImageFunction<InternalImageType, double>;
 
     InterpolatorType::Pointer  interpolator = InterpolatorType::New();
     InterpolatorType2::Pointer interpolator2 = InterpolatorType2::New();
@@ -200,7 +195,7 @@ private:
     resampler->SetOutputSpacing( spacing );
 
     InputImageType::SizeType inputSize = inputImage->GetLargestPossibleRegion().GetSize();
-    typedef InputImageType::SizeType::SizeValueType SizeValueType;
+    using SizeValueType = InputImageType::SizeType::SizeValueType;
     InputImageType::SizeType size;
     for( int i = 0; i < 2; i++ )
       {
@@ -219,13 +214,13 @@ private:
 
   if( Dimension == 3 )
     {
-    typedef   float InputPixelType;
-    typedef   float InternalPixelType;
-    typedef   float OutputPixelType;
+    using InputPixelType = float;
+    using InternalPixelType = float;
+    using OutputPixelType = float;
 
-    typedef itk::Image<InputPixelType,    3> InputImageType;
-    typedef itk::Image<InternalPixelType, 3> InternalImageType;
-    typedef itk::Image<OutputPixelType,   3> OutputImageType;
+    using InputImageType = itk::Image<InputPixelType, 3>;
+    using InternalImageType = itk::Image<InternalPixelType, 3>;
+    using OutputImageType = itk::Image<OutputPixelType, 3>;
     InputImageType::Pointer inputImage;
     ReadImage<InputImageType>( inputImage, argv[2] );
 
@@ -239,7 +234,7 @@ private:
 
     std::cout <<  " spacing " << spacing << " dim " << 3 << std::endl;
 
-    bool dosmooth = 1;
+    bool dosmooth = true;
     if( argc > 4 )
       {
       spacing[0] = atof(argv[4]);
@@ -254,17 +249,17 @@ private:
       }
     if( argc > 7 )
       {
-      dosmooth = atoi(argv[7]);
+      dosmooth = std::stoi(argv[7]);
       }
     int addvox = 0;
     if( argc > 8 )
       {
-      addvox = atoi(argv[8]);
+      addvox = std::stoi(argv[8]);
       }
     bool nn = false;
     if( argc > 9 )
       {
-      nn = atoi(argv[9]);
+      nn = std::stoi(argv[9]);
       }
 
     std::cout <<  " spacing2 " << spacing << std::endl;
@@ -274,9 +269,7 @@ private:
       {
       for( int sm = 0; sm < 3; sm++ )
         {
-        typedef itk::RecursiveGaussianImageFilter<
-            OutputImageType,
-            OutputImageType> GaussianFilterType;
+        using GaussianFilterType = itk::RecursiveGaussianImageFilter<OutputImageType, OutputImageType>;
 
         GaussianFilterType::Pointer smootherX = GaussianFilterType::New();
         smootherX->SetInput( smoothedImage );
@@ -306,17 +299,14 @@ private:
     // InternalImageType::ConstPointer smoothedImage = reader->GetOutput();
     // smoothedImage =SmoothImage<ImageType>(reader->GetOutput() , );
 
-    typedef itk::ResampleImageFilter<
-        InternalImageType, OutputImageType>  ResampleFilterType;
+    using ResampleFilterType = itk::ResampleImageFilter<InternalImageType, OutputImageType>;
 
     ResampleFilterType::Pointer resampler = ResampleFilterType::New();
 
-    typedef itk::IdentityTransform<double, 3> TransformType;
+    using TransformType = itk::IdentityTransform<double, 3>;
 
-    typedef itk::LinearInterpolateImageFunction<
-        InternalImageType, double>  InterpolatorType;
-    typedef itk::NearestNeighborInterpolateImageFunction<
-        InternalImageType, double>  InterpolatorType2;
+    using InterpolatorType = itk::LinearInterpolateImageFunction<InternalImageType, double>;
+    using InterpolatorType2 = itk::NearestNeighborInterpolateImageFunction<InternalImageType, double>;
 
     InterpolatorType::Pointer  interpolator = InterpolatorType::New();
     InterpolatorType2::Pointer interpolator2 = InterpolatorType2::New();
@@ -338,7 +328,7 @@ private:
     resampler->SetOutputSpacing( spacing );
 
     InputImageType::SizeType inputSize = inputImage->GetLargestPossibleRegion().GetSize();
-    typedef InputImageType::SizeType::SizeValueType SizeValueType;
+    using SizeValueType = InputImageType::SizeType::SizeValueType;
     InputImageType::SizeType size;
     for( int i = 0; i < 3; i++ )
       {
@@ -357,12 +347,12 @@ private:
 /*ADDING 4-dimensional images */
 if( Dimension == 4 )
 {
-typedef float InputPixelType;
-typedef float InternalPixelType;
-typedef float OutputPixelType;
-typedef itk::Image<InputPixelType, 4> InputImageType;
-typedef itk::Image<InternalPixelType, 4> InternalImageType;
-typedef itk::Image<OutputPixelType, 4> OutputImageType;
+using InputPixelType = float;
+using InternalPixelType = float;
+using OutputPixelType = float;
+using InputImageType = itk::Image<InputPixelType, 4>;
+using InternalImageType = itk::Image<InternalPixelType, 4>;
+using OutputImageType = itk::Image<OutputPixelType, 4>;
 InputImageType::Pointer inputImage;
 ReadImage<InputImageType>( inputImage, argv[2] );
 const InputImageType::SpacingType& inputSpacing = inputImage->GetSpacing();
@@ -372,7 +362,7 @@ for( int i = 0; i < 4; i++ )
 spacing[i] = inputSpacing[i];
 }
 std::cout << " spacing " << spacing << " dim " << 4 << std::endl;
-bool dosmooth = 1;
+bool dosmooth = true;
 if( argc > 4 )
 {
 spacing[0] = atof(argv[4]);
@@ -391,17 +381,17 @@ spacing[3] = atof(argv[7]);
 }
 if( argc > 8 )
 {
-dosmooth = atoi(argv[8]);
+dosmooth = std::stoi(argv[8]);
 }
 int addvox = 0;
 if( argc > 9 )
 {
-addvox = atoi(argv[9]);
+addvox = std::stoi(argv[9]);
 }
 bool nn = false;
 if( argc > 9 )
 {
-nn = atoi(argv[10]);
+nn = std::stoi(argv[10]);
 }
 std::cout << " spacing2 " << spacing << std::endl;
 InternalImageType::Pointer smoothedImage = inputImage;
@@ -409,9 +399,7 @@ if( dosmooth )
 {
 for( int sm = 0; sm < 4; sm++ )
 {
-typedef itk::RecursiveGaussianImageFilter<
-OutputImageType,
-OutputImageType> GaussianFilterType;
+using GaussianFilterType = itk::RecursiveGaussianImageFilter<OutputImageType, OutputImageType>;
 GaussianFilterType::Pointer smootherX = GaussianFilterType::New();
 smootherX->SetInput( smoothedImage );
 const float sig = atof(argv[4 + sm]) / inputSpacing[sm] - 1.0;
@@ -437,14 +425,11 @@ smoothedImage = smootherX->GetOutput();
 // InternalImageType::ConstPointer smoothedImage = smootherY->GetOutput();
 // InternalImageType::ConstPointer smoothedImage = reader->GetOutput();
 // smoothedImage =SmoothImage<ImageType>(reader->GetOutput() , );
-typedef itk::ResampleImageFilter<
-InternalImageType, OutputImageType> ResampleFilterType;
+using ResampleFilterType = itk::ResampleImageFilter<InternalImageType, OutputImageType>;
 ResampleFilterType::Pointer resampler = ResampleFilterType::New();
-typedef itk::IdentityTransform<double, 4> TransformType;
-typedef itk::LinearInterpolateImageFunction<
-InternalImageType, double> InterpolatorType;
-typedef itk::NearestNeighborInterpolateImageFunction<
-InternalImageType, double> InterpolatorType2;
+using TransformType = itk::IdentityTransform<double, 4>;
+using InterpolatorType = itk::LinearInterpolateImageFunction<InternalImageType, double>;
+using InterpolatorType2 = itk::NearestNeighborInterpolateImageFunction<InternalImageType, double>;
 InterpolatorType::Pointer interpolator = InterpolatorType::New();
 InterpolatorType2::Pointer interpolator2 = InterpolatorType2::New();
 resampler->SetInterpolator( interpolator );
@@ -461,7 +446,7 @@ resampler->SetOutputParametersFromImage( inputImage );
 std::cout << " out space " << spacing << std::endl;
 resampler->SetOutputSpacing( spacing );
 InputImageType::SizeType inputSize = inputImage->GetLargestPossibleRegion().GetSize();
-typedef InputImageType::SizeType::SizeValueType SizeValueType;
+using SizeValueType = InputImageType::SizeType::SizeValueType;
 InputImageType::SizeType size;
 for( int i = 0; i < 4; i++ )
 {

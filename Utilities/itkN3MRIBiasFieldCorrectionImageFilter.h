@@ -60,7 +60,7 @@ namespace itk
  *     can reconstruct it using the class itkBSplineControlPointImageFilter.
  *     See the IJ article and the test file for an example.
  *  5. The 'Z' parameter in Sled's 1998 paper is the square root
- *     of the class variable 'm_WeinerFilterNoise'.
+ *     of the class variable 'm_WienerFilterNoise'.
  *
  * \author Nicholas J. Tustison
  *
@@ -83,9 +83,9 @@ namespace itk
  * Class definition for N3BiasFieldScaleCostFunction
  */
 
-template <class TInputImage, class TBiasFieldImage, class TMaskImage,
-          class TConfidenceImage>
-class N3BiasFieldScaleCostFunction
+template <typename TInputImage, typename TBiasFieldImage, typename TMaskImage,
+          typename TConfidenceImage>
+class N3BiasFieldScaleCostFunction final
   : public       SingleValuedCostFunction
 {
 public:
@@ -109,18 +109,18 @@ public:
   itkSetObjectMacro( MaskImage, TMaskImage );
   itkSetObjectMacro( ConfidenceImage, TConfidenceImage );
 
-  MeasureType GetValue( const ParametersType & parameters ) const ITK_OVERRIDE;
+  MeasureType GetValue( const ParametersType & parameters ) const override;
 
-  void GetDerivative( const ParametersType & parameters, DerivativeType & derivative ) const ITK_OVERRIDE;
+  void GetDerivative( const ParametersType & parameters, DerivativeType & derivative ) const override;
 
-  unsigned int GetNumberOfParameters() const ITK_OVERRIDE;
+  unsigned int GetNumberOfParameters() const override;
 
 protected:
   N3BiasFieldScaleCostFunction();
-  virtual ~N3BiasFieldScaleCostFunction() ITK_OVERRIDE;
+  ~N3BiasFieldScaleCostFunction() override;
 private:
-  N3BiasFieldScaleCostFunction(const Self &); // purposely not implemented
-  void operator=(const Self &);               // purposely not implemented
+  N3BiasFieldScaleCostFunction(const Self &) = delete;
+  void operator=(const Self &) = delete;
 
   typename TInputImage::Pointer                  m_InputImage;
   typename TBiasFieldImage::Pointer              m_BiasFieldImage;
@@ -131,10 +131,10 @@ private:
 /**
  * Class definition for N3MRIBiasFieldCorrectionImageFilter
  */
-template <class TInputImage, class TMaskImage = Image<unsigned char,
+template <typename TInputImage, typename TMaskImage = Image<unsigned char,
                                                       TInputImage::ImageDimension>,
           class TOutputImage = TInputImage>
-class N3MRIBiasFieldCorrectionImageFilter :
+class N3MRIBiasFieldCorrectionImageFilter final :
   public         ImageToImageFilter<TInputImage, TOutputImage>
 {
 public:
@@ -215,8 +215,8 @@ public:
   itkSetMacro( NumberOfHistogramBins, unsigned int );
   itkGetConstMacro( NumberOfHistogramBins, unsigned int );
 
-  itkSetMacro( WeinerFilterNoise, RealType );
-  itkGetConstMacro( WeinerFilterNoise, RealType );
+  itkSetMacro( WienerFilterNoise, RealType );
+  itkGetConstMacro( WienerFilterNoise, RealType );
 
   itkSetMacro( BiasFieldFullWidthAtHalfMaximum, RealType );
   itkGetConstMacro( BiasFieldFullWidthAtHalfMaximum, RealType );
@@ -256,16 +256,14 @@ public:
   itkGetConstMacro( CurrentConvergenceMeasurement, RealType );
 protected:
   N3MRIBiasFieldCorrectionImageFilter();
-  virtual ~N3MRIBiasFieldCorrectionImageFilter() ITK_OVERRIDE
-  {
-  };
-  void PrintSelf( std::ostream& os, Indent indent ) const ITK_OVERRIDE;
+  ~N3MRIBiasFieldCorrectionImageFilter() override = default;
+  void PrintSelf( std::ostream& os, Indent indent ) const override;
 
-  void GenerateData() ITK_OVERRIDE;
+  void GenerateData() override;
 
 private:
-  N3MRIBiasFieldCorrectionImageFilter( const Self & ); // purposely not implemented
-  void operator=( const Self & );                      // purposely not implemented
+  N3MRIBiasFieldCorrectionImageFilter( const Self & ) = delete;
+  void operator=( const Self & ) = delete;
 
   typename N3MRIBiasFieldCorrectionImageFilter<TInputImage, TMaskImage, TOutputImage>::RealImageType::Pointer
     SharpenImage( typename N3MRIBiasFieldCorrectionImageFilter<TInputImage, TMaskImage,
@@ -281,10 +279,10 @@ private:
     typename RealImageType::Pointer );
 
   /**
-   * Parameters for deconvolution with Weiner filter
+   * Parameters for deconvolution with Wiener filter
    */
   unsigned int m_NumberOfHistogramBins;
-  RealType     m_WeinerFilterNoise;
+  RealType     m_WienerFilterNoise;
   RealType     m_BiasFieldFullWidthAtHalfMaximum;
 
   /**

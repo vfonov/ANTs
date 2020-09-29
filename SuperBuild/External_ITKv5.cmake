@@ -19,7 +19,7 @@ ProjectDependancyPush(CACHED_proj ${proj})
 # even if other External_${ExtProjName}.cmake files are sourced by
 # SlicerMacroCheckExternalProjectDependency
 set(extProjName ITK) #The find_package known name
-set(proj      ITKv4) #This local name
+set(proj      ITKv5) #This local name
 set(${extProjName}_REQUIRED_VERSION ${${extProjName}_VERSION_MAJOR})  #If a required version is necessary, then set this, else leave blank
 
 #if(${USE_SYSTEM_${extProjName}})
@@ -114,8 +114,8 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
   set(${proj}_CMAKE_OPTIONS
       -DBUILD_TESTING:BOOL=OFF
       -DBUILD_EXAMPLES:BOOL=OFF
-      -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/${proj}-install
-      -DITK_LEGACY_REMOVE:BOOL=ON
+      -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_BINARY_DIR}/staging
+      -DITK_LEGACY_REMOVE:BOOL=OFF # <--- NEEDED TEMPORARILY until fixes for enum-class and ITK 5.1 release are required
       -DITK_FUTURE_LEGACY_REMOVE:BOOL=ON
       -DITKV3_COMPATIBILITY:BOOL=OFF
       -DITK_BUILD_DEFAULT_MODULES:BOOL=ON
@@ -128,6 +128,7 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
       -DITK_WRAPPING:BOOL=OFF #${BUILD_SHARED_LIBS} ## HACK:  QUICK CHANGE
       -DModule_MGHIO:BOOL=ON
       -DModule_ITKReview:BOOL=ON
+      -DModule_GenericLabelInterpolator:BOOL=ON
       ${${proj}_DCMTK_ARGS}
       ${${proj}_WRAP_ARGS}
       ${${proj}_FFTWF_ARGS}
@@ -138,7 +139,8 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
     if( USE_VTK STREQUAL "ON" )
       list(APPEND ${proj}_CMAKE_OPTIONS -DModule_ITKVtkGlue:BOOL=ON)
       if( USE_SYSTEM_VTK STREQUAL "OFF" )
-        list(APPEND ${proj}_CMAKE_OPTIONS -DVTK_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/VTK-install/lib/cmake/vtk-6.2 )
+        list(INSERT CMAKE_PREFIX_PATH 0 ${CMAKE_BINARY_DIR}/staging)
+        list(APPEND ${proj}_CMAKE_OPTIONS -DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH})
       endif()
       list(APPEND ${proj}_DEPENDENCIES VTK)
     else()
@@ -148,8 +150,9 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
 
   ### --- End Project specific additions
   set(${proj}_REPOSITORY ${git_protocol}://github.com/InsightSoftwareConsortium/ITK.git)
-  set(${proj}_GIT_TAG c5138560409c75408ff76bccff938f21e5dcafc6) ##
-  set(ITK_VERSION_ID ITK-4.12) ### NOTE: When updating GIT_TAG, also update ITK_VERSION_ID
+  # set(${proj}_REPOSITORY ${git_protocol}://github.com/stnava/ITK.git)
+  set(${proj}_GIT_TAG  1e708db2f586997e408cfdc2cea5114ae5575892)  # Type -> Enum  Update to ITKv5rc02 2020-03-18
+  set(ITK_VERSION_ID ITK-5.1) ### NOTE: When updating GIT_TAG, also update ITK_VERSION_ID
 
   ExternalProject_Add(${proj}
     GIT_REPOSITORY ${${proj}_REPOSITORY}
@@ -168,11 +171,12 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
       ${CMAKE_OSX_EXTERNAL_PROJECT_ARGS}
       ${COMMON_EXTERNAL_PROJECT_ARGS}
       ${${proj}_CMAKE_OPTIONS}
+      -DCMAKE_GENERATOR_PLATFORM:STRING=${CMAKE_GENERATOR_PLATFORM}
 ## We really do want to install in order to limit # of include paths INSTALL_COMMAND ""
     DEPENDS
       ${${proj}_DEPENDENCIES}
   )
-  set(${extProjName}_DIR ${CMAKE_BINARY_DIR}/${proj}-install/lib/cmake/${ITK_VERSION_ID})
+  set(${extProjName}_DIR ${CMAKE_BINARY_DIR}/staging/lib/cmake/${ITK_VERSION_ID})
 else()
   if(${USE_SYSTEM_${extProjName}})
     find_package(${extProjName} ${ITK_VERSION_MAJOR} REQUIRED)

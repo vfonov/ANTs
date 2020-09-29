@@ -32,7 +32,7 @@
 
 namespace ants
 {
-template <class TensorType>
+template <typename TensorType>
 double CalculateFractionalAnisotropy( TensorType tensor )
 {
   typename TensorType::EigenValuesArrayType eigenvalues;
@@ -57,15 +57,15 @@ double CalculateFractionalAnisotropy( TensorType tensor )
   double denominator = 0.0;
   for( unsigned int d = 0; d < TensorType::Dimension; d++ )
     {
-    numerator += vnl_math_sqr( eigenvalues[d] - mean );
-    denominator += vnl_math_sqr( eigenvalues[d] );
+    numerator += static_cast<double>( itk::Math::sqr( static_cast<double>( eigenvalues[d] ) - mean ) );
+    denominator += static_cast<double>( itk::Math::sqr( eigenvalues[d] ) );
     }
   fa = std::sqrt( ( 3.0 * numerator ) / ( 2.0 * denominator ) );
 
   return fa;
 }
 
-template <class TensorType>
+template <typename TensorType>
 double CalculateMeanDiffusivity( TensorType tensor )
 {
   typename TensorType::EigenValuesArrayType eigenvalues;
@@ -91,27 +91,26 @@ double CalculateMeanDiffusivity( TensorType tensor )
 template <unsigned int ImageDimension>
 int CreateDTICohort( itk::ants::CommandLineParser *parser )
 {
-  typedef float                                                    RealType;
-  typedef itk::SymmetricSecondRankTensor<RealType, ImageDimension> TensorType;
-  typedef itk::VariableSizeMatrix<typename TensorType::ValueType>  MatrixType;
+  using RealType = float;
+  using TensorType = itk::SymmetricSecondRankTensor<RealType, ImageDimension>;
+  using MatrixType = itk::VariableSizeMatrix<typename TensorType::ValueType>;
 
-  typedef itk::Image<RealType, ImageDimension> ImageType;
+  using ImageType = itk::Image<RealType, ImageDimension>;
 
-  typedef unsigned int                          LabelType;
-  typedef itk::Image<LabelType, ImageDimension> MaskImageType;
-  typename MaskImageType::Pointer maskImage = ITK_NULLPTR;
+  using LabelType = unsigned int;
+  using MaskImageType = itk::Image<LabelType, ImageDimension>;
+  typename MaskImageType::Pointer maskImage = nullptr;
 
-  typedef itk::Image<TensorType, ImageDimension> TensorImageType;
-  typename TensorImageType::Pointer inputAtlas = ITK_NULLPTR;
+  using TensorImageType = itk::Image<TensorType, ImageDimension>;
+  typename TensorImageType::Pointer inputAtlas = nullptr;
 
-  typedef itk::ImageFileReader<TensorImageType> TensorReaderType;
+  using TensorReaderType = itk::ImageFileReader<TensorImageType>;
   typename TensorReaderType::Pointer reader = TensorReaderType::New();
 
-  typedef itk::DecomposeTensorFunction<MatrixType,
-                                       typename MatrixType::ValueType, MatrixType> DecomposerType;
+  using DecomposerType = itk::DecomposeTensorFunction<MatrixType, typename MatrixType::ValueType, MatrixType>;
   typename DecomposerType::Pointer decomposer = DecomposerType::New();
 
-  typedef itk::Statistics::MersenneTwisterRandomVariateGenerator RandomizerType;
+  using RandomizerType = itk::Statistics::MersenneTwisterRandomVariateGenerator;
   typename RandomizerType::Pointer randomizer = RandomizerType::New();
   randomizer->Initialize();
 
@@ -180,7 +179,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
   if( maskImageOption && maskImageOption->GetNumberOfFunctions() )
     {
     std::string inputFile = maskImageOption->GetFunction( 0 )->GetName();
-    typedef itk::ImageFileReader<MaskImageType> ReaderType;
+    using ReaderType = itk::ImageFileReader<MaskImageType>;
     typename ReaderType::Pointer maskreader = ReaderType::New();
     maskreader->SetFileName( inputFile.c_str() );
     try
@@ -212,8 +211,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
       ItF.Set( CalculateFractionalAnisotropy<TensorType>( ItA.Get() ) );
       }
 
-    typedef itk::BinaryThresholdImageFilter<ImageType, MaskImageType>
-      ThresholderType;
+    using ThresholderType = itk::BinaryThresholdImageFilter<ImageType, MaskImageType>;
     typename ThresholderType::Pointer thresholder = ThresholderType::New();
     thresholder->SetInput( faImage );
     thresholder->SetInsideValue( 1 );
@@ -229,8 +227,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
   //
   // Get label information for pathology option
   //
-  typedef itk::LabelGeometryImageFilter<MaskImageType, ImageType>
-    LabelGeometryFilterType;
+  using LabelGeometryFilterType = itk::LabelGeometryImageFilter<MaskImageType, ImageType>;
   typename LabelGeometryFilterType::Pointer labelGeometry =
     LabelGeometryFilterType::New();
   labelGeometry->SetInput( maskImage );
@@ -294,7 +291,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
       for( unsigned int n = 0; n < labels.size(); n++ )
         {
         RealType percentage = percentageVoxels;
-        if( percentage > 1.0 )
+        if( percentage > itk::NumericTraits<RealType>::OneValue() )
           {
           percentage /= static_cast<RealType>( labelGeometry->GetVolume( labels[n] ) );
           }
@@ -308,9 +305,9 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
       {
       for( unsigned int n = 0; n < pathologyOption->GetNumberOfFunctions(); n++ )
         {
-        LabelType whichClass = parser->Convert<LabelType>( pathologyOption->GetFunction( n )->GetName() );
+        auto whichClass = parser->Convert<LabelType>( pathologyOption->GetFunction( n )->GetName() );
 
-        std::vector<LabelType>::const_iterator it = std::find( labels.begin(), labels.end(), whichClass );
+        auto it = std::find( labels.begin(), labels.end(), whichClass );
 
         if( it == labels.end() )
           {
@@ -335,7 +332,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
           }
 
         RealType percentage = percentageVoxels;
-        if( percentage > 1.0 )
+        if( percentage > itk::NumericTraits<RealType>::OneValue() )
           {
           percentage /= static_cast<RealType>( labelGeometry->GetVolume( *it ) );
           }
@@ -420,8 +417,8 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
           else
             {
             M(k, count) = eigenvalues[2];
-            M(k, totalMaskVolume + count) =
-              0.5 * ( eigenvalues[0] + eigenvalues[1] );
+            M(k, totalMaskVolume + count) = static_cast<RealType>( 0.5 )
+              * ( eigenvalues[0] + eigenvalues[1] );
             }
           ++count;
           }
@@ -459,7 +456,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
   //
   // Get DWI parameters
   //
-  typename ImageType::Pointer b0Image = ITK_NULLPTR;
+  typename ImageType::Pointer b0Image = nullptr;
   unsigned int                       numberOfDirections = 0;
   std::vector<vnl_vector<RealType> > directions;
   std::vector<RealType>              bvalues;
@@ -476,7 +473,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
   if( dwiOption && dwiOption->GetNumberOfFunctions() &&
       dwiOption->GetFunction( 0 )->GetNumberOfParameters() > 1 )
     {
-    typedef itk::ImageFileReader<ImageType> ReaderType;
+    using ReaderType = itk::ImageFileReader<ImageType>;
     typename ReaderType::Pointer reader2 = ReaderType::New();
     reader2->SetFileName( dwiOption->GetFunction( 0 )->GetParameter( 0 ) );
     reader2->Update();
@@ -591,13 +588,12 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
       }
 
     // copy atlas
-    typedef itk::ImageDuplicator<TensorImageType> DuplicatorType;
+    using DuplicatorType = itk::ImageDuplicator<TensorImageType>;
     typename DuplicatorType::Pointer duplicator = DuplicatorType::New();
     duplicator->SetInputImage( inputAtlas );
     duplicator->Update();
 
-    typename TensorImageType::Pointer dti = duplicator->GetModifiableOutput();
-    dti->DisconnectPipeline();
+    typename TensorImageType::Pointer dti = duplicator->GetOutput();
 
     // If we are to apply intersubject variability, we calculate random
     // projection.
@@ -605,9 +601,9 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
     if( applyISV )
       {
       vnl_vector<RealType> R( ISV.cols() );
-      for( unsigned int d = 0; d < R.size(); d++ )
+      for(float & d : R)
         {
-        R[d] = randomizer->GetNormalVariate( 0.0, 1.0 );
+        d = randomizer->GetNormalVariate( 0.0, 1.0 );
         }
       eigenISVProjection = ISV * R;
       }
@@ -639,7 +635,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
         eigenvalues[2] = eigenvalues[1];
         }
 
-      std::vector<LabelType>::const_iterator it = std::find( labels.begin(),
+      auto it = std::find( labels.begin(),
                                                              labels.end(), label );
       if( it == labels.end() )
         {
@@ -656,8 +652,8 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
       //
       RealType pathologyLongitudinalChange = 0.0;
       RealType pathologyTransverseChange = 0.0;
-      if( ( n == 0 || n > numberOfControls ) && randomizer->GetUniformVariate(
-            0.0, 1.0 ) <= pathologyParameters(labelIndex, 2) )
+      if( ( n == 0 || n > numberOfControls ) && static_cast<RealType>(
+            randomizer->GetUniformVariate( 0.0, 1.0 ) ) <= pathologyParameters(labelIndex, 2) )
         {
         pathologyLongitudinalChange = pathologyParameters(labelIndex, 0);
         pathologyTransverseChange = pathologyParameters(labelIndex, 1);
@@ -683,11 +679,11 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
         newEigenvalues[1] = eigenvalues[1]
           + eigenvalues[1] * pathologyLongitudinalChange
           + isvLongitudinalProjection;
-        newEigenvalues[0] = eigenvalues[0] * ( 1.0 + eigenvalues[0] )
+        newEigenvalues[0] = eigenvalues[0] * ( itk::NumericTraits<RealType>::OneValue() + eigenvalues[0] )
           * pathologyTransverseChange + isvTransverseProjection;
         if( newEigenvalues[0] >= newEigenvalues[1] )
           {
-          newEigenvalues[0] = newEigenvalues[1] - 1.0e-6;
+          newEigenvalues[0] = newEigenvalues[1] - static_cast<RealType>( 1.0e-6 );
           }
         }
       else
@@ -695,20 +691,20 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
         newEigenvalues[2] = eigenvalues[2]
           + eigenvalues[2] * pathologyLongitudinalChange
           + isvLongitudinalProjection;
-        RealType eigenAverage = 0.5 * ( eigenvalues[1] + eigenvalues[0] );
-        newEigenvalues[1] = ( 2.0 * eigenAverage
-                              * ( 1.0 + pathologyTransverseChange )
-                              + isvTransverseProjection ) / ( eigenvalues[0] / eigenvalues[1] + 1.0 );
+        RealType eigenAverage = static_cast<RealType>( 0.5 ) * ( eigenvalues[1] + eigenvalues[0] );
+        newEigenvalues[1] = ( static_cast<RealType>( 2.0 ) * eigenAverage
+                              * ( itk::NumericTraits<RealType>::OneValue() + pathologyTransverseChange )
+                              + isvTransverseProjection ) / ( eigenvalues[0] / eigenvalues[1] + itk::NumericTraits<RealType>::OneValue() );
         if( newEigenvalues[1] >= newEigenvalues[2] )
           {
-          newEigenvalues[1] = newEigenvalues[2] - 1.0e-6;
+          newEigenvalues[1] = newEigenvalues[2] - static_cast<RealType>( 1.0e-6 );
           }
         newEigenvalues[0] = ( eigenvalues[0] / eigenvalues[1] )
           * newEigenvalues[1];
         }
       for( unsigned int d = 0; d < ImageDimension; d++ )
         {
-        if( vnl_math_isnan( newEigenvalues[d] ) )
+        if( std::isnan( newEigenvalues[d] ) )
           {
           newEigenvalues[d] = 0.0;
           }
@@ -718,7 +714,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
         {
         newEigenvalues[0] = newEigenvalues[1];
         }
-      if( ImageDimension == 3 && newEigenvalues[2] < 0 )
+      if( ImageDimension == 3 && newEigenvalues[2] < itk::NumericTraits<RealType>::ZeroValue() )
         {
         newEigenvalues[2] = newEigenvalues[1];
         }
@@ -745,14 +741,14 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
 
       if( label != 0 && n == 0 )
         {
-        meanFAandMD(labelIndex, 0) +=
-          CalculateFractionalAnisotropy<TensorType>( tensor );
-        meanFAandMD(labelIndex, 1) +=
-          CalculateMeanDiffusivity<TensorType>( tensor );
-        meanFAandMD(labelIndex, 2) +=
-          CalculateFractionalAnisotropy<TensorType>( newTensor );
-        meanFAandMD(labelIndex, 3) +=
-          CalculateMeanDiffusivity<TensorType>( newTensor );
+        meanFAandMD(labelIndex, 0) += static_cast<RealType>(
+          CalculateFractionalAnisotropy<TensorType>( tensor ) );
+        meanFAandMD(labelIndex, 1) += static_cast<RealType>(
+          CalculateMeanDiffusivity<TensorType>( tensor ) );
+        meanFAandMD(labelIndex, 2) += static_cast<RealType>(
+          CalculateFractionalAnisotropy<TensorType>( newTensor ) );
+        meanFAandMD(labelIndex, 3) += static_cast<RealType>(
+          CalculateMeanDiffusivity<TensorType>( newTensor ) );
         meanFAandMD(labelIndex, 4)++;
         }
       else if( n != 0 )
@@ -837,7 +833,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
           TensorType tensor = It.Get();
           for( unsigned int i = 0; i < tensor.GetNumberOfComponents(); i++ )
             {
-            if( vnl_math_isnan( tensor[i] ) )
+            if( std::isnan( tensor[i] ) )
               {
               tensor[i] = 0.0;
               }
@@ -859,12 +855,12 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
           // Add Rician noise
           RealType realNoise = 0.0;
           RealType imagNoise = 0.0;
-          if( noiseSigma > 0.0 )
+          if( noiseSigma > itk::NumericTraits<RealType>::ZeroValue() )
             {
             realNoise = randomizer->GetNormalVariate( 0.0,
-                                                      vnl_math_sqr( noiseSigma ) );
+                                                      itk::Math::sqr( noiseSigma ) );
             imagNoise = randomizer->GetNormalVariate( 0.0,
-                                                      vnl_math_sqr( noiseSigma ) );
+                                                      itk::Math::sqr( noiseSigma ) );
             }
           RealType realSignal = signal + realNoise;
           RealType imagSignal = imagNoise;
@@ -878,7 +874,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
             ItD.Set( finalSignal );
             }
           }
-        typedef itk::ImageFileWriter<ImageType> WriterType;
+        using WriterType = itk::ImageFileWriter<ImageType>;
         typename WriterType::Pointer writer = WriterType::New();
         writer->SetFileName( dwiImageNames[d].c_str() );
         writer->SetInput( dwi );
@@ -891,7 +887,7 @@ int CreateDTICohort( itk::ants::CommandLineParser *parser )
 
 void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
-  typedef itk::ants::CommandLineParser::OptionType OptionType;
+  using OptionType = itk::ants::CommandLineParser::OptionType;
 
     {
     std::string description =
@@ -1065,7 +1061,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int CreateDTICohort( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int CreateDTICohort( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -1083,7 +1079,7 @@ int CreateDTICohort( std::vector<std::string> args, std::ostream* /*out_stream =
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -1181,7 +1177,7 @@ private:
       return EXIT_FAILURE;
       }
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(
-        filename.c_str(), itk::ImageIOFactory::ReadMode );
+        filename.c_str(), itk::ImageIOFactory::FileModeEnum::ReadMode );
     dimension = imageIO->GetNumberOfDimensions();
     }
 

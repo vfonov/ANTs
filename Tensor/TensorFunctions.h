@@ -1,5 +1,5 @@
-#ifndef _TensorFunctions_cxx_
-#define _TensorFunctions_cxx_
+#ifndef TensorFunctions_cxx
+#define TensorFunctions_cxx
 
 // #include "itkSmallStrainDiffusionTensorReorientationImageFilter.h"
 // #include "itkVectorIndexSelectionCastImageFilter.h"
@@ -55,7 +55,7 @@ unsigned int Columns(const itk::VariableSizeMatrix<TFloat> & mat)
 
 }
 
-template <class TensorType, class MatrixType>
+template <typename TensorType, typename MatrixType>
 void Vector2Matrix( TensorType & dtv, MatrixType & dtm )
 {
   // dtm(0, 0) = dtv[0];
@@ -75,7 +75,7 @@ void Vector2Matrix( TensorType & dtv, MatrixType & dtm )
     }
 }
 
-template <class TensorType, class MatrixType>
+template <typename TensorType, typename MatrixType>
 MatrixType Vector2Matrix( TensorType dtv )
 {
   MatrixType dtm(3, 3);
@@ -85,7 +85,7 @@ MatrixType Vector2Matrix( TensorType dtv )
   return dtm;
 }
 
-template <class TensorType, class MatrixType>
+template <typename TensorType, typename MatrixType>
 TensorType Matrix2Vector( MatrixType dtm )
 {
   TensorType dtv;
@@ -108,7 +108,7 @@ TensorType Matrix2Vector( MatrixType dtm )
   return dtv;
 }
 
-template <class TensorType, class MatrixType>
+template <typename TensorType, typename MatrixType>
 void EigenAnalysis(TensorType dtv,  MatrixType & evals, MatrixType & evecs)
 {
   MatrixType dtm = Vector2Matrix<TensorType, MatrixType>(dtv);
@@ -118,7 +118,7 @@ void EigenAnalysis(TensorType dtv,  MatrixType & evals, MatrixType & evecs)
   decomposer.EvaluateSymmetricEigenDecomposition( dtm, evals, evecs );
 }
 
-template <class TensorType, class VectorType>
+template <typename TensorType, typename VectorType>
 float DiffusionCoefficient( TensorType dtv, VectorType direction, bool normalized = false)
 {
   vnl_matrix<double> tensor(3, 3);
@@ -135,14 +135,14 @@ float DiffusionCoefficient( TensorType dtv, VectorType direction, bool normalize
   tangentmat(2, 0) = direction[2];
 
   vnl_matrix<double> fddmat = tangentmat.transpose() * tensor * tangentmat;
-  float              fdd = (float) fddmat(0, 0);
+  double             fdd = fddmat(0, 0);
 
   if( normalized > 0 )
     {
     fdd = fdd / (tensor[0][0] + tensor[1][1] + tensor[2][2]);
     }
 
-  return fdd;
+  return static_cast<float>(fdd);
 }
 
 namespace tensorHelper
@@ -161,7 +161,7 @@ unsigned int size(const itk::Vector<TFloat, NDim> &)
 }
 
 }
-template <class TensorType>
+template <typename TensorType>
 TensorType TensorLogAndExp( TensorType dtv, bool takelog, bool & success)
 {
   float eps = 1.e-12, mag = 0;
@@ -170,7 +170,7 @@ TensorType TensorLogAndExp( TensorType dtv, bool takelog, bool & success)
     {
     float ff = dtv[jj];
     mag += ff * ff;
-    if( vnl_math_isnan( ff ) || vnl_math_isinf(ff)   )
+    if( std::isnan( ff ) || std::isinf(ff)   )
       {
       dtv.Fill(0); // dtv[0]=eps;   dtv[3]=eps;  dtv[5]=eps;
       success = false;
@@ -190,7 +190,7 @@ TensorType TensorLogAndExp( TensorType dtv, bool takelog, bool & success)
     unsigned int jj;
     for( jj = 0; indices[jj] < tensorHelper::size(dtv); ++jj )
       {
-      if( dtv[indices[jj]] != 0.0 )
+      if( ! itk::Math::FloatAlmostEqual( static_cast<double>( dtv[indices[jj]] ), 0.0 ) )
         {
         break;
         }
@@ -219,12 +219,12 @@ TensorType TensorLogAndExp( TensorType dtv, bool takelog, bool & success)
   double e3 = D(2, 2);
   // float peigeps=1.e-12;
 
-  if( fabs(e3) < eps )
-    {
-    // success = false;
-    // std::cout << "-4" << std::flush;
-    // return dtv;
-    }
+  // if( fabs(e3) < eps )
+  //   {
+  //   // success = false;
+  //   // std::cout << "-4" << std::flush;
+  //   // return dtv;
+  //   }
 
   MatrixType eigmat(3, 3);
   eigmat.Fill(0);
@@ -249,9 +249,9 @@ TensorType TensorLogAndExp( TensorType dtv, bool takelog, bool & success)
     eigmat(2, 2) = exp(e3);
     }
 
-  if( vnl_math_isnan(eigmat(0, 0) ) ||
-      vnl_math_isnan(eigmat(1, 1) ) ||
-      vnl_math_isnan(eigmat(2, 2) ) )
+  if( std::isnan(eigmat(0, 0) ) ||
+      std::isnan(eigmat(1, 1) ) ||
+      std::isnan(eigmat(2, 2) ) )
     {
     dtv.Fill(0);
     success = false;
@@ -265,26 +265,26 @@ TensorType TensorLogAndExp( TensorType dtv, bool takelog, bool & success)
   return dtv2;
 }
 
-template <class TensorType>
+template <typename TensorType>
 TensorType TensorLog( TensorType dtv, bool success = true )
 {
   return TensorLogAndExp<TensorType>( dtv, true, success );
 }
 
-template <class TensorType>
+template <typename TensorType>
 TensorType TensorExp( TensorType dtv, bool /* takelog */, bool success = true)
 {
   return TensorLogAndExp<TensorType>( dtv, false, success );
 }
 
-template <class TensorType>
+template <typename TensorType>
 bool IsRealTensor( TensorType dtv )
 {
   bool isreal = true;
 
   for( unsigned int i = 0; i < 6; i++ )
     {
-    if( !vnl_math_isfinite( dtv[i] ) )
+    if( !std::isfinite( dtv[i] ) )
       {
       isreal = false;
       }
@@ -292,15 +292,16 @@ bool IsRealTensor( TensorType dtv )
   return isreal;
 }
 
-template <class TensorType>
+template <typename TensorType>
 float  GetTensorFA( TensorType dtv )
 {
 
-  // Check for zero diffusion (probably background) and return zero FA 
+  // Check for zero diffusion (probably background) and return zero FA
   // if that's the case
-  if (dtv[0] + dtv[3] + dtv[5] == 0.0f) 
+  typename TensorType::ValueType sum = dtv[0] + dtv[3] + dtv[5];
+  if (itk::Math::FloatAlmostEqual( sum, itk::NumericTraits<typename TensorType::ValueType>::ZeroValue() ) )
     {
-      return 0.0f;
+      return itk::NumericTraits<float>::ZeroValue();
     }
 
   typedef vnl_matrix<double> MatrixType;
@@ -332,7 +333,7 @@ float  GetTensorFA( TensorType dtv )
   return fa;
 }
 
-template <class TensorType>
+template <typename TensorType>
 float  GetTensorFANumerator( TensorType dtv )
 {
   typedef vnl_matrix<double> MatrixType;
@@ -362,7 +363,7 @@ float  GetTensorFANumerator( TensorType dtv )
   return numer;
 }
 
-template <class TensorType>
+template <typename TensorType>
 float  GetTensorFADenominator( TensorType dtv )
 {
   typedef vnl_matrix<double> MatrixType;
@@ -391,7 +392,7 @@ float  GetTensorFADenominator( TensorType dtv )
   return denom;
 }
 
-template <class TVectorType, class TTensorType>
+template <typename TVectorType, typename TTensorType>
 float  GetMetricTensorCost(  TVectorType dpath,  TTensorType dtv, unsigned int matrixpower)
 {
   typedef vnl_matrix<double> MatrixType;
@@ -409,9 +410,9 @@ float  GetMetricTensorCost(  TVectorType dpath,  TTensorType dtv, unsigned int m
   double                            e2 = (eig.D(1, 1) );
   double                            e3 = (eig.D(2, 2) );
   double                            etot = e1 + e2 + e3;
-  if( etot == 0 )
+  if( itk::Math::FloatAlmostEqual( etot, 0.0 ) )
     {
-    etot = 1;
+    etot = 1.0;
     }
 
   MatrixType vec(3, 1);
@@ -430,7 +431,7 @@ float  GetMetricTensorCost(  TVectorType dpath,  TTensorType dtv, unsigned int m
   return sqrt(cost);
 }
 
-template <class TVectorType, class TTensorType>
+template <typename TVectorType, typename TTensorType>
 TVectorType ChangeTensorByVector(  TVectorType dpath,  TTensorType dtv, float epsilon)
 {
   typedef vnl_matrix<double> MatrixType;
@@ -447,9 +448,9 @@ TVectorType ChangeTensorByVector(  TVectorType dpath,  TTensorType dtv, float ep
   double                            e2 = (eig.D(1, 1) );
   double                            e1 = (eig.D(2, 2) );
   double                            etot = e1 + e2 + e3;
-  if( etot == 0 )
+  if( itk::Math::FloatAlmostEqual( etot, 0.0 ) )
     {
-    etot = 1;
+    etot = 1.0;
     }
 
   MatrixType vec(3, 1);
@@ -473,7 +474,7 @@ TVectorType ChangeTensorByVector(  TVectorType dpath,  TTensorType dtv, float ep
   float temp;
   temp = (vec.transpose() * evec1)(0, 0);
   temp = sqrt(temp * temp);
-  e1 *= ( 1.0 - epsilon * temp);
+  e1 *= ( 1.0 - static_cast<double>( epsilon * temp ) );
   if( e1 < 1.e-11 )
     {
     e1 = 1.e-11;
@@ -481,7 +482,7 @@ TVectorType ChangeTensorByVector(  TVectorType dpath,  TTensorType dtv, float ep
 
   temp = (vec.transpose() * evec2)(0, 0);
   temp = sqrt(temp * temp);
-  e2 *= ( 1.0 - epsilon * temp);
+  e2 *= ( 1.0 - static_cast<double>( epsilon * temp ) );
   if( e2 < 1.e-11 )
     {
     e2 = 1.e-11;
@@ -489,7 +490,7 @@ TVectorType ChangeTensorByVector(  TVectorType dpath,  TTensorType dtv, float ep
 
   temp = (vec.transpose() * evec3)(0, 0);
   temp = sqrt(temp * temp);
-  e3 *= ( 1.0 - epsilon * temp);
+  e3 *= ( 1.0 - static_cast<double>( epsilon * temp ) );
   if( e3 < 1.e-11 )
     {
     e3 = 1.e-11;
@@ -508,35 +509,38 @@ TVectorType ChangeTensorByVector(  TVectorType dpath,  TTensorType dtv, float ep
   return newtens;
 }
 
-template <class TTensorType>
+template <typename TTensorType>
 float  GetTensorADC( TTensorType dtv,  unsigned int opt = 0)
 {
+  typename TTensorType::ValueType sum = dtv[0] + dtv[3] + dtv[5];
+
   if( opt <= 1 )
     {
-    return ( dtv[0] + dtv[3] + dtv[5] ) / 3.0;
+    return ( sum / static_cast<typename TTensorType::ValueType>( 3.0 ) );
     }
   float eps = 1.e-9, mag = 0;
   for( unsigned int jj = 0; jj < 6; jj++ )
     {
     float ff = dtv[jj];
     mag += ff * ff;
-    if( vnl_math_isnan( ff ) || vnl_math_isinf(ff)   )
+    if( std::isnan( ff ) || std::isinf(ff)   )
       {
-      return 0;
+      return itk::NumericTraits<float>::ZeroValue();
       }
     }
   mag = sqrt(mag);
 
-  if(  dtv[1] == 0 && dtv[2] == 0 && dtv[4] == 0 )
+  if( itk::Math::FloatAlmostEqual( dtv[1], itk::NumericTraits<typename TTensorType::ValueType>::ZeroValue() ) &&
+      itk::Math::FloatAlmostEqual( dtv[2], itk::NumericTraits<typename TTensorType::ValueType>::ZeroValue() ) &&
+      itk::Math::FloatAlmostEqual( dtv[4], itk::NumericTraits<typename TTensorType::ValueType>::ZeroValue() ) )
     {
-    return 0;
+    return itk::NumericTraits<float>::ZeroValue();
     }
   if( mag < eps )
     {
-    return 0;
+    return itk::NumericTraits<float>::ZeroValue();
     }
 
-  itk::Vector<float, 6> dtv2;
   typedef vnl_matrix<double> MatrixType;
   MatrixType DT(3, 3);
   DT.fill(0);
@@ -588,7 +592,7 @@ float  GetTensorADC( TTensorType dtv,  unsigned int opt = 0)
     }
 }
 
-template <class TTensorType>
+template <typename TTensorType>
 itk::RGBPixel<unsigned char>   GetTensorRGB( TTensorType dtv )
 {
   typedef TTensorType TensorType;
@@ -600,7 +604,7 @@ itk::RGBPixel<unsigned char>   GetTensorRGB( TTensorType dtv )
     {
     float ff = dtv[jj];
     mag += ff * ff;
-    if( vnl_math_isnan( ff ) || vnl_math_isinf(ff)   )
+    if( std::isnan( ff ) || std::isinf(ff)   )
       {
       return zero;
       }
@@ -609,7 +613,9 @@ itk::RGBPixel<unsigned char>   GetTensorRGB( TTensorType dtv )
 
   itk::RGBPixel<unsigned char> rgb;
 
-  if(  dtv[1] == 0 && dtv[2] == 0 && dtv[4] == 0 )
+  if( itk::Math::FloatAlmostEqual( dtv[1], itk::NumericTraits<typename TTensorType::ValueType>::ZeroValue() ) &&
+      itk::Math::FloatAlmostEqual( dtv[2], itk::NumericTraits<typename TTensorType::ValueType>::ZeroValue() ) &&
+      itk::Math::FloatAlmostEqual( dtv[4], itk::NumericTraits<typename TTensorType::ValueType>::ZeroValue() ) )
     {
     return zero;
     }
@@ -632,7 +638,7 @@ itk::RGBPixel<unsigned char>   GetTensorRGB( TTensorType dtv )
   return rgb;
 }
 
-template <class TTensorType>
+template <typename TTensorType>
 itk::RGBPixel<float>   GetTensorPrincipalEigenvector( TTensorType dtv )
 {
   itk::RGBPixel<float> zero;
@@ -643,23 +649,24 @@ itk::RGBPixel<float>   GetTensorPrincipalEigenvector( TTensorType dtv )
     {
     float ff = dtv[jj];
     mag += ff * ff;
-    if( vnl_math_isnan( ff ) || vnl_math_isinf(ff)   )
+    if( std::isnan( ff ) || std::isinf(ff)   )
       {
       return zero;
       }
     }
   mag = sqrt(mag);
 
-  if(  dtv[1] == 0 && dtv[2] == 0 && dtv[4] == 0 )
+  if( itk::Math::FloatAlmostEqual( dtv[1], itk::NumericTraits<typename TTensorType::ValueType>::ZeroValue() ) &&
+      itk::Math::FloatAlmostEqual( dtv[2], itk::NumericTraits<typename TTensorType::ValueType>::ZeroValue() ) &&
+      itk::Math::FloatAlmostEqual( dtv[4], itk::NumericTraits<typename TTensorType::ValueType>::ZeroValue() ) )
     {
-    return zero;
+    return itk::NumericTraits<float>::ZeroValue();
     }
   if( mag < eps )
     {
-    return zero;
+    return itk::NumericTraits<float>::ZeroValue();
     }
 
-  itk::Vector<float, 6> dtv2;
   typedef vnl_matrix<double> MatrixType;
   MatrixType DT(3, 3);
   DT.fill(0);
@@ -681,16 +688,16 @@ itk::RGBPixel<float>   GetTensorPrincipalEigenvector( TTensorType dtv )
   float yy = dtv[3];
   float yz = dtv[4];
   float zz = dtv[5];
-  float isp = ( xx * xx + yy * yy + zz * zz + 2.0 * (xy * xy + xz * xz + yz * yz) );
+  float isp = ( xx * xx + yy * yy + zz * zz + 2.0f * (xy * xy + xz * xz + yz * yz) );
 
   float fa = 0.0;
-  if( isp > 0.0 )
+  if( isp > 0.0f )
     {
     float trace = dtv[0];
     trace += dtv[3];
     trace += dtv[5];
-    float anisotropy = 3.0 * isp - trace * trace;
-    fa = ( std::sqrt(anisotropy / ( 2.0 * isp ) ) );
+    float anisotropy = 3.0f * isp - trace * trace;
+    fa = ( std::sqrt(anisotropy / ( 2.0f * isp ) ) );
     }
 
   // rgb[0]=eig.V(2,0)*fa*255;//+eig.V(1,0)*e2;
@@ -713,7 +720,7 @@ itk::RGBPixel<float>   GetTensorPrincipalEigenvector( TTensorType dtv )
   return rgb;
 }
 
-template <class TTensorType>
+template <typename TTensorType>
 itk::Vector<float>   GetTensorPrincipalEigenvector( TTensorType dtv, unsigned int whichvec)
 {
   itk::Vector<float, 3> zero;
@@ -724,14 +731,16 @@ itk::Vector<float>   GetTensorPrincipalEigenvector( TTensorType dtv, unsigned in
     {
     float ff = dtv[jj];
     mag += ff * ff;
-    if( vnl_math_isnan( ff ) || vnl_math_isinf(ff)   )
+    if( std::isnan( ff ) || std::isinf(ff)   )
       {
       return zero;
       }
     }
   mag = sqrt(mag);
 
-  if(  dtv[1] == 0 && dtv[2] == 0 && dtv[4] == 0 )
+  if( itk::Math::FloatAlmostEqual( dtv[1], itk::NumericTraits<typename TTensorType::ValueType>::ZeroValue() ) &&
+      itk::Math::FloatAlmostEqual( dtv[2], itk::NumericTraits<typename TTensorType::ValueType>::ZeroValue() ) &&
+      itk::Math::FloatAlmostEqual( dtv[4], itk::NumericTraits<typename TTensorType::ValueType>::ZeroValue() ) )
     {
     return zero;
     }
@@ -740,7 +749,6 @@ itk::Vector<float>   GetTensorPrincipalEigenvector( TTensorType dtv, unsigned in
     return zero;
     }
 
-  itk::Vector<float, 6> dtv2;
   typedef vnl_matrix<double> MatrixType;
   MatrixType DT(3, 3);
   DT.fill(0);
@@ -762,9 +770,9 @@ itk::Vector<float>   GetTensorPrincipalEigenvector( TTensorType dtv, unsigned in
   float yy = dtv[3];
   float yz = dtv[4];
   float zz = dtv[5];
-  float isp = ( xx * xx + yy * yy + zz * zz + 2.0 * (xy * xy + xz * xz + yz * yz) );
+  float isp = ( xx * xx + yy * yy + zz * zz + 2.0f * (xy * xy + xz * xz + yz * yz) );
 
-  if( isp > 0.0 )
+  if( isp > 0.0f )
     {
     float trace = dtv[0];
     trace += dtv[3];
@@ -778,7 +786,7 @@ itk::Vector<float>   GetTensorPrincipalEigenvector( TTensorType dtv, unsigned in
   return rgb;
 }
 
-template <class TTensorType>
+template <typename TTensorType>
 static float GetMetricTensorCost(  itk::Vector<float, 3> dpath,  TTensorType dtv )
 {
   typedef vnl_matrix<double> MatrixType;
@@ -795,7 +803,7 @@ static float GetMetricTensorCost(  itk::Vector<float, 3> dpath,  TTensorType dtv
   double                            e2 = (eig.D(1, 1) );
   double                            e3 = (eig.D(2, 2) );
   double                            etot = e1 + e2 + e3;
-  if( etot == 0 )
+  if( itk::Math::AlmostEquals( etot, 0.0 ) )
     {
     etot = 1;
     }
@@ -812,7 +820,7 @@ static float GetMetricTensorCost(  itk::Vector<float, 3> dpath,  TTensorType dtv
   return cost;
 }
 
-template <class TensorType, class VersorTensorType, class MatrixType>
+template <typename TensorType, typename VersorTensorType, typename MatrixType>
 VersorTensorType VersorTensor( TensorType dtv )
 {
   typedef itk::VariableSizeMatrix<typename MatrixType::ValueType> EigenMatrixType;
@@ -852,7 +860,7 @@ VersorTensorType VersorTensor( TensorType dtv )
   return dtq;
 }
 
-template <class TensorType, class VersorTensorType, class MatrixType>
+template <typename TensorType, typename VersorTensorType, typename MatrixType>
 VersorTensorType VersorTensor( TensorType dtv, MatrixType frame )
 {
   typedef itk::VariableSizeMatrix<typename MatrixType::ValueType> EigenMatrixType;

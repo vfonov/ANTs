@@ -4,8 +4,8 @@
 #include <deque>
 #include <string>
 #include <vector>
-#include <stdio.h>
-#include <math.h>
+#include <cstdio>
+#include <cmath>
 #include <iostream>
 #include <fstream>
 
@@ -42,7 +42,6 @@ TRAN_FILE_TYPE CheckFileType(const char * const str)
     {
     return INVALID_FILE;
     }
-  return AFFINE_FILE;
 }
 
 TRAN_FILE_TYPE CheckFileType(const std::string & str)
@@ -118,7 +117,7 @@ bool get_a_double_number(const char * const str, double & v)
     {
     return false;     // OVERFLOW
     }
-  if( (errno == ERANGE && v == 0.0) )
+  if( ( errno == ERANGE && itk::Math::FloatAlmostEqual(v, 0.0) ) )
     {
     return false;     // UNDERFLOW
     }
@@ -131,9 +130,9 @@ bool get_a_double_number(const char * const str, double & v)
 
 void DisplayOptQueue(const TRAN_OPT_QUEUE & opt_queue)
 {
-  const int kQueueSize = opt_queue.size();
+  const itk::SizeValueType kQueueSize = opt_queue.size();
 
-  for( int i = 0; i < kQueueSize; i++ )
+  for( itk::SizeValueType i = 0; i < kQueueSize; i++ )
     {
     std::cout << "[" << i << "/" << kQueueSize << "]: ";
 
@@ -159,7 +158,7 @@ void DisplayOptQueue(const TRAN_OPT_QUEUE & opt_queue)
         std::cout << "HEADER";
         }
         break;
-      default:
+      case INVALID_FILE: default:
         {
         std::cout << "Invalid Format!!!";
         }
@@ -197,7 +196,7 @@ void DisplayOpt(const TRAN_OPT & opt)
       std::cout << "HEADER";
       }
       break;
-    default:
+    case INVALID_FILE: default:
       {
       std::cout << "Invalid Format!!!";
       }
@@ -210,7 +209,7 @@ void DisplayOpt(const TRAN_OPT & opt)
   std::cout << ": " << opt.filename << std::endl;
 }
 
-std::string GetPreferredTransformFileType(void)
+std::string GetPreferredTransformFileType()
 {
   // return ".mat";
   return ".txt";

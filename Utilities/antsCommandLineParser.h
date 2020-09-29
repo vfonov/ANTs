@@ -10,8 +10,8 @@
      PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
-#ifndef __antsCommandLineParser_h
-#define __antsCommandLineParser_h
+#ifndef antsCommandLineParser_h
+#define antsCommandLineParser_h
 
 #include "antsCommandLineOption.h"
 
@@ -22,7 +22,7 @@
 
 #include <list>
 #include <sstream>
-#include <stdio.h>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -48,7 +48,7 @@ namespace ants
     {10, 20, 30} as "10x20x30".
 */
 
-class CommandLineParser
+class CommandLineParser final
   : public       DataObject
 {
 public:
@@ -59,10 +59,10 @@ public:
   typedef SmartPointer<const Self> ConstPointer;
 
   /** Method for creation through the object factory. */
-  itkNewMacro( Self );
+  itkNewMacro( Self )
 
   /** Run-time type information (and related methods). */
-  itkTypeMacro( CommandLineParser, DataObject );
+  itkTypeMacro( CommandLineParser, DataObject )
 
   typedef CommandLineOption              OptionType;
   typedef std::list<OptionType::Pointer> OptionListType;
@@ -84,11 +84,11 @@ public:
 
   void PrintMenu( std::ostream& os, Indent indent, bool printShortVersion = false ) const;
 
-  itkSetStringMacro( Command );
-  itkGetStringMacro( Command );
+  itkSetStringMacro( Command )
+  itkGetStringMacro( Command )
 
-  itkSetStringMacro( CommandDescription );
-  itkGetStringMacro( CommandDescription );
+  itkSetStringMacro( CommandDescription )
+  itkGetStringMacro( CommandDescription )
 
   OptionListType GetOptions() const
   {
@@ -109,7 +109,7 @@ public:
   void AssignStages();
 
 
-  template <class TValue>
+  template <typename TValue>
   TValue Convert( std::string optionString ) const
     {
     //Strip whitespace at end
@@ -123,12 +123,12 @@ public:
       std::string internalTypeName( typeid(value).name() );
       itkExceptionMacro( "ERROR: Parse error occured during command line argument processing\n"
         << "ERROR: Unable to convert '" << optionString
-        << "' to type '" << internalTypeName << "' as " << ConvertToHumanReadable(internalTypeName) << std::endl);
+        << "' to type '" << internalTypeName << "' as " << ConvertToHumanReadable(internalTypeName) << std::endl)
       }
     return value;
     }
 
-  template <class TValue>
+  template <typename TValue>
   std::vector<TValue> ConvertVector( std::string optionString ) const
   {
     //Strip whitespace at end
@@ -154,15 +154,13 @@ public:
 
 protected:
   CommandLineParser();
-  virtual ~CommandLineParser() ITK_OVERRIDE
-  {
-  }
+  ~CommandLineParser() override = default;
 
-  void PrintSelf( std::ostream& os, Indent indent ) const ITK_OVERRIDE;
+  void PrintSelf( std::ostream& os, Indent indent ) const override;
 
 private:
-  CommandLineParser( const Self & ); // purposely not implemented
-  void operator=( const Self & );    // purposely not implemented
+  CommandLineParser( const Self & ) = delete;
+  void operator=( const Self & ) = delete;
 
   std::vector<std::string> RegroupCommandLineArguments( unsigned int, char * * );
 

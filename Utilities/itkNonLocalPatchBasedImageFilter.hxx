@@ -71,7 +71,7 @@ NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>
   this->m_TargetImageRegion = this->GetInput()->GetRequestedRegion();
 }
 
-template <class TInputImage, class TOutputImage>
+template <typename TInputImage, typename TOutputImage>
 typename NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>::InputImagePixelVectorType
 NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>
 ::VectorizeImageListPatch( const InputImageList &imageList, const IndexType index, const bool normalize )
@@ -88,7 +88,7 @@ NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>
   return patchVector;
 }
 
-template <class TInputImage, class TOutputImage>
+template <typename TInputImage, typename TOutputImage>
 typename NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>::InputImagePixelVectorType
 NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>
 ::VectorizeImagePatch( const InputImagePointer image, const IndexType index, const bool normalize )
@@ -127,7 +127,7 @@ NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>
   return patchVector;
 }
 
-template <class TInputImage, class TOutputImage>
+template <typename TInputImage, typename TOutputImage>
 void
 NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>
 ::GetMeanAndStandardDeviationOfVectorizedImagePatch(
@@ -143,15 +143,15 @@ NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>
     if( std::isfinite( *it ) )
       {
       sum += *it;
-      sumOfSquares += vnl_math_sqr( *it );
-      count += 1.0;
+      sumOfSquares += itk::Math::sqr ( *it );
+      count += itk::NumericTraits<RealType>::OneValue();
       }
     }
   mean = sum / count;
-  standardDeviation = std::sqrt( ( sumOfSquares - count * vnl_math_sqr( mean ) ) / ( count - 1.0 ) );
+  standardDeviation = std::sqrt( ( sumOfSquares - count * itk::Math::sqr( mean ) ) / ( count - itk::NumericTraits<RealType>::OneValue() ) );
 }
 
-template <class TInputImage, class TOutputImage>
+template <typename TInputImage, typename TOutputImage>
 typename NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>::RealType
 NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>
 ::ComputeNeighborhoodPatchSimilarity( const InputImageList &imageList, const IndexType index,
@@ -179,15 +179,15 @@ NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>
       bool isInBounds = this->m_TargetImageRegion.IsInside( neighborhoodIndex );
       if( isInBounds && std::isfinite( patchVectorY[count] ) )
         {
-        RealType x = static_cast<RealType>( imageList[i]->GetPixel( neighborhoodIndex ) );
-        RealType y = static_cast<RealType>( patchVectorY[count] );
+        auto x = static_cast<RealType>( imageList[i]->GetPixel( neighborhoodIndex ) );
+        auto y = static_cast<RealType>( patchVectorY[count] );
 
         sumX += x;
-        sumOfSquaresX += vnl_math_sqr( x );
+        sumOfSquaresX += itk::Math::sqr ( x );
         sumXY += ( x * y );
 
-        sumOfSquaredDifferencesXY += vnl_math_sqr( y - x );
-        N += 1.0;
+        sumOfSquaredDifferencesXY += itk::Math::sqr ( y - x );
+        N += itk::NumericTraits<RealType>::OneValue();
         }
       ++count;
       }
@@ -196,17 +196,17 @@ NonLocalPatchBasedImageFilter<TInputImage, TOutputImage>
   // If we are on the boundary, a neighborhood patch might not overlap
   // with the image.  If we have 2 voxels or less for a neighborhood patch
   // we don't consider it to be a suitable match.
-  if( N < 3.0 )
+  if( N < static_cast<RealType>( 3.0 ) )
     {
     return NumericTraits<RealType>::max();
     }
 
   if( this->m_SimilarityMetric == PEARSON_CORRELATION )
     {
-    RealType varianceX = sumOfSquaresX - vnl_math_sqr( sumX ) / N;
+    RealType varianceX = sumOfSquaresX - itk::Math::sqr ( sumX ) / N;
     varianceX = std::max( varianceX, static_cast<RealType>( 1.0e-6 ) );
 
-    RealType measure = vnl_math_sqr( sumXY ) / varianceX;
+    RealType measure = itk::Math::sqr ( sumXY ) / varianceX;
     if( sumXY > 0 )
       {
       return -measure;

@@ -6,8 +6,8 @@ namespace ants
 /** \class antsRegistrationOptimizerCommandIterationUpdate
  *  \brief observe the optimizer for traditional registration methods
  */
-template <class ParametersValueType, unsigned VImageDimension, class TOptimizer>
-class antsRegistrationOptimizerCommandIterationUpdate : public itk::Command
+template <typename ParametersValueType, unsigned VImageDimension, typename TOptimizer>
+class antsRegistrationOptimizerCommandIterationUpdate final : public itk::Command
 {
 public:
   typedef antsRegistrationOptimizerCommandIterationUpdate Self;
@@ -37,19 +37,19 @@ protected:
     this->m_origFixedImage = ImageType::New();
     this->m_origMovingImage = ImageType::New();
     this->m_ComputeFullScaleCCInterval = 0;
-    this->m_WriteInterationsOutputsInIntervals = 0;
+    this->m_WriteIterationsOutputsInIntervals = 0;
     this->m_CurrentStageNumber = 0;
-    this->m_CurLevel = -1;
+    this->m_CurrentLevel = itk::NumericTraits<unsigned int>::ZeroValue();
   }
 
 public:
 
-  void Execute(itk::Object *caller, const itk::EventObject & event) ITK_OVERRIDE
+  void Execute(itk::Object *caller, const itk::EventObject & event) final
   {
     Execute( (const itk::Object *) caller, event);
   }
 
-  void Execute(const itk::Object *, const itk::EventObject & event) ITK_OVERRIDE
+  void Execute(const itk::Object *, const itk::EventObject & event) final
   {
 #if 0
     if( typeid( event ) == typeid( itk::InitializeEvent ) )
@@ -93,18 +93,13 @@ public:
 #endif
     if( typeid( event ) == typeid( itk::IterationEvent ) )
       {
-      // const unsigned int curLevel = this->m_Optimizer->GetCurrentLevel();
-      const unsigned int curIter = this->m_Optimizer->GetCurrentIteration() + 1;
-      if( curIter == 1 )
+      // currentIteration indexed from 1 for printing to the screen and naming output
+      const unsigned int currentIteration = this->m_Optimizer->GetCurrentIteration() + 1;
+      if( currentIteration == 1 )
         {
-        ++this->m_CurLevel;
-        }
+        this->m_Optimizer->SetNumberOfIterations( this->m_NumberOfIterations[this->m_CurrentLevel] );
+        this->m_CurrentLevel++;
 
-      const unsigned int lCurrentIteration = this->m_Optimizer->GetCurrentIteration() + 1;
-
-
-      if( lCurrentIteration  == 1 )
-        {
         if( this->m_ComputeFullScaleCCInterval != 0 )
           {
           // Print header line one time
@@ -124,8 +119,8 @@ public:
       MeasureType        metricValue = 0.0;
       const unsigned int lastIteration = this->m_Optimizer->GetNumberOfIterations();
       if( ( this->m_ComputeFullScaleCCInterval != 0 ) &&
-          ( lCurrentIteration == 1 || ( lCurrentIteration % this->m_ComputeFullScaleCCInterval == 0 ) ||
-            lCurrentIteration == lastIteration) )
+          ( currentIteration == 1 || ( currentIteration % this->m_ComputeFullScaleCCInterval == 0 ) ||
+            currentIteration == lastIteration) )
         {
         // This function finds the similarity value between the original fixed image and the original moving images
         // using a CC metric type with radius 4.
@@ -133,9 +128,9 @@ public:
         this->UpdateFullScaleMetricValue(this->m_Optimizer, metricValue);
         }
 
-      if( ( this->m_WriteInterationsOutputsInIntervals != 0 ) &&
-          ( lCurrentIteration == 1 || (lCurrentIteration % this->m_WriteInterationsOutputsInIntervals == 0 ) ||
-         lCurrentIteration == lastIteration) )
+      if( ( this->m_WriteIterationsOutputsInIntervals != 0 ) &&
+          ( currentIteration == 1 || (currentIteration % this->m_WriteIterationsOutputsInIntervals == 0 ) ||
+         currentIteration == lastIteration) )
         {
         // This function writes the output volume of each iteration to the disk.
         // The feature can be used to observe the progress of the registration process at each iteration,
@@ -148,12 +143,12 @@ public:
         }                 // will appear before line, else a free space will be printed to keep visual alignment.
 
       this->Logger() << "2DIAGNOSTIC, "
-                     << std::setw(5) << lCurrentIteration << ", "
+                     << std::setw(5) << currentIteration << ", "
                      << std::scientific << std::setprecision(12) << this->m_Optimizer->GetValue() << ", "
                      << std::scientific << std::setprecision(12) << this->m_Optimizer->GetConvergenceValue() << ", "
                      << std::setprecision(4) << now << ", "
                      << std::setprecision(4) << (now - this->m_lastTotalTime)  << ", ";
-      if( ( this->m_ComputeFullScaleCCInterval != 0 ) && std::fabs(metricValue) > 1e-7 )
+      if( ( this->m_ComputeFullScaleCCInterval != 0 ) && std::fabs(metricValue) > static_cast<MeasureType>( 1e-7 ) )
         {
         this->Logger() << std::scientific << std::setprecision(12) << metricValue
                        << std::flush << std::endl;
@@ -162,8 +157,6 @@ public:
         {
         this->Logger() << std::flush << std::endl;
         }
-
-      this->m_Optimizer->SetNumberOfIterations( this->m_NumberOfIterations[this->m_CurLevel] );
 
       this->m_lastTotalTime = now;
       m_clock.Start();
@@ -177,7 +170,7 @@ public:
 
   itkSetMacro( ComputeFullScaleCCInterval, unsigned int );
 
-  itkSetMacro( WriteInterationsOutputsInIntervals, unsigned int );
+  itkSetMacro( WriteIterationsOutputsInIntervals, unsigned int );
 
   itkSetMacro( CurrentStageNumber, unsigned int );
 
@@ -382,24 +375,24 @@ public:
 
     // write the results to the disk
     std::stringstream currentFileName;
-    currentFileName << "Stage" << this->m_CurrentStageNumber + 1 << "_level" << this->m_CurLevel;
+    currentFileName << "Stage" << this->m_CurrentStageNumber + 1 << "_level" << this->m_CurrentLevel;
     /*
     The name arrangement of written files are important to us.
     To prevent: "Iter1 Iter10 Iter2 Iter20" we use the following style.
     Then the order is: "Iter1 Iter2 ... Iters10 ... Itert20"
     */
 
-    const unsigned int curIter = this->m_Optimizer->GetCurrentIteration() + 1;
+    const unsigned int currentIteration = this->m_Optimizer->GetCurrentIteration() + 1;
 
-    if( curIter < 10 )
+    if( currentIteration < 10 )
       {
-      currentFileName << "_Iter000" << curIter << ".nii.gz";
+      currentFileName << "_Iter000" << currentIteration << ".mnc";
       }
-    else if( curIter < 100 )
+    else if( currentIteration < 100 )
       {
       currentFileName << "_Iters" << curIter << ".mnc";
       }
-    else if( curIter < 1000 )
+    else if( currentIteration < 1000 )
       {
       currentFileName << "_Itert" << curIter << ".mnc";
       }
@@ -443,12 +436,12 @@ private:
   itk::RealTimeClock::TimeStampType m_lastTotalTime;
 
   unsigned int m_ComputeFullScaleCCInterval;
-  unsigned int m_WriteInterationsOutputsInIntervals;
+  unsigned int m_WriteIterationsOutputsInIntervals;
   unsigned int m_CurrentStageNumber;
-  unsigned int m_CurLevel;
+  unsigned int m_CurrentLevel;
 
   typename ImageType::Pointer       m_origFixedImage;
   typename ImageType::Pointer       m_origMovingImage;
 };
-}; // end namespace ants
+} // end namespace ants
 #endif // antsRegistrationOptimizerCommandIterationUpdate__h_

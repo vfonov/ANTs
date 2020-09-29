@@ -6,9 +6,9 @@
 namespace itk
 {
 template <
-  class TOutputImage,
-  class TDisplacementField,
-  class TTransform
+  typename TOutputImage,
+  typename TDisplacementField,
+  typename TTransform
   >
 class DisplacementFieldFromMultiTransformFilter :
   public         WarpImageMultiTransformFilter<TOutputImage, TOutputImage, TDisplacementField, TTransform>
@@ -57,24 +57,6 @@ public:
 
   typedef typename Superclass::PointType PointType;
 
-  void GenerateInputRequestedRegion() ITK_OVERRIDE
-  {
-    Superclass::GenerateInputRequestedRegion();
-  }
-
-  void BeforeThreadedGenerateData() ITK_OVERRIDE
-  {
-  };
-
-  void AfterThreadedGenerateData() ITK_OVERRIDE
-  {
-  };
-
-  void GenerateOutputInformation() ITK_OVERRIDE
-  {
-    // call the superclass's implementation
-    Superclass::GenerateOutputInformation();
-  };
 protected:
   DisplacementFieldFromMultiTransformFilter() : Superclass()
   {
@@ -83,19 +65,13 @@ protected:
     Superclass::m_EdgePaddingValue.Fill(kMaxDisp);
   }
 
-  virtual ~DisplacementFieldFromMultiTransformFilter() ITK_OVERRIDE
-  {
-  };
-  void PrintSelf(std::ostream& os, Indent indent) const ITK_OVERRIDE
-  {
-    Superclass::PrintSelf(os, indent);
-  };
+  ~DisplacementFieldFromMultiTransformFilter() {};
 
   /** WarpImageMultiTransformFilter is implemented as a multi-threaded filter.
    * As such, it needs to provide and implementation for
    * ThreadedGenerateData(). */
   void ThreadedGenerateData(const OutputImageRegionType& outputRegionForThread,
-                            ThreadIdType threadId ) ITK_OVERRIDE
+                            ThreadIdType threadId ) override
   {
     OutputImagePointer outputPtr = this->GetOutput();
 

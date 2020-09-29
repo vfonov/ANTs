@@ -17,7 +17,7 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
-#include <stdio.h>
+#include <cstdio>
 #include "itkImage.h"
 #include "itkImageFileWriter.h"
 #include "itkImageFileReader.h"
@@ -29,14 +29,14 @@ namespace ants
 template <unsigned int ImageDimension>
 int ConvertType(int argc, char *argv[])
 {
-  typedef  unsigned char                             outPixelType;
-  typedef  float                                     floatPixelType;
-  typedef  float                                     inPixelType;
-  typedef itk::Image<inPixelType, ImageDimension>    ImageType;
-  typedef itk::Image<floatPixelType, ImageDimension> IntermediateType;
-  typedef itk::Image<outPixelType, ImageDimension>   OutImageType;
-  typedef itk::ImageFileReader<ImageType>            readertype;
-  typedef itk::ImageFileWriter<OutImageType>         writertype;
+  using outPixelType = unsigned char;
+  using floatPixelType = float;
+  using inPixelType = float;
+  using ImageType = itk::Image<inPixelType, ImageDimension>;
+  using IntermediateType = itk::Image<floatPixelType, ImageDimension>;
+  using OutImageType = itk::Image<outPixelType, ImageDimension>;
+  using readertype = itk::ImageFileReader<ImageType>;
+  using writertype = itk::ImageFileWriter<OutImageType>;
 
   typename readertype::Pointer reader = readertype::New();
   if( argc < 2 )
@@ -48,22 +48,22 @@ int ConvertType(int argc, char *argv[])
   reader->Update();
   std::cout << " Updated reader " << std::endl;
 
-  typedef itk::CastImageFilter<ImageType, IntermediateType> castertype;
+  using castertype = itk::CastImageFilter<ImageType, IntermediateType>;
   typename   castertype::Pointer caster = castertype::New();
   caster->SetInput(reader->GetOutput() );
   caster->Update();
 
   // Rescale the image intensities so that they fall between 0 and 255
-  typedef itk::RescaleIntensityImageFilter<IntermediateType, IntermediateType> FilterType;
+  using FilterType = itk::RescaleIntensityImageFilter<IntermediateType, IntermediateType>;
   typename   FilterType::Pointer fixedrescalefilter = FilterType::New();
   fixedrescalefilter->SetInput(caster->GetOutput() );
-  const double desiredMinimum =  0.0;
-  const double desiredMaximum =  255.0;
+  constexpr double desiredMinimum = 0.0;
+  constexpr double desiredMaximum = 255.0;
   fixedrescalefilter->SetOutputMinimum( desiredMinimum );
   fixedrescalefilter->SetOutputMaximum( desiredMaximum );
   fixedrescalefilter->UpdateLargestPossibleRegion();
 
-  typedef itk::CastImageFilter<IntermediateType, OutImageType> castertype2;
+  using castertype2 = itk::CastImageFilter<IntermediateType, OutImageType>;
   typename castertype2::Pointer caster2 = castertype2::New();
   caster2->SetInput(fixedrescalefilter->GetOutput() );
   caster2->Update();
@@ -88,7 +88,7 @@ int ConvertType(int argc, char *argv[])
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ConvertToJpg( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int ConvertToJpg( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   try
     {
@@ -107,7 +107,7 @@ int ConvertToJpg( std::vector<std::string> args, std::ostream* /*out_stream = IT
       // place the null character in the end
       argv[i][args[i].length()] = '\0';
       }
-    argv[argc] = ITK_NULLPTR;
+    argv[argc] = nullptr;
     // class to automatically cleanup argv upon destruction
     class Cleanup_argv
     {
@@ -148,7 +148,7 @@ private:
     std::string               fn = std::string(argv[1]);
     itk::ImageIOBase::Pointer imageIO =
       itk::ImageIOFactory::CreateImageIO(
-        fn.c_str(), itk::ImageIOFactory::ReadMode);
+        fn.c_str(), itk::ImageIOFactory::FileModeEnum::ReadMode);
     imageIO->SetFileName(fn.c_str() );
     imageIO->ReadImageInformation();
 

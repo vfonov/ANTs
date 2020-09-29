@@ -41,15 +41,15 @@ namespace ants
 template <unsigned int ImageDimension>
 int  ClusterStatistics(unsigned int argc, char *argv[])
 {
-  typedef float PixelType;
+  using PixelType = float;
 //  const unsigned int ImageDimension = AvantsImageDimension;
-  typedef itk::Image<PixelType, ImageDimension>                           ImageType;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
   // typedef itk::ImageRegionIteratorWithIndex<ImageType> Iterator;
 
-  typedef unsigned long                                                    ULPixelType;
-  typedef itk::Image<ULPixelType, ImageDimension>                          labelimagetype;
-  typedef itk::ConnectedComponentImageFilter<ImageType, labelimagetype>    FilterType;
-  typedef itk::RelabelComponentImageFilter<labelimagetype, labelimagetype> RelabelType;
+  using ULPixelType = unsigned long;
+  using labelimagetype = itk::Image<ULPixelType, ImageDimension>;
+  using FilterType = itk::ConnectedComponentImageFilter<ImageType, labelimagetype>;
+  using RelabelType = itk::RelabelComponentImageFilter<labelimagetype, labelimagetype>;
 
   // want the average value in each cluster as defined by the mask and the value thresh and the clust thresh
 
@@ -60,14 +60,14 @@ int  ClusterStatistics(unsigned int argc, char *argv[])
   float       minSize = clusterthresh;
   float       valuethresh = atof(argv[6]);
   //  std::cout << " Cth " << clusterthresh << " Vth " << valuethresh << std::endl;
-  typename ImageType::Pointer valimage = ITK_NULLPTR;
-  typename ImageType::Pointer roiimage = ITK_NULLPTR;
-  typename ImageType::Pointer labelimage = ITK_NULLPTR;
+  typename ImageType::Pointer valimage = nullptr;
+  typename ImageType::Pointer roiimage = nullptr;
+  typename ImageType::Pointer labelimage = nullptr;
 
   ReadImage<ImageType>(roiimage, roimaskfn.c_str() );
   ReadImage<ImageType>(labelimage, labelimagefn.c_str() );
 
-  typedef itk::MinimumMaximumImageFilter<ImageType> MinMaxFilterType;
+  using MinMaxFilterType = itk::MinimumMaximumImageFilter<ImageType>;
   typename MinMaxFilterType::Pointer minMaxFilter = MinMaxFilterType::New();
   minMaxFilter->SetInput( labelimage );
   minMaxFilter->Update();
@@ -81,7 +81,7 @@ int  ClusterStatistics(unsigned int argc, char *argv[])
     ReadImage<ImageType>(valimage, argv[filecount]);
 
     //  first, threshold the value image then get the clusters of min size
-    typedef itk::BinaryThresholdImageFilter<ImageType, ImageType> ThresholdFilterType;
+    using ThresholdFilterType = itk::BinaryThresholdImageFilter<ImageType, ImageType>;
     typename ThresholdFilterType::Pointer threshold = ThresholdFilterType::New();
     threshold->SetInput(valimage);
     threshold->SetInsideValue(1);
@@ -90,12 +90,12 @@ int  ClusterStatistics(unsigned int argc, char *argv[])
     threshold->SetUpperThreshold(1.e9);
     threshold->Update();
     typename ImageType::Pointer thresh = threshold->GetOutput();
-    typedef itk::ImageRegionIteratorWithIndex<ImageType>      fIterator;
-    typedef itk::ImageRegionIteratorWithIndex<labelimagetype> Iterator;
+    using fIterator = itk::ImageRegionIteratorWithIndex<ImageType>;
+    using Iterator = itk::ImageRegionIteratorWithIndex<labelimagetype>;
     fIterator tIter( thresh, thresh->GetLargestPossibleRegion() );
     for(  tIter.GoToBegin(); !tIter.IsAtEnd(); ++tIter )
       {
-      if( roiimage->GetPixel(tIter.GetIndex() ) < 0.5 )
+      if( roiimage->GetPixel(tIter.GetIndex() ) < static_cast<PixelType>( 0.5 ) )
         {
         tIter.Set(0);
         }
@@ -107,7 +107,7 @@ int  ClusterStatistics(unsigned int argc, char *argv[])
     typename RelabelType::Pointer relabel = RelabelType::New();
 
     filter->SetInput( thresh );
-    int fullyConnected = 0; // atoi( argv[5] );
+    int fullyConnected = 0; // std::stoi( argv[5] );
     filter->SetFullyConnected( fullyConnected );
     relabel->SetInput( filter->GetOutput() );
     relabel->SetMinimumObjectSize( (unsigned int) minSize );
@@ -158,8 +158,8 @@ int  ClusterStatistics(unsigned int argc, char *argv[])
             maxlabel[(unsigned long)vfIter.Get()] = (long int)labelimage->GetPixel(vfIter.GetIndex() );
             }
 
-          suminlabel[(unsigned long)(labelimage->GetPixel(vfIter.GetIndex() ) - min)] += vox;
-          countinlabel[(unsigned long)(labelimage->GetPixel(vfIter.GetIndex() ) - min)] += 1;
+          suminlabel[(unsigned long)(labelimage->GetPixel(vfIter.GetIndex() ) - static_cast<float>( min ))] += vox;
+          countinlabel[(unsigned long)(labelimage->GetPixel(vfIter.GetIndex() ) - static_cast<float>( min ))] += 1;
           }
         }
       }
@@ -282,7 +282,7 @@ int  ClusterStatistics(unsigned int argc, char *argv[])
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ClusterImageStatistics( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */)
+int ClusterImageStatistics( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */)
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -299,7 +299,7 @@ int ClusterImageStatistics( std::vector<std::string> args, std::ostream* /*out_s
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -347,7 +347,7 @@ private:
     return EXIT_FAILURE;
     }
 
-  switch( atoi(argv[1]) )
+  switch( std::stoi(argv[1]) )
     {
     case 2:
       {

@@ -23,7 +23,7 @@ static bool WarpTensorImageMultiTransform_ParseInput(int argc, char * *argv, cha
   opt_queue.clear();
   opt_queue.reserve(argc - 2);
 
-  misc_opt.reference_image_filename = ITK_NULLPTR;
+  misc_opt.reference_image_filename = nullptr;
   misc_opt.use_NN_interpolator = false;
   misc_opt.use_TightestBoundingBox = false;
   misc_opt.use_RotationHeader = false;
@@ -79,7 +79,7 @@ static bool WarpTensorImageMultiTransform_ParseInput(int argc, char * *argv, cha
       }
     else if( strcmp(argv[ind], "--reference-image-header") == 0 || strcmp(argv[ind], "-rh") == 0 )
       {
-      if( misc_opt.reference_image_filename == ITK_NULLPTR )
+      if( misc_opt.reference_image_filename == nullptr )
         {
         std::cout
           << "reference image filename is not given yet. Specify it with -R before --reference-image-header / -rh."
@@ -105,7 +105,7 @@ static bool WarpTensorImageMultiTransform_ParseInput(int argc, char * *argv, cha
       std::string prefix = argv[ind];
       std::string path, name, ext;
       FilePartsWithgz(prefix, path, name, ext);
-      if( ext == "" )
+      if( ext.empty() )
         {
         ext = ".nii.gz";
         }
@@ -143,7 +143,7 @@ static bool WarpTensorImageMultiTransform_ParseInput(int argc, char * *argv, cha
       std::string prefix = argv[ind];
       std::string path, name, ext;
       FilePartsWithgz(prefix, path, name, ext);
-      if( ext == "" )
+      if( ext.empty() )
         {
         ext = ".nii.gz";
         }
@@ -219,7 +219,7 @@ static bool WarpTensorImageMultiTransform_ParseInput(int argc, char * *argv, cha
   return true;
 }
 
-template <class TAffineTransform>
+template <typename TAffineTransform>
 static void GetIdentityTransform(typename TAffineTransform::Pointer & aff)
 {
   aff = TAffineTransform::New();
@@ -273,24 +273,17 @@ static void WarpImageMultiTransform(char *moving_image_filename, char *output_im
                                     TRAN_OPT_QUEUE & opt_queue, MISC_OPT & misc_opt)
 {
   // typedef itk::Vector<float,6> PixelType;
-  typedef itk::SymmetricSecondRankTensor<float,
-                                         3>                       PixelType;
-  typedef itk::Image<PixelType,
-                     ImageDimension>                              TensorImageType;
-  typedef itk::Image<float,
-                     ImageDimension>                              ImageType;
-  typedef itk::Vector<float,
-                      ImageDimension>                             VectorType;
-  typedef itk::Image<VectorType,
-                     ImageDimension>                              DisplacementFieldType;
-  typedef itk::MatrixOffsetTransformBase<double, ImageDimension,
-                                         ImageDimension>          AffineTransformType;
-  typedef itk::WarpImageMultiTransformFilter<ImageType, ImageType, DisplacementFieldType,
-                                             AffineTransformType> WarperType;
+  using PixelType = itk::SymmetricSecondRankTensor<float, 3>;
+  using TensorImageType = itk::Image<PixelType, ImageDimension>;
+  using ImageType = itk::Image<float, ImageDimension>;
+  using VectorType = itk::Vector<float, ImageDimension>;
+  using DisplacementFieldType = itk::Image<VectorType, ImageDimension>;
+  using AffineTransformType = itk::MatrixOffsetTransformBase<double, ImageDimension, ImageDimension>;
+  using WarperType = itk::WarpImageMultiTransformFilter<ImageType, ImageType, DisplacementFieldType, AffineTransformType>;
 
   itk::TransformFactory<AffineTransformType>::RegisterTransform();
 
-  typedef itk::ImageFileReader<ImageType> ImageFileReaderType;
+  using ImageFileReaderType = itk::ImageFileReader<ImageType>;
   // typename ImageFileReaderType::Pointer reader_img = ImageFileReaderType::New();
   // reader_img->SetFileName(moving_image_filename);
   // reader_img->Update();
@@ -316,7 +309,7 @@ static void WarpImageMultiTransform(char *moving_image_filename, char *output_im
     AllocImage<TensorImageType>(img_ref);
   for( unsigned int tensdim = 0;  tensdim < 6;  tensdim++ )
     {
-    typedef itk::VectorIndexSelectionCastImageFilter<TensorImageType, ImageType> IndexSelectCasterType;
+    using IndexSelectCasterType = itk::VectorIndexSelectionCastImageFilter<TensorImageType, ImageType>;
     typename IndexSelectCasterType::Pointer fieldCaster = IndexSelectCasterType::New();
     fieldCaster->SetInput( img_mov );
     fieldCaster->SetIndex( tensdim );
@@ -334,16 +327,14 @@ static void WarpImageMultiTransform(char *moving_image_filename, char *output_im
 
     if( misc_opt.use_NN_interpolator )
       {
-      typedef typename itk::NearestNeighborInterpolateImageFunction<ImageType,
-                                                                    typename WarperType::CoordRepType>
-        NNInterpolateType;
+      using NNInterpolateType = typename itk::NearestNeighborInterpolateImageFunction<ImageType, typename WarperType::CoordRepType>;
       typename NNInterpolateType::Pointer interpolator_NN = NNInterpolateType::New();
       std::cout << "Haha" << std::endl;
       warper->SetInterpolator(interpolator_NN);
       }
 
-    typedef itk::TransformFileReader                    TranReaderType;
-    typedef itk::ImageFileReader<DisplacementFieldType> FieldReaderType;
+    using TranReaderType = itk::TransformFileReader;
+    using FieldReaderType = itk::ImageFileReader<DisplacementFieldType>;
 
     unsigned int transcount = 0;
     const int    kOptQueueSize = opt_queue.size();
@@ -464,7 +455,7 @@ static void WarpImageMultiTransform(char *moving_image_filename, char *output_im
     warper->DetermineFirstDeformNoInterp();
     warper->Update();
 
-    typedef itk::ImageRegionIteratorWithIndex<TensorImageType> Iterator;
+    using Iterator = itk::ImageRegionIteratorWithIndex<TensorImageType>;
     Iterator vfIter2( img_output, img_output->GetLargestPossibleRegion() );
     for(  vfIter2.GoToBegin(); !vfIter2.IsAtEnd(); ++vfIter2 )
       {
@@ -481,7 +472,7 @@ static void WarpImageMultiTransform(char *moving_image_filename, char *output_im
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int WarpTensorImageMultiTransform( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int WarpTensorImageMultiTransform( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -499,7 +490,7 @@ int WarpTensorImageMultiTransform( std::vector<std::string> args, std::ostream* 
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -572,7 +563,7 @@ private:
       "Applies the inversion of abcdAffine.txt and then abcdInverseWarpxvec.nii.gz/abcdInverseWarpyvec.nii.gz/abcdInverseWarpzvec.nii.gz. Use this with ANTS to get the reference_image warped into the moving_image domain. "
              << std::endl
              << "Note: " << std::endl
-             << "prefix name \"abcd\" without any extension will use \".nii.gz\" by default" << std::endl;
+             << R"(prefix name "abcd" without any extension will use ".nii.gz" by default)" << std::endl;
     if( argc >= 2 &&
         ( std::string( argv[1] ) == std::string("--help") || std::string( argv[1] ) == std::string("-h") ) )
       {
@@ -582,12 +573,12 @@ private:
     }
 
   TRAN_OPT_QUEUE opt_queue;
-  char *         moving_image_filename = ITK_NULLPTR;
-  char *         output_image_filename = ITK_NULLPTR;
+  char *         moving_image_filename = nullptr;
+  char *         output_image_filename = nullptr;
 
   MISC_OPT misc_opt;
 
-  const int  kImageDim = atoi(argv[1]);
+  const int  kImageDim = std::stoi(argv[1]);
   const bool is_parsing_ok =
     WarpTensorImageMultiTransform_ParseInput(argc - 2, argv + 2, moving_image_filename, output_image_filename,
                                              opt_queue,

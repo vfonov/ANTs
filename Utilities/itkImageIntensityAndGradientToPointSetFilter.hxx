@@ -11,8 +11,8 @@
      PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
-#ifndef __itkImageIntensityAndGradientToPointSetFilter_hxx
-#define __itkImageIntensityAndGradientToPointSetFilter_hxx
+#ifndef itkImageIntensityAndGradientToPointSetFilter_hxx
+#define itkImageIntensityAndGradientToPointSetFilter_hxx
 
 #include "itkImageIntensityAndGradientToPointSetFilter.h"
 
@@ -64,7 +64,7 @@ ImageIntensityAndGradientToPointSetFilter<TInputImage, TMaskImage, TOutputMesh>
 
   // Calculate gradient image
 
-  typename GradientImageType::Pointer gradientImage = ITK_NULLPTR;
+  typename GradientImageType::Pointer gradientImage = nullptr;
   if( this->m_UseCentralDifferenceFunction )
     {
     GradientPixelType zeroVector;

@@ -23,11 +23,11 @@ namespace ants
 {
 namespace Statistics
 {
-template <class TListSample, class TOutput, class TCoordRep>
+template <typename TListSample, typename TOutput, typename TCoordRep>
 ManifoldParzenWindowsListSampleFunction<TListSample, TOutput, TCoordRep>
 ::ManifoldParzenWindowsListSampleFunction()
 {
-  this->m_KdTreeGenerator = ITK_NULLPTR;
+  this->m_KdTreeGenerator = nullptr;
 
   this->m_EvaluationKNeighborhood = 50;
   this->m_RegularizationSigma = 1.0;
@@ -36,13 +36,12 @@ ManifoldParzenWindowsListSampleFunction<TListSample, TOutput, TCoordRep>
   this->m_KernelSigma = 0.0;
 }
 
-template <class TListSample, class TOutput, class TCoordRep>
+template <typename TListSample, typename TOutput, typename TCoordRep>
 ManifoldParzenWindowsListSampleFunction<TListSample, TOutput, TCoordRep>
 ::~ManifoldParzenWindowsListSampleFunction()
-{
-}
+= default;
 
-template <class TListSample, class TOutput, class TCoordRep>
+template <typename TListSample, typename TOutput, typename TCoordRep>
 void
 ManifoldParzenWindowsListSampleFunction<TListSample, TOutput, TCoordRep>
 ::SetInputListSample( const InputListSampleType * ptr )
@@ -105,7 +104,7 @@ ManifoldParzenWindowsListSampleFunction<TListSample, TOutput, TCoordRep>
 
       typename TreeGeneratorType::KdTreeType
       ::InstanceIdentifierVectorType neighbors;
-      unsigned int numberOfNeighbors = vnl_math_min(
+      unsigned int numberOfNeighbors = std::min(
           this->m_CovarianceKNeighborhood, static_cast<unsigned int>(
             this->GetInputListSample()->Size() ) );
       this->m_KdTreeGenerator->GetOutput()->Search(
@@ -124,11 +123,11 @@ ManifoldParzenWindowsListSampleFunction<TListSample, TOutput, TCoordRep>
           RealType kernelValue = this->m_Gaussians[count]->Evaluate( neighbor );
           if( this->GetListSampleWeights()->Size() == this->m_Gaussians.size() )
             {
-            kernelValue *= ( *this->GetListSampleWeights() )[count];
+            kernelValue *= static_cast<RealType>( ( *this->GetListSampleWeights() )[count] );
             }
 
           denominator += kernelValue;
-          if( kernelValue > 0.0 )
+          if( kernelValue > NumericTraits<RealType>::ZeroValue() )
             {
             for( unsigned int m = 0; m < Dimension; m++ )
               {
@@ -137,21 +136,21 @@ ManifoldParzenWindowsListSampleFunction<TListSample, TOutput, TCoordRep>
                 RealType covariance = kernelValue
                   * ( neighbor[m] - inputMeasurement[m] )
                   * ( neighbor[n] - inputMeasurement[n] );
-                Cov( m, n ) += covariance;
-                Cov( n, m ) += covariance;
+                Cov( m, n ) += static_cast<typename CovarianceMatrixType::ComponentType>( covariance );
+                Cov( n, m ) += Cov( m, n );
                 }
               }
             }
           }
         }
-      if( denominator > 0.0 )
+      if( denominator > NumericTraits<RealType>::ZeroValue() )
         {
         Cov /= denominator;
         }
       for( unsigned int m = 0; m < Dimension; m++ )
         {
         Cov( m, m ) +=
-          ( this->m_RegularizationSigma * this->m_RegularizationSigma );
+          static_cast<typename CovarianceMatrixType::ComponentType>( this->m_RegularizationSigma * this->m_RegularizationSigma );
         }
       this->m_Gaussians[count]->SetCovariance( Cov );
       }
@@ -174,23 +173,23 @@ ManifoldParzenWindowsListSampleFunction<TListSample, TOutput, TCoordRep>
     {
     if( this->GetListSampleWeights()->Size() == this->m_Gaussians.size() )
       {
-      this->m_NormalizationFactor += ( *this->GetListSampleWeights() )[i];
+      this->m_NormalizationFactor += static_cast<RealType>( ( *this->GetListSampleWeights() )[i] );
       }
     else
       {
-      this->m_NormalizationFactor += 1.0;
+      this->m_NormalizationFactor += NumericTraits<RealType>::OneValue();
       }
     }
 }
 
-template <class TListSample, class TOutput, class TCoordRep>
+template <typename TListSample, typename TOutput, typename TCoordRep>
 TOutput
 ManifoldParzenWindowsListSampleFunction<TListSample, TOutput, TCoordRep>
 ::Evaluate( const InputMeasurementVectorType & measurement ) const
 {
   try
     {
-    unsigned int numberOfNeighbors = vnl_math_min(
+    unsigned int numberOfNeighbors = std::min(
         this->m_EvaluationKNeighborhood,
         static_cast<unsigned int>( this->m_Gaussians.size() ) );
 
@@ -227,7 +226,7 @@ ManifoldParzenWindowsListSampleFunction<TListSample, TOutput, TCoordRep>
 /**
  * Standard "PrintSelf" method
  */
-template <class TListSample, class TOutput, class TCoordRep>
+template <typename TListSample, typename TOutput, typename TCoordRep>
 void
 ManifoldParzenWindowsListSampleFunction<TListSample, TOutput, TCoordRep>
 ::PrintSelf(

@@ -43,7 +43,7 @@
 #include "vtkTextProperty.h"
 #include "vtkWindowToImageFilter.h"
 
-#include "vnl/vnl_math.h"
+#include "itkMath.h"
 
 #include <vector>
 #include <string>
@@ -57,11 +57,11 @@ float CalculateGenus( vtkPolyData *mesh, bool verbose )
   extractEdges->SetInputData( mesh );
   extractEdges->Update();
 
-  float numberOfEdges = static_cast<float>( extractEdges->GetOutput()->GetNumberOfLines() );
-  float numberOfVertices = static_cast<float>( mesh->GetNumberOfPoints() );
-  float numberOfFaces = static_cast<float>( mesh->GetNumberOfPolys() );
+  auto numberOfEdges = static_cast<float>( extractEdges->GetOutput()->GetNumberOfLines() );
+  auto numberOfVertices = static_cast<float>( mesh->GetNumberOfPoints() );
+  auto numberOfFaces = static_cast<float>( mesh->GetNumberOfPolys() );
 
-  float genus = 0.5 * ( 2.0 - numberOfVertices + numberOfEdges - numberOfFaces );
+  float genus = 0.5f * ( 2.0f - numberOfVertices + numberOfEdges - numberOfFaces );
 
   if( verbose )
     {
@@ -79,7 +79,7 @@ void Display( vtkPolyData *vtkMesh,
               const std::vector<float> backgroundColor,
               const std::string screenCaptureFileName,
               const bool renderScalarBar = false,
-              vtkLookupTable *scalarBarLookupTable = ITK_NULLPTR,
+              vtkLookupTable *scalarBarLookupTable = nullptr,
               const std::string scalarBarTitle = std::string( "" ),
               unsigned int scalarBarNumberOfLabels = 5,
               unsigned int scalarBarWidthInPixels = 0,
@@ -106,7 +106,7 @@ void Display( vtkPolyData *vtkMesh,
   actor->RotateZ( rotationAngleInDegrees[2] );
 
   vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
-  renderer->SetBackground( backgroundColor[0] / 255.0, backgroundColor[1] / 255.0, backgroundColor[2] / 255.0 );
+  renderer->SetBackground( backgroundColor[0] / 255.0f, backgroundColor[1] / 255.0f, backgroundColor[2] / 255.0f );
 
   vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
   renderWindow->AddRenderer( renderer );
@@ -176,7 +176,7 @@ void Display( vtkPolyData *vtkMesh,
     vtkSmartPointer<vtkWindowToImageFilter> windowToImageFilter =
     vtkSmartPointer<vtkWindowToImageFilter>::New();
     windowToImageFilter->SetInput( renderWindow );
-    windowToImageFilter->SetMagnification( 5 );
+    windowToImageFilter->SetScale( 5 );
     windowToImageFilter->Update();
 
     vtkSmartPointer<vtkPNGWriter> writer = vtkSmartPointer<vtkPNGWriter>::New();
@@ -189,22 +189,22 @@ void Display( vtkPolyData *vtkMesh,
 
 int antsImageToSurface( itk::ants::CommandLineParser *parser )
 {
-  const unsigned int ImageDimension = 3;
+  constexpr unsigned int ImageDimension = 3;
 
-  typedef float                                      RealType;
-  typedef itk::Image<RealType, ImageDimension>       ImageType;
-  typedef itk::Image<int, ImageDimension>            MaskImageType;
+  using RealType = float;
+  using ImageType = itk::Image<RealType, ImageDimension>;
+  using MaskImageType = itk::Image<int, ImageDimension>;
 
-  typedef unsigned char                              RgbComponentType;
-  typedef itk::RGBPixel<RgbComponentType>            RgbPixelType;
-  typedef itk::Image<RgbPixelType, ImageDimension>   RgbImageType;
+  using RgbComponentType = unsigned char;
+  using RgbPixelType = itk::RGBPixel<RgbComponentType>;
+  using RgbImageType = itk::Image<RgbPixelType, ImageDimension>;
 
   ImageType::PointType zeroOrigin;
   zeroOrigin.Fill( 0.0 );
 
   // Read in input surface image
 
-  ImageType::Pointer inputImage = ITK_NULLPTR;
+  ImageType::Pointer inputImage = nullptr;
 
   RealType defaultColorRed = 255.0;
   RealType defaultColorGreen = 255.0;
@@ -272,7 +272,7 @@ int antsImageToSurface( itk::ants::CommandLineParser *parser )
   //   and
   // http://www.vtk.org/Wiki/VTK/ExamplesBoneYard/Cxx/VolumeRendering/itkVtkImageConvert
 
-  typedef itk::AffineTransform<RealType> RigidTransformType;
+  using RigidTransformType = itk::AffineTransform<RealType>;
   RigidTransformType::Pointer meshToItkImageTransform = RigidTransformType::New();
   RigidTransformType::OutputVectorType offset;
   offset[0] = -inputImage->GetOrigin()[0];
@@ -300,7 +300,7 @@ int antsImageToSurface( itk::ants::CommandLineParser *parser )
     antiAliasRmseParameter = parser->Convert<RealType>( antiAliasRmseOption->GetFunction( 0 )->GetName() );
     }
 
-  typedef itk::AntiAliasBinaryImageFilter<ImageType, ImageType> AntiAliasFilterType;
+  using AntiAliasFilterType = itk::AntiAliasBinaryImageFilter<ImageType, ImageType>;
   AntiAliasFilterType::Pointer antiAlias = AntiAliasFilterType::New();
   antiAlias->SetMaximumRMSError( antiAliasRmseParameter );
   antiAlias->SetInput( inputImage );
@@ -308,7 +308,7 @@ int antsImageToSurface( itk::ants::CommandLineParser *parser )
 
   // Reconstruct binary surface.
 
-  typedef itk::ImageToVTKImageFilter<ImageType> ConnectorType;
+  using ConnectorType = itk::ImageToVTKImageFilter<ImageType>;
   ConnectorType::Pointer connector = ConnectorType::New();
   connector->SetInput( antiAlias->GetOutput() );
   connector->Update();
@@ -357,7 +357,7 @@ int antsImageToSurface( itk::ants::CommandLineParser *parser )
 
       std::string rgbFileName = functionalOverlayOption->GetFunction( n )->GetParameter( 0 );
 
-      typedef itk::ImageFileReader<RgbImageType> RgbReaderType;
+      using RgbReaderType = itk::ImageFileReader<RgbImageType>;
       RgbReaderType::Pointer rgbReader = RgbReaderType::New();
       rgbReader->SetFileName( rgbFileName.c_str() );
       try
@@ -370,13 +370,13 @@ int antsImageToSurface( itk::ants::CommandLineParser *parser )
         std::cerr << "Error reading RGB file " << rgbFileName << std::endl;
         return EXIT_FAILURE;
         }
-      functionalRgbImages.push_back( rgbReader->GetOutput() );
+      functionalRgbImages.emplace_back(rgbReader->GetOutput() );
 
       // read mask
 
       std::string maskFileName = functionalOverlayOption->GetFunction( n )->GetParameter( 1 );
 
-      typedef itk::ImageFileReader<MaskImageType> MaskReaderType;
+      using MaskReaderType = itk::ImageFileReader<MaskImageType>;
       MaskReaderType::Pointer maskReader = MaskReaderType::New();
       maskReader->SetFileName( maskFileName.c_str() );
       try
@@ -389,11 +389,11 @@ int antsImageToSurface( itk::ants::CommandLineParser *parser )
         std::cerr << "Error reading mask file " << maskFileName << std::endl;
         return EXIT_FAILURE;
         }
-      functionalMaskImages.push_back( maskReader->GetOutput() );
+      functionalMaskImages.emplace_back(maskReader->GetOutput() );
 
       if( functionalOverlayOption->GetFunction( n )->GetNumberOfParameters() > 2 )
         {
-        RealType alpha = parser->Convert<RealType>(
+        auto alpha = parser->Convert<RealType>(
           functionalOverlayOption->GetFunction( n )->GetParameter( 2 ) );
         functionalAlphaValues.push_back( alpha );
         }
@@ -438,9 +438,9 @@ int antsImageToSurface( itk::ants::CommandLineParser *parser )
       imagePoint[d] = meshPoints->GetPoint( n )[d];
       }
 
-    RealType currentRed   = defaultColorRed / 255.0;
-    RealType currentGreen = defaultColorGreen / 255.0;
-    RealType currentBlue  = defaultColorBlue / 255.0;
+    RealType currentRed   = defaultColorRed / static_cast<RealType>( 255.0 );
+    RealType currentGreen = defaultColorGreen / static_cast<RealType>( 255.0 );
+    RealType currentBlue  = defaultColorBlue / static_cast<RealType>( 255.0 );
     RealType currentAlpha = defaultAlpha;
 
     for( int i = functionalAlphaValues.size() - 1; i >= 0; i-- )
@@ -455,9 +455,9 @@ int antsImageToSurface( itk::ants::CommandLineParser *parser )
 
         RgbPixelType rgbPixel = functionalRgbImages[i]->GetPixel( index );
 
-        RealType functionalRed = rgbPixel.GetRed() / 255.0;
-        RealType functionalGreen = rgbPixel.GetGreen() / 255.0;
-        RealType functionalBlue = rgbPixel.GetBlue() / 255.0;
+        RealType functionalRed = rgbPixel.GetRed() / static_cast<RealType>( 255.0 );
+        RealType functionalGreen = rgbPixel.GetGreen() / static_cast<RealType>( 255.0 );
+        RealType functionalBlue = rgbPixel.GetBlue() / static_cast<RealType>( 255.0 );
         RealType functionalAlpha = functionalAlphaValues[i];
 
         RealType backgroundRed   = currentRed;
@@ -465,20 +465,20 @@ int antsImageToSurface( itk::ants::CommandLineParser *parser )
         RealType backgroundBlue  = currentBlue;
         RealType backgroundAlpha = currentAlpha;
 
-        currentAlpha = 1.0 - ( 1.0 - functionalAlpha ) * ( 1.0 - backgroundAlpha );
-        currentRed   = functionalRed   * functionalAlpha / currentAlpha + backgroundRed   * backgroundAlpha * ( 1.0 - functionalAlpha ) / currentAlpha;
-        currentGreen = functionalGreen * functionalAlpha / currentAlpha + backgroundGreen * backgroundAlpha * ( 1.0 - functionalAlpha ) / currentAlpha;
-        currentBlue  = functionalBlue  * functionalAlpha / currentAlpha + backgroundBlue  * backgroundAlpha * ( 1.0 - functionalAlpha ) / currentAlpha;
+        currentAlpha = 1.0f - ( 1.0f - functionalAlpha ) * ( 1.0f - backgroundAlpha );
+        currentRed   = functionalRed   * functionalAlpha / currentAlpha + backgroundRed   * backgroundAlpha * ( 1.0f - functionalAlpha ) / currentAlpha;
+        currentGreen = functionalGreen * functionalAlpha / currentAlpha + backgroundGreen * backgroundAlpha * ( 1.0f - functionalAlpha ) / currentAlpha;
+        currentBlue  = functionalBlue  * functionalAlpha / currentAlpha + backgroundBlue  * backgroundAlpha * ( 1.0f - functionalAlpha ) / currentAlpha;
         }
       }
 
     unsigned char currentColor[4];
-    currentColor[0] = static_cast<unsigned char>( currentRed   * 255.0 );
-    currentColor[1] = static_cast<unsigned char>( currentGreen * 255.0 );
-    currentColor[2] = static_cast<unsigned char>( currentBlue  * 255.0 );
-    currentColor[3] = static_cast<unsigned char>( currentAlpha * 255.0 );
+    currentColor[0] = static_cast<unsigned char>( currentRed   * 255.0f );
+    currentColor[1] = static_cast<unsigned char>( currentGreen * 255.0f );
+    currentColor[2] = static_cast<unsigned char>( currentBlue  * 255.0f );
+    currentColor[3] = static_cast<unsigned char>( currentAlpha * 255.0f );
 
-    colors->InsertNextTupleValue( currentColor );
+    colors->InsertNextTypedTuple( currentColor );
     }
   vtkMesh->GetPointData()->SetScalars( colors );
 
@@ -612,7 +612,10 @@ int antsImageToSurface( itk::ants::CommandLineParser *parser )
     unsigned int index = 0;
     while( fileStr >> value >> comma >> redComponent >> comma >> greenComponent >> comma >> blueComponent >> comma >> alphaComponent )
       {
-      lookupTable->SetTableValue( index++, redComponent / 255.0, greenComponent / 255.0, blueComponent / 255.0, alphaComponent );
+      lookupTable->SetTableValue( index++, redComponent / static_cast<RealType>( 255.0 ),
+                                           greenComponent / static_cast<RealType>( 255.0 ),
+                                           blueComponent / static_cast<RealType>( 255.0 ),
+                                           alphaComponent );
 
       if( value < minValue )
         {
@@ -851,7 +854,7 @@ int antsSurfaceToImage( itk::ants::CommandLineParser *parser )
 
 void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
-  typedef itk::ants::CommandLineParser::OptionType OptionType;
+  using OptionType = itk::ants::CommandLineParser::OptionType;
 
     {
     std::string description =
@@ -967,7 +970,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
     std::string description =
     std::string( "Add a scalar bar to the rendering for the final overlay.  One can tailor " )
     + std::string( "the aesthetic by changing the number of labels and/or the orientation and ")
-    + std::string( "size of the scalar bar.  If the \'width\' > \'height\' (in pixels) then the ")
+    + std::string( R"(size of the scalar bar.  If the 'width' > 'height' (in pixels) then the )")
     + std::string( "orientation is horizontal.  Otherwise it is vertical (default)." );
 
     OptionType::Pointer option = OptionType::New();
@@ -1000,7 +1003,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int antsSurf( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int antsSurf( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -1018,7 +1021,7 @@ int antsSurf( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NU
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = 0;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -1097,7 +1100,7 @@ private:
       inputFile = imageOption->GetFunction( 0 )->GetParameter( 0 );
       }
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(
-        inputFile.c_str(), itk::ImageIOFactory::ReadMode );
+        inputFile.c_str(), itk::ImageIOFactory::FileModeEnum::ReadMode );
     unsigned int dimension = imageIO->GetNumberOfDimensions();
 
     if( dimension == 3 )

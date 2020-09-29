@@ -15,7 +15,7 @@
 
 #include "itkLabelPerimeterEstimationCalculator.h"
 #include "itkLabelMap.h"
-#include "itkLabelImageToLabelMapFilter.h"
+#include "itkLabelImageToShapeLabelMapFilter.h"
 #include "itkShapeLabelMapFilter.h"
 #include "itkShapeLabelObject.h"
 
@@ -32,11 +32,11 @@ namespace ants
 template <unsigned int ImageDimension>
 int LabelGeometryMeasures( int argc, char * argv[] )
 {
-  typedef unsigned int                          LabelType;
-  typedef itk::Image<LabelType, ImageDimension> LabelImageType;
+  using LabelType = unsigned int;
+  using LabelImageType = itk::Image<LabelType, ImageDimension>;
 
-  typedef float                                RealType;
-  typedef itk::Image<RealType, ImageDimension> RealImageType;
+  using RealType = float;
+  using RealImageType = itk::Image<RealType, ImageDimension>;
 
   typename LabelImageType::Pointer labelImage = LabelImageType::New();
   ReadImage<LabelImageType>( labelImage, argv[2] );
@@ -60,7 +60,7 @@ int LabelGeometryMeasures( int argc, char * argv[] )
     {
     outputCSVFormat = true;
     }
-  typedef itk::LabelGeometryImageFilter<LabelImageType, RealImageType> FilterType;
+  using FilterType = itk::LabelGeometryImageFilter<LabelImageType, RealImageType>;
   typename FilterType::Pointer filter = FilterType::New();
   filter->SetInput( labelImage );
   if( intensityImageUsed )
@@ -77,15 +77,15 @@ int LabelGeometryMeasures( int argc, char * argv[] )
 
   filter->Update();
 
-  typedef itk::ShapeLabelObject<LabelType, ImageDimension> LabelObjectType;
-  typedef itk::LabelMap< LabelObjectType > LabelMapType;
+  using LabelObjectType = itk::ShapeLabelObject<LabelType, ImageDimension>;
+  using LabelMapType = itk::LabelMap<LabelObjectType>;
 
   // convert the image in a collection of objects
-  typedef itk::LabelImageToLabelMapFilter<LabelImageType, LabelMapType> ConverterType;
+  using ConverterType = itk::LabelImageToShapeLabelMapFilter<LabelImageType, LabelMapType>;
   typename ConverterType::Pointer converter = ConverterType::New();
   converter->SetInput( labelImage );
 
-  typedef itk::ShapeLabelMapFilter< LabelMapType > ValuatorType;
+  using ValuatorType = itk::ShapeLabelMapFilter<LabelMapType>;
   typename ValuatorType::Pointer valuator = ValuatorType::New();
   valuator->SetInput( converter->GetOutput() );
 
@@ -108,42 +108,42 @@ int LabelGeometryMeasures( int argc, char * argv[] )
 
     std::vector<std::string>   columnHeaders;
 
-    columnHeaders.push_back( std::string( "Label" ) );
-    columnHeaders.push_back( std::string( "VolumeInVoxels" ) );
-    columnHeaders.push_back( std::string( "SurfaceAreaInMillimetersSquared" ) );
-    columnHeaders.push_back( std::string( "Eccentricity" ) );
-    columnHeaders.push_back( std::string( "Elongation" ) );
-    columnHeaders.push_back( std::string( "Orientation" ) );
-    columnHeaders.push_back( std::string( "Centroid_x" ) );
-    columnHeaders.push_back( std::string( "Centroid_y" ) );
+    columnHeaders.emplace_back( "Label" );
+    columnHeaders.emplace_back( "VolumeInVoxels" );
+    columnHeaders.emplace_back( "SurfaceAreaInMillimetersSquared" );
+    columnHeaders.emplace_back( "Eccentricity" );
+    columnHeaders.emplace_back( "Elongation" );
+    columnHeaders.emplace_back( "Orientation" );
+    columnHeaders.emplace_back( "Centroid_x" );
+    columnHeaders.emplace_back( "Centroid_y" );
     if( ImageDimension == 3 )
       {
-      columnHeaders.push_back( std::string( "Centroid_z" ) );
+      columnHeaders.emplace_back( "Centroid_z" );
       }
-    columnHeaders.push_back( std::string( "AxesLength_x" ) );
-    columnHeaders.push_back( std::string( "AxesLength_y" ) );
+    columnHeaders.emplace_back( "AxesLength_x" );
+    columnHeaders.emplace_back( "AxesLength_y" );
     if( ImageDimension == 3 )
       {
-      columnHeaders.push_back( std::string( "AxesLength_z" ) );
+      columnHeaders.emplace_back( "AxesLength_z" );
       }
-    columnHeaders.push_back( std::string( "BoundingBoxLower_x" ) );
-    columnHeaders.push_back( std::string( "BoundingBoxUpper_x" ) );
-    columnHeaders.push_back( std::string( "BoundingBoxLower_y" ) );
-    columnHeaders.push_back( std::string( "BoundingBoxUpper_y" ) );
+    columnHeaders.emplace_back( "BoundingBoxLower_x" );
+    columnHeaders.emplace_back( "BoundingBoxUpper_x" );
+    columnHeaders.emplace_back( "BoundingBoxLower_y" );
+    columnHeaders.emplace_back( "BoundingBoxUpper_y" );
     if( ImageDimension == 3 )
       {
-      columnHeaders.push_back( std::string( "BoundingBoxLower_z" ) );
-      columnHeaders.push_back( std::string( "BoundingBoxUpper_z" ) );
+      columnHeaders.emplace_back( "BoundingBoxLower_z" );
+      columnHeaders.emplace_back( "BoundingBoxUpper_z" );
       }
 
     if( filter->GetIntensityInput() )
       {
-      columnHeaders.push_back( std::string( "IntegratedIntensity" ) );
-      columnHeaders.push_back( std::string( "WeightedCentroid_x" ) );
-      columnHeaders.push_back( std::string( "WeightedCentroid_y" ) );
+      columnHeaders.emplace_back( "IntegratedIntensity" );
+      columnHeaders.emplace_back( "WeightedCentroid_x" );
+      columnHeaders.emplace_back( "WeightedCentroid_y" );
       if( ImageDimension == 3 )
         {
-        columnHeaders.push_back( std::string( "WeightedCentroid_z" ) );
+        columnHeaders.emplace_back( "WeightedCentroid_z" );
         }
       }
 
@@ -220,7 +220,7 @@ int LabelGeometryMeasures( int argc, char * argv[] )
       rowIndex++;
       }
 
-    typedef itk::CSVNumericObjectFileWriter<double, 1, 1> WriterType;
+    using WriterType = itk::CSVNumericObjectFileWriter<double, 1, 1>;
     WriterType::Pointer writer = WriterType::New();
     writer->SetFileName( argv[4] );
     writer->SetColumnHeaders( columnHeaders );
@@ -325,7 +325,7 @@ int LabelGeometryMeasures( std::vector<std::string> args, std::ostream* itkNotUs
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -364,7 +364,7 @@ private:
     return EXIT_FAILURE;
     }
 
-  switch( atoi( argv[1] ) )
+  switch( std::stoi( argv[1] ) )
     {
     case 2:
       {

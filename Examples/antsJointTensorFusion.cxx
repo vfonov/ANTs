@@ -24,27 +24,27 @@
 namespace ants
 {
 
-template <class TFilter>
+template <typename TFilter>
 class CommandProgressUpdate : public itk::Command
 {
 public:
-  typedef  CommandProgressUpdate                      Self;
-  typedef  itk::Command                               Superclass;
-  typedef  itk::SmartPointer<CommandProgressUpdate>  Pointer;
+  using Self = CommandProgressUpdate<TFilter>;
+  using Superclass = itk::Command;
+  using Pointer = itk::SmartPointer<CommandProgressUpdate<TFilter> >;
   itkNewMacro( CommandProgressUpdate );
 protected:
 
-  CommandProgressUpdate() : m_CurrentProgress( 0 ) {};
+  CommandProgressUpdate()  = default;;
 
-  typedef TFilter FilterType;
+  using FilterType = TFilter;
 
-  unsigned int m_CurrentProgress;
+  unsigned int m_CurrentProgress{ 0 };
 
 public:
 
-  void Execute(itk::Object *caller, const itk::EventObject & event) ITK_OVERRIDE
+  void Execute(itk::Object *caller, const itk::EventObject & event) override
     {
-    itk::ProcessObject *po = dynamic_cast<itk::ProcessObject *>( caller );
+    auto *po = dynamic_cast<itk::ProcessObject *>( caller );
     if (! po) return;
 //    std::cout << po->GetProgress() << std::endl;
     if( typeid( event ) == typeid ( itk::ProgressEvent )  )
@@ -64,9 +64,9 @@ public:
       }
     }
 
-  void Execute(const itk::Object * object, const itk::EventObject & event) ITK_OVERRIDE
+  void Execute(const itk::Object * object, const itk::EventObject & event) override
     {
-    itk::ProcessObject *po = dynamic_cast<itk::ProcessObject *>(
+    auto *po = dynamic_cast<itk::ProcessObject *>(
       const_cast<itk::Object *>( object ) );
     if (! po) return;
 
@@ -91,17 +91,17 @@ public:
 template <unsigned int ImageDimension>
 int antsJointTensorFusion( itk::ants::CommandLineParser *parser )
 {
-  typedef float                                                 RealType;
-  typedef itk::DiffusionTensor3D<RealType>                      TensorType;
-  typedef itk::Image<RealType, ImageDimension>                  ImageType;
-  typedef itk::Image<TensorType, ImageDimension>                TensorImageType;
-  typedef itk::NthElementImageAdaptor<TensorImageType,RealType> TensorAdaptorType;
-  typedef itk::CastImageFilter<TensorAdaptorType,ImageType>     CastFilterType;
+  using RealType = float;
+  using TensorType = itk::DiffusionTensor3D<RealType>;
+  using ImageType = itk::Image<RealType, ImageDimension>;
+  using TensorImageType = itk::Image<TensorType, ImageDimension>;
+  using TensorAdaptorType = itk::NthElementImageAdaptor<TensorImageType, RealType>;
+  using CastFilterType = itk::CastImageFilter<TensorAdaptorType, ImageType>;
 
-  typedef itk::Image<unsigned int, ImageDimension>              LabelImageType;
-  typedef LabelImageType                                        MaskImageType;
+  using LabelImageType = itk::Image<unsigned int, ImageDimension>;
+  using MaskImageType = LabelImageType;
 
-  typedef typename itk::ants::CommandLineParser::OptionType     OptionType;
+  using OptionType = typename itk::ants::CommandLineParser::OptionType;
 
   // Determine verbosity of output
 
@@ -120,9 +120,9 @@ int antsJointTensorFusion( itk::ants::CommandLineParser *parser )
 
   // Instantiate the joint fusion filter
 
-  typedef itk::WeightedVotingFusionImageFilter<ImageType, LabelImageType> FusionFilterType;
+  using FusionFilterType = itk::WeightedVotingFusionImageFilter<ImageType, LabelImageType>;
   typename FusionFilterType::Pointer fusionFilter = FusionFilterType::New();
-  typedef typename LabelImageType::PixelType                   LabelType;
+  using LabelType = typename LabelImageType::PixelType;
 
 
   // Get the alpha and beta parameters
@@ -271,7 +271,7 @@ int antsJointTensorFusion( itk::ants::CommandLineParser *parser )
     {
     if( targetImageOption->GetFunction( 0 )->GetNumberOfParameters() == 0 )
       {
-      typename TensorImageType::Pointer targetImage = ITK_NULLPTR;
+      typename TensorImageType::Pointer targetImage = nullptr;
 
       std::string targetFile = targetImageOption->GetFunction( 0 )->GetName();
       ReadTensorImage<TensorImageType>( targetImage, targetFile.c_str(), logEuclidean );
@@ -348,7 +348,7 @@ int antsJointTensorFusion( itk::ants::CommandLineParser *parser )
   for( unsigned int m = 0; m < numberOfAtlases; m++ )
     {
     typename FusionFilterType::InputImageList atlasImageList;
-    typename LabelImageType::Pointer atlasSegmentation = ITK_NULLPTR;
+    typename LabelImageType::Pointer atlasSegmentation = nullptr;
 
     if( atlasImageOption->GetFunction( m )->GetNumberOfParameters() == 0 )
       {
@@ -362,7 +362,7 @@ int antsJointTensorFusion( itk::ants::CommandLineParser *parser )
           }
         return EXIT_FAILURE;
         }
-      typename TensorImageType::Pointer atlasImage = ITK_NULLPTR;
+      typename TensorImageType::Pointer atlasImage = nullptr;
 
       std::string atlasFile = atlasImageOption->GetFunction( m )->GetName();
       ReadTensorImage<TensorImageType>( atlasImage, atlasFile.c_str(), logEuclidean );
@@ -399,9 +399,9 @@ int antsJointTensorFusion( itk::ants::CommandLineParser *parser )
     {
     for( unsigned int n = 0; n < exclusionImageOption->GetNumberOfFunctions(); n++ )
       {
-      LabelType label = parser->Convert<LabelType>( exclusionImageOption->GetFunction( n )->GetName() );
+      auto label = parser->Convert<LabelType>( exclusionImageOption->GetFunction( n )->GetName() );
 
-      typename LabelImageType::Pointer exclusionImage = ITK_NULLPTR;
+      typename LabelImageType::Pointer exclusionImage = nullptr;
       std::string exclusionFile = exclusionImageOption->GetFunction( n )->GetParameter( 0 );
       ReadImage<LabelImageType>( exclusionImage, exclusionFile.c_str() );
       fusionFilter->AddLabelExclusionImage( label, exclusionImage );
@@ -414,7 +414,7 @@ int antsJointTensorFusion( itk::ants::CommandLineParser *parser )
     parser->GetOption( "mask-image" );
   if( maskImageOption && maskImageOption->GetNumberOfFunctions() )
     {
-    typename MaskImageType::Pointer maskImage = ITK_NULLPTR;
+    typename MaskImageType::Pointer maskImage = nullptr;
 
     std::string inputFile = maskImageOption->GetFunction( 0 )->GetName();
     ReadImage<MaskImageType>( maskImage, inputFile.c_str() );
@@ -428,7 +428,7 @@ int antsJointTensorFusion( itk::ants::CommandLineParser *parser )
 
   if( verbose )
     {
-    typedef CommandProgressUpdate<FusionFilterType> CommandType;
+    using CommandType = CommandProgressUpdate<FusionFilterType>;
     typename CommandType::Pointer observer = CommandType::New();
     fusionFilter->AddObserver( itk::ProgressEvent(), observer );
     }
@@ -594,7 +594,7 @@ int antsJointTensorFusion( itk::ants::CommandLineParser *parser )
 
 void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
-  typedef itk::ants::CommandLineParser::OptionType OptionType;
+  using OptionType = itk::ants::CommandLineParser::OptionType;
 
   {
   std::string description =
@@ -842,7 +842,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int antsJointTensorFusion( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int antsJointTensorFusion( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -860,7 +860,7 @@ int antsJointTensorFusion( std::vector<std::string> args, std::ostream* /*out_st
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -974,7 +974,7 @@ private:
       return EXIT_FAILURE;
       }
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(
-        filename.c_str(), itk::ImageIOFactory::ReadMode );
+        filename.c_str(), itk::ImageIOFactory::FileModeEnum::ReadMode );
     dimension = imageIO->GetNumberOfDimensions();
     }
 

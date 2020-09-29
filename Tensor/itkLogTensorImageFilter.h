@@ -11,8 +11,8 @@
      PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
-#ifndef __itkLogTensorImageFilter_h
-#define __itkLogTensorImageFilter_h
+#ifndef itkLogTensorImageFilter_h
+#define itkLogTensorImageFilter_h
 
 #include "itkImageToImageFilter.h"
 #include "itkImage.h"
@@ -36,7 +36,7 @@ namespace itk
  *
  * \ingroup IntensityImageFilters
  */
-template <class TInputImage, class TOutputImage>
+template <typename TInputImage, typename TOutputImage>
 class LogTensorImageFilter :
   public         ImageToImageFilter<TInputImage, TOutputImage>
 {
@@ -58,10 +58,10 @@ public:
   typedef SmartPointer<const Self>                            ConstPointer;
 
   /** Method for creation through the object factory. */
-  itkNewMacro(Self);
+  itkNewMacro(Self)
 
   /** Run-time type information (and related methods). */
-  itkTypeMacro(LogTensorImageFilter, ImageToImageFilter);
+  itkTypeMacro(LogTensorImageFilter, ImageToImageFilter)
 
   /** Image typedef support. */
   typedef typename InputImageType::ConstPointer InputImagePointer;
@@ -85,17 +85,15 @@ public:
   typedef typename OutputImageType::IndexType OutputIndexType;
 
   /** Set the radius of the neighborhood used to compute the mean. */
-  // itkSetMacro(Radius, InputSizeType);
+  // itkSetMacro(Radius, InputSizeType)
 
   /** Get the radius of the neighborhood used to compute the mean */
-  // itkGetConstReferenceMacro(Radius, InputSizeType);
+  // itkGetConstReferenceMacro(Radius, InputSizeType)
 protected:
   LogTensorImageFilter();
-  virtual ~LogTensorImageFilter() ITK_OVERRIDE
-  {
-  }
+  ~LogTensorImageFilter() override = default;
 
-  void PrintSelf(std::ostream& os, Indent indent) const ITK_OVERRIDE;
+  void PrintSelf(std::ostream& os, Indent indent) const override;
 
   /** LogTensorImageFilter can be implemented as a multithreaded filter.
    * Therefore, this implementation provides a ThreadedGenerateData()
@@ -107,11 +105,11 @@ protected:
    *
    * \sa ImageToImageFilter::ThreadedGenerateData(),
    *     ImageToImageFilter::GenerateData() */
-  void GenerateData() ITK_OVERRIDE;
+  void GenerateData() override;
 
 private:
-  LogTensorImageFilter(const Self &); // purposely not implemented
-  void operator=(const Self &);       // purposely not implemented
+  LogTensorImageFilter(const Self &) = delete;
+  void operator=(const Self &) = delete;
 };
 } // end namespace itk
 

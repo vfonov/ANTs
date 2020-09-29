@@ -11,8 +11,8 @@
      PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
-#ifndef __itkDecomposeTensorFunction2_h
-#define __itkDecomposeTensorFunction2_h
+#ifndef itkDecomposeTensorFunction2_h
+#define itkDecomposeTensorFunction2_h
 
 #include "itkVariableSizeMatrix.h"
 
@@ -61,9 +61,7 @@ public:
   RealType EvaluateDeterminant( InputMatrixType & );
 
   DecomposeTensorFunction2();
-  virtual ~DecomposeTensorFunction2()
-  {
-  }
+  virtual ~DecomposeTensorFunction2() = default;
 
 protected:
 
@@ -71,8 +69,8 @@ protected:
 
 private:
 
-  DecomposeTensorFunction2(const Self &); // purposely not implemented
-  void operator=(const Self &);           // purposely not implemented
+  DecomposeTensorFunction2(const Self &) = delete;
+  void operator=(const Self &) = delete;
 };
 } // end namespace itk
 

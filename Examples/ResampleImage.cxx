@@ -2,7 +2,7 @@
 #include "antsUtilities.h"
 #include <algorithm>
 
-#include <stdio.h>
+#include <cstdio>
 
 #include "itkImage.h"
 #include "itkImageFileReader.h"
@@ -24,66 +24,59 @@
 namespace ants
 {
 
-template <unsigned int ImageDimension, class PixelType>
+template <unsigned int ImageDimension, typename PixelType>
 int ResampleImage( int argc, char *argv[] )
 {
-  typedef double                                RealType;
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
+  using RealType = double;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
 
-  typename ImageType::Pointer image = ITK_NULLPTR;
+  typename ImageType::Pointer image = nullptr;
   ReadImage<ImageType>( image, argv[2] );
 
-  typedef itk::IdentityTransform<RealType, ImageDimension> TransformType;
+  using TransformType = itk::IdentityTransform<RealType, ImageDimension>;
   typename TransformType::Pointer transform = TransformType::New();
   transform->SetIdentity();
 
-  typedef itk::LinearInterpolateImageFunction<ImageType, RealType>
-    LinearInterpolatorType;
+  using LinearInterpolatorType = itk::LinearInterpolateImageFunction<ImageType, RealType>;
   typename LinearInterpolatorType::Pointer interpolator
     = LinearInterpolatorType::New();
   interpolator->SetInputImage( image );
 
-  typedef itk::NearestNeighborInterpolateImageFunction<ImageType, RealType>
-    NearestNeighborInterpolatorType;
+  using NearestNeighborInterpolatorType = itk::NearestNeighborInterpolateImageFunction<ImageType, RealType>;
   typename NearestNeighborInterpolatorType::Pointer nn_interpolator
     = NearestNeighborInterpolatorType::New();
   nn_interpolator->SetInputImage( image );
 
-  typedef itk::BSplineInterpolateImageFunction<ImageType, RealType>
-    BSplineInterpolatorType;
+  using BSplineInterpolatorType = itk::BSplineInterpolateImageFunction<ImageType, RealType>;
   typename BSplineInterpolatorType::Pointer bs_interpolator
     = BSplineInterpolatorType::New();
   bs_interpolator->SetInputImage( image );
 
-  typedef itk::GaussianInterpolateImageFunction<ImageType, RealType>
-    GaussianInterpolatorType;
+  using GaussianInterpolatorType = itk::GaussianInterpolateImageFunction<ImageType, RealType>;
   typename GaussianInterpolatorType::Pointer g_interpolator
     = GaussianInterpolatorType::New();
   g_interpolator->SetInputImage( image );
 
-  typedef itk::WindowedSincInterpolateImageFunction<ImageType, 3> HammingInterpolatorType;
+  using HammingInterpolatorType = itk::WindowedSincInterpolateImageFunction<ImageType, 3>;
   typename HammingInterpolatorType::Pointer sh_interpolator = HammingInterpolatorType::New();
   sh_interpolator->SetInputImage( image );
 
-  typedef itk::WindowedSincInterpolateImageFunction<ImageType, 3,
-                                                    itk::Function::CosineWindowFunction<3> > Sinc1InterpolatorType;
+  using Sinc1InterpolatorType = itk::WindowedSincInterpolateImageFunction<ImageType, 3, itk::Function::CosineWindowFunction<3> >;
   typename Sinc1InterpolatorType::Pointer sc_interpolator = Sinc1InterpolatorType::New();
   sc_interpolator->SetInputImage( image );
 
-  typedef itk::WindowedSincInterpolateImageFunction<ImageType, 3,
-                                                    itk::Function::WelchWindowFunction<3> > Sinc2InterpolatorType;
+  using Sinc2InterpolatorType = itk::WindowedSincInterpolateImageFunction<ImageType, 3, itk::Function::WelchWindowFunction<3> >;
   typename Sinc2InterpolatorType::Pointer sw_interpolator = Sinc2InterpolatorType::New();
   sw_interpolator->SetInputImage( image );
 
-  typedef itk::WindowedSincInterpolateImageFunction<ImageType, 3,
-                                                    itk::Function::LanczosWindowFunction<3> > Sinc3InterpolatorType;
+  using Sinc3InterpolatorType = itk::WindowedSincInterpolateImageFunction<ImageType, 3, itk::Function::LanczosWindowFunction<3> >;
   typename Sinc3InterpolatorType::Pointer sl_interpolator = Sinc3InterpolatorType::New();
   sl_interpolator->SetInputImage( image );
 
   typename Sinc3InterpolatorType::Pointer sb_interpolator = Sinc3InterpolatorType::New();
   sb_interpolator->SetInputImage( image );
 
-  typedef itk::ResampleImageFilter<ImageType, ImageType, RealType> ResamplerType;
+  using ResamplerType = itk::ResampleImageFilter<ImageType, ImageType, RealType>;
   typename ResamplerType::Pointer resampler = ResamplerType::New();
   typename ResamplerType::SpacingType spacing;
   typename ResamplerType::SizeType size;
@@ -93,7 +86,7 @@ typename ImageType::IndexType newStartIndex;
 
   std::vector<RealType> sp = ConvertVector<RealType>( std::string( argv[4] ) );
 
-  if( argc <= 5 || atoi( argv[5] ) == 0 )
+  if( argc <= 5 || std::stoi( argv[5] ) == 0 )
     {
     if( sp.size() == 1 )
       {
@@ -138,13 +131,13 @@ typename ImageType::IndexType newStartIndex;
       }
     for( unsigned int i = 0; i < ImageDimension; i++ )
       {
-      RealType spacing_old = image->GetSpacing()[i];
-      RealType size_old = image->GetLargestPossibleRegion().GetSize()[i];
-      float ratio = static_cast<float>( size_old - 1.0 )
-                  / static_cast<float>( size[i] - 1.0 );
+      auto spacing_old = static_cast<RealType>( image->GetSpacing()[i] );
+      auto size_old = static_cast<RealType>( image->GetLargestPossibleRegion().GetSize()[i] );
+      RealType ratio = ( static_cast<RealType>( size_old ) - itk::NumericTraits<RealType>::OneValue() )
+                  / ( static_cast<RealType>( size[i] ) - itk::NumericTraits<RealType>::OneValue() );
       spacing[i] = spacing_old * ratio;
       RealType oldstart = static_cast<float>( oldStartIndex[i] );
-      newStartIndex[i] = static_cast<int>( oldstart * ratio + 0.5 );
+      newStartIndex[i] = static_cast<int>( oldstart * ratio + static_cast<RealType>( 0.5 ) );
       }
     }
 
@@ -156,9 +149,9 @@ typename ImageType::IndexType newStartIndex;
 
   resampler->SetTransform( transform );
   resampler->SetInterpolator( interpolator );
-  if( argc > 6 && atoi( argv[6] ) )
+  if( argc > 6 && std::stoi( argv[6] ) )
     {
-    switch( atoi( argv[6] ) )
+    switch( std::stoi( argv[6] ) )
       {
       case 0: default:
         {
@@ -226,20 +219,21 @@ typename ImageType::IndexType newStartIndex;
             }
             break;
           }
+        break;
         }
       case 4:
         {
-        if( argc > 7 && atoi( argv[7] ) >= 0 && atoi( argv[7] ) <= 5 )
+        if( argc > 7 && std::stoi( argv[7] ) >= 0 && std::stoi( argv[7] ) <= 5 )
           {
-          bs_interpolator->SetSplineOrder( atoi( argv[7] ) );
+          bs_interpolator->SetSplineOrder( std::stoi( argv[7] ) );
           }
         else
           {
           bs_interpolator->SetSplineOrder( 3 );
           }
         resampler->SetInterpolator( bs_interpolator );
-        }
         break;
+        }
       }
     }
   resampler->SetInput( image );
@@ -260,7 +254,7 @@ typename ImageType::IndexType newStartIndex;
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ResampleImage( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int ResampleImage( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -278,7 +272,7 @@ int ResampleImage( std::vector<std::string> args, std::ostream* /*out_stream = I
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -334,13 +328,13 @@ private:
   unsigned int typeoption = 6;
   if( argc > 7 )
     {
-    typeoption = atoi(argv[7]);
+    typeoption = std::stoi(argv[7]);
     }
 
   switch ( typeoption )
     {
     case 0:
-      switch( atoi( argv[1] ) )
+      switch( std::stoi( argv[1] ) )
         {
         case 2:
           {
@@ -363,7 +357,7 @@ private:
         }
         break;
     case 1:
-      switch( atoi( argv[1] ) )
+      switch( std::stoi( argv[1] ) )
         {
         case 2:
           {
@@ -386,7 +380,7 @@ private:
         }
         break;
     case 2:
-      switch( atoi( argv[1] ) )
+      switch( std::stoi( argv[1] ) )
         {
         case 2:
           {
@@ -408,7 +402,7 @@ private:
           return EXIT_FAILURE;
         }
     case 3:
-      switch( atoi( argv[1] ) )
+      switch( std::stoi( argv[1] ) )
         {
         case 2:
           {
@@ -430,7 +424,7 @@ private:
           return EXIT_FAILURE;
         }
     case 4:
-      switch( atoi( argv[1] ) )
+      switch( std::stoi( argv[1] ) )
         {
         case 2:
           {
@@ -452,7 +446,7 @@ private:
           return EXIT_FAILURE;
         }
     case 5:
-      switch( atoi( argv[1] ) )
+      switch( std::stoi( argv[1] ) )
         {
         case 2:
           {
@@ -474,7 +468,7 @@ private:
           return EXIT_FAILURE;
         }
     case 6:
-      switch( atoi( argv[1] ) )
+      switch( std::stoi( argv[1] ) )
         {
         case 2:
           {
@@ -496,7 +490,7 @@ private:
           return EXIT_FAILURE;
           }
     case 7:
-      switch( atoi( argv[1] ) )
+      switch( std::stoi( argv[1] ) )
         {
         case 2:
          {

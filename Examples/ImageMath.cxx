@@ -167,7 +167,7 @@ int ImageMath( std::vector<std::string> args, std::ostream * itkNotUsed( out_str
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -241,6 +241,8 @@ private:
     std::cout << "  GE Image1.ext s    : Grayscale Erosion with radius s" << std::endl;
     std::cout << "  GO Image1.ext s    : Grayscale Opening with radius s" << std::endl;
     std::cout << "  GC Image1.ext s    : Grayscale Closing with radius s" << std::endl;
+    std::cout << "  Extract contours: extract contours from a label image" << std::endl;
+    std::cout << "    Usage: ExtractContours inputImage [doFullyConnected=1]" << std::endl;
     std::cout
       <<
       "  BlobDetector Image1.ext NumberOfBlobsToExtract  Optional-Input-Image2 Blob-2-out.nii.gz N-Blobs-To-Match  :  blob detection by searching for local extrema of the Laplacian of the Gassian (LoG) "
@@ -632,8 +634,14 @@ private:
     std::cout << "\n  SigmoidImage   : " << std::endl;
     std::cout << "      Usage        : SigmoidImage ImageIn [alpha=1.0] [beta=0.0]" << std::endl;
 
-    std::cout << "\n  Sharpen   : " << std::endl;
+    std::cout << "\n  Sharpen        : Apply a Laplacian sharpening filter" << std::endl;
     std::cout << "      Usage        : Sharpen ImageIn" << std::endl;
+
+    std::cout << "\n  UnsharpMask     Apply an Unsharp Mask filter" << std::endl;
+    std::cout << "      Usage        : UnsharpMask ImageIn [amount=0.5] [radius=1] [threshold=0] [radius in spacing unit (0)/1]" << std::endl;
+
+    std::cout << "\n  CoordinateComponentImages   : " << std::endl;
+    std::cout << "      Usage        : CoordinateComponentImages domainImage" << std::endl;
 
     std::cout << "\n  CenterImage2inImage1        : " << std::endl;
     std::cout << "      Usage       : ReferenceImageSpace ImageToCenter " << std::endl;
@@ -729,7 +737,7 @@ private:
 
   std::string operation = std::string(argv[3]);
 
-  unsigned int imageDimension = atoi(argv[1]);
+  unsigned int imageDimension = std::stoi(argv[1]);
 
   switch( imageDimension )
     {

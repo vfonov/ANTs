@@ -52,7 +52,7 @@ namespace itk
 {
 namespace ants
 {
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::AtroposSegmentationImageFilter()
 {
@@ -83,8 +83,8 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   this->m_PriorProbabilitySparseImages.clear();
 
   this->m_IntensityImages.clear();
-  this->m_PriorLabelImage = ITK_NULLPTR;
-  this->m_MaskImage = ITK_NULLPTR;
+  this->m_PriorLabelImage = nullptr;
+  this->m_MaskImage = nullptr;
 
   this->m_MRFSmoothingFactor = 0.3;
   this->m_MRFRadius.Fill( 1 );
@@ -99,8 +99,10 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   this->m_PosteriorProbabilityImages.clear();
   this->m_DistancePriorProbabilityImages.clear();
 
-  this->m_OutlierHandlingFilter = ITK_NULLPTR;
+  this->m_OutlierHandlingFilter = nullptr;
 
+  this->m_RandomizerInitializationSeed =
+    std::numeric_limits<RandomizerSeedType>::quiet_NaN();
   this->m_Randomizer = RandomizerType::New();
   this->m_Randomizer->Initialize();
 
@@ -108,27 +110,30 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   this->m_InitialAnnealingTemperature = 1.0;
   this->m_AnnealingRate = 1.0;
   this->m_MinimumAnnealingTemperature = 0.1;
-  this->m_ICMCodeImage = ITK_NULLPTR;
+  this->m_ICMCodeImage = nullptr;
   this->m_UseAsynchronousUpdating = true;
   this->m_MaximumNumberOfICMIterations = 1;
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::~AtroposSegmentationImageFilter()
-{
-}
+= default;
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::SetRandomizerInitializationSeed( const RandomizerSeedType seed )
 {
-  this->m_Randomizer->Initialize( seed );
-  this->Modified();
+  if( seed != this->m_RandomizerInitializationSeed )
+    {
+    this->m_RandomizerInitializationSeed = seed;
+    this->m_Randomizer->Initialize( this->m_RandomizerInitializationSeed );
+    this->Modified();
+    }
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::SetMaskImage( const MaskImageType * mask )
@@ -137,7 +142,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   this->m_MaskImage = mask;
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 const typename AtroposSegmentationImageFilter
 <TInputImage, TMaskImage, TClassifiedImage>::MaskImageType
 * AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
@@ -151,7 +156,7 @@ const typename AtroposSegmentationImageFilter
   return this->m_MaskImage;
   }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::SetPriorLabelImage( const ClassifiedImageType * prior )
@@ -160,7 +165,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   this->m_PriorLabelImage = prior;
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 const typename AtroposSegmentationImageFilter
 <TInputImage, TMaskImage, TClassifiedImage>::ClassifiedImageType
 * AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
@@ -175,7 +180,7 @@ const typename AtroposSegmentationImageFilter
   return this->m_PriorLabelImage;
   }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::SetPriorProbabilityImage( unsigned int whichClass, RealImageType * priorImage )
@@ -238,7 +243,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     }
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 typename AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::RealImagePointer
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
@@ -246,7 +251,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 {
   if( this->m_InitializationStrategy != PriorProbabilityImages )
     {
-    return ITK_NULLPTR;
+    return nullptr;
     }
   if( this->m_NumberOfPartialVolumeClasses == 0 && whichClass
       > this->m_NumberOfTissueClasses )
@@ -257,7 +262,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     }
   else if( whichClass > this->m_NumberOfTissueClasses )
     {
-    return ITK_NULLPTR;
+    return nullptr;
     }
 
   if( ( this->m_MinimizeMemoryUsage &&
@@ -311,7 +316,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     }
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::SetIntensityImage( unsigned int which, const ImageType * image )
@@ -336,7 +341,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   this->m_IntensityImages[which] = image;
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 const typename AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::ImageType
 * AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
@@ -366,7 +371,7 @@ const typename AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifi
   return image;
   }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::AddPartialVolumeLabelSet( PartialVolumeLabelSetType labelSet )
@@ -383,7 +388,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     if( *it < 1 || *it > this->m_NumberOfTissueClasses )
       {
       itkWarningMacro( "The label " << *it << " is outside the specified "
-                                    << "range of the specified tissue class labels." )
+                                    << "range of the specified tissue class labels." );
       return;
       }
     }
@@ -427,7 +432,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   this->Modified();
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::GenerateData()
@@ -502,7 +507,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     }
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::GenerateInitialClassLabeling()
@@ -559,7 +564,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         duplicator->SetInputImage( this->GetPriorLabelImage() );
         duplicator->Update();
 
-        this->SetNthOutput( 0, duplicator->GetModifiableOutput() );
+        this->SetNthOutput( 0, duplicator->GetOutput() );
         }
       }
       break;
@@ -657,7 +662,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         }
       else
         {
-        this->m_MixtureModelProportions[n] = 1.0
+        this->m_MixtureModelProportions[n] = NumericTraits<RealType>::OneValue()
           / static_cast<RealType>( totalNumberOfClasses );
         }
       }
@@ -683,12 +688,12 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     this->m_ControlPointLattices.push_back( container );
     for( unsigned int n = 0; n < this->m_NumberOfTissueClasses; n++ )
       {
-      this->m_ControlPointLattices[i].push_back( ITK_NULLPTR );
+      this->m_ControlPointLattices[i].push_back( nullptr );
       }
     }
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::GenerateInitialClassLabelingWithPriorProbabilityImages()
@@ -737,7 +742,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
           ItM.Set( ItP.Get() );
           ItO.Set( n + 1 );
           }
-        else if( ItP.Get() == ItM.Get() )
+        else if( Math::FloatAlmostEqual( ItP.Get(), ItM.Get() ) )
           {
           if( n == 0 )
             {
@@ -780,7 +785,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
       {
       if( !this->GetMaskImage() || this->GetMaskImage()->GetPixel( ItP.GetIndex() ) != NumericTraits<MaskLabelType>::ZeroValue() )
         {
-        if( ItM.Get() <= this->m_ProbabilityThreshold || ItS.Get() == 0.0 )
+        if( ItM.Get() <= this->m_ProbabilityThreshold || Math::FloatAlmostEqual( ItS.Get(), NumericTraits<typename ImageType::PixelType>::ZeroValue() ) )
           {
           ItO.Set( NumericTraits<LabelType>::ZeroValue() );
           ItP.Set( NumericTraits<RealType>::ZeroValue() );
@@ -812,7 +817,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   this->SetPriorLabelImage( duplicator->GetOutput() );
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::GenerateInitialClassLabelingWithOtsuThresholding()
@@ -871,7 +876,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     LabelType label = NumericTraits<LabelType>::ZeroValue();
     if( !this->GetMaskImage() || this->GetMaskImage()->GetPixel( ItI.GetIndex() ) != NumericTraits<MaskLabelType>::ZeroValue() )
       {
-      if( ItI.Get() < thresholds[0] )
+      if( ItI.Get() < static_cast<typename ImageType::PixelType>( thresholds[0] ) )
         {
         label = NumericTraits<LabelType>::OneValue();
         }
@@ -880,7 +885,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         bool thresholdFound = false;
         for( unsigned int i = 1; i < thresholds.size(); i++ )
           {
-          if( ItI.Get() >= thresholds[i - 1] && ItI.Get() <= thresholds[i] )
+          if( ItI.Get() >= static_cast<typename ImageType::PixelType>( thresholds[i - 1] ) && ItI.Get() <= static_cast<typename ImageType::PixelType>( thresholds[i] ) )
             {
             label = static_cast<LabelType>( i + 1 );
             thresholdFound = true;
@@ -897,7 +902,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     }
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::GenerateInitialClassLabelingWithKMeansClustering()
@@ -978,7 +983,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     for( unsigned int n = 0; n < this->m_NumberOfTissueClasses; n++ )
       {
       initialMeans[n] = minValue + ( maxValue - minValue )
-        * ( static_cast<RealType>( n ) + 0.5 )
+        * ( static_cast<RealType>( n ) + static_cast<RealType>( 0.5 ) )
         / static_cast<RealType>( this->m_NumberOfTissueClasses );
       }
     }
@@ -1207,7 +1212,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     }
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 typename AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::RealType
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
@@ -1331,7 +1336,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
           ItM.Set( posteriorProbability );
           ItO.Set( static_cast<LabelType>( n + 1 ) );
           }
-        else if( posteriorProbability == ItM.Get() )
+        else if( Math::FloatAlmostEqual( posteriorProbability, ItM.Get() ) )
           {
           LabelType currentLabel = ItO.Get();
           if( currentLabel >= 1 && this->m_LabelVolumes[n] < this->m_LabelVolumes[currentLabel - 1] )
@@ -1375,7 +1380,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
       }
     else
       {
-      this->m_MixtureModelProportions[n] = 1.0
+      this->m_MixtureModelProportions[n] = NumericTraits<RealType>::OneValue()
         / static_cast<RealType>( totalNumberOfClasses );
       }
     }
@@ -1545,7 +1550,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   return maxPosteriorSum / static_cast<RealType>( totalSampleSize );
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 typename AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::RealType
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
@@ -1585,7 +1590,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     // Calculate the mrf prior probability
 
     RealType mrfPriorProbability = 1.0;
-    if( mrfSmoothingFactor > 0.0 && ( It.GetNeighborhood() ).Size() > 1 )
+    if( mrfSmoothingFactor > NumericTraits<RealType>::ZeroValue() && ( It.GetNeighborhood() ).Size() > 1 )
       {
       RealType numerator = std::exp( -mrfSmoothingFactor * mrfNeighborhoodWeights[k] );
       RealType denominator = 0.0;
@@ -1593,7 +1598,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         {
         denominator += std::exp( -mrfSmoothingFactor * mrfNeighborhoodWeights[n] );
         }
-      if( denominator > 0.0 )
+      if( denominator > NumericTraits<RealType>::ZeroValue() )
         {
         mrfPriorProbability = numerator / denominator;
         }
@@ -1619,8 +1624,8 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         this->m_MixtureModelProportions[k], priorProbability, 1,
         mrfPriorProbability, likelihood, It.GetIndex(), k + 1 );
 
-    if( vnl_math_isnan( posteriorProbability ) ||
-        vnl_math_isinf( posteriorProbability ) )
+    if( std::isnan( posteriorProbability ) ||
+        std::isinf( posteriorProbability ) )
       {
       posteriorProbability = 0.0;
       }
@@ -1636,8 +1641,8 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 
   maxPosteriorProbability /= sumPosteriorProbability;
 
-  if( vnl_math_isnan( maxPosteriorProbability ) ||
-      vnl_math_isinf( maxPosteriorProbability ) )
+  if( std::isnan( maxPosteriorProbability ) ||
+      std::isinf( maxPosteriorProbability ) )
     {
     maxPosteriorProbability = 0.0;
     }
@@ -1645,7 +1650,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   return maxPosteriorProbability;
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 typename AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::SamplePointer
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
@@ -1741,7 +1746,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   return scalarSamples;
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 typename AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::RealType
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
@@ -1754,10 +1759,10 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 
   RealType probabilityEpsilon = 1.0e-10;
 
-  spatialPriorProbability = vnl_math_max( static_cast<RealType>( probabilityEpsilon ), spatialPriorProbability );
-  distancePriorProbability = vnl_math_max( static_cast<RealType>( probabilityEpsilon ), distancePriorProbability );
-  mrfPriorProbability = vnl_math_max( static_cast<RealType>( probabilityEpsilon ), mrfPriorProbability );
-  likelihood = vnl_math_max( static_cast<RealType>( probabilityEpsilon ), likelihood );
+  spatialPriorProbability = std::max( static_cast<RealType>( probabilityEpsilon ), spatialPriorProbability );
+  distancePriorProbability = std::max( static_cast<RealType>( probabilityEpsilon ), distancePriorProbability );
+  mrfPriorProbability = std::max( static_cast<RealType>( probabilityEpsilon ), mrfPriorProbability );
+  likelihood = std::max( static_cast<RealType>( probabilityEpsilon ), likelihood );
 
   RealType posteriorProbability = 0.0;
 
@@ -1789,7 +1794,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         std::pow( static_cast<RealType>( spatialPriorProbability ),
                  static_cast<RealType>( this->m_PriorProbabilityWeight ) )
         * std::pow( static_cast<RealType>( likelihood * mrfPriorProbability ),
-                   static_cast<RealType>( 1.0 - this->m_PriorProbabilityWeight ) );
+                   static_cast<RealType>( NumericTraits<RealType>::OneValue() - this->m_PriorProbabilityWeight ) );
       }
       break;
     case Plato:
@@ -1803,7 +1808,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         mrfPriorProbability = 1.0;
         }
       else if( this->GetPriorProbabilityImage( whichClass ) &&
-               this->GetPriorProbabilityImage( whichClass )->GetPixel( index ) == 1.0 )
+               Math::FloatAlmostEqual( this->GetPriorProbabilityImage( whichClass )->GetPixel( index ), NumericTraits<RealType>::OneValue() ) )
         {
         spatialPriorProbability = 1.0;
         likelihood = 1.0;
@@ -1813,7 +1818,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         std::pow( static_cast<RealType>( spatialPriorProbability ),
                  static_cast<RealType>( this->m_PriorProbabilityWeight ) )
         * std::pow( static_cast<RealType>( likelihood * mrfPriorProbability ),
-                   static_cast<RealType>( 1.0 - this->m_PriorProbabilityWeight ) );
+                   static_cast<RealType>( NumericTraits<RealType>::OneValue() - this->m_PriorProbabilityWeight ) );
       }
       break;
     case Aristotle:
@@ -1822,7 +1827,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         std::pow( static_cast<RealType>( spatialPriorProbability * distancePriorProbability ),
                  static_cast<RealType>( this->m_PriorProbabilityWeight ) )
         * std::pow( static_cast<RealType>( likelihood * mrfPriorProbability ),
-                   static_cast<RealType>( 1.0 - this->m_PriorProbabilityWeight ) );
+                   static_cast<RealType>( NumericTraits<RealType>::OneValue() - this->m_PriorProbabilityWeight ) );
       }
       break;
     case Sigmoid:
@@ -1839,26 +1844,27 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         }
       */
       RealType totalNumberOfClasses = static_cast<RealType>( this->m_NumberOfTissueClasses + this->m_NumberOfPartialVolumeClasses );
-      RealType offset = 1.0 / totalNumberOfClasses;
-      spatialPriorProbability = 1.0 / ( 1.0 + std::exp( -1.0 * ( spatialPriorProbability - offset ) * this->m_PriorProbabilityWeight ) );
+      RealType offset = NumericTraits<RealType>::OneValue() / totalNumberOfClasses;
+      spatialPriorProbability = NumericTraits<RealType>::OneValue()
+        / ( NumericTraits<RealType>::OneValue() + std::exp( -NumericTraits<RealType>::OneValue() * ( spatialPriorProbability - offset ) * this->m_PriorProbabilityWeight ) );
       posteriorProbability = static_cast<RealType>( spatialPriorProbability ) * static_cast<RealType>( likelihood * mrfPriorProbability );
       }
       break;
     }
 
-  if( this->m_InitialAnnealingTemperature != 1.0 )
+  if( ! Math::FloatAlmostEqual( this->m_InitialAnnealingTemperature, NumericTraits<RealType>::OneValue() ) )
     {
     RealType annealingTemperature = this->m_InitialAnnealingTemperature
       * std::pow( this->m_AnnealingRate, static_cast<RealType>( this->m_ElapsedIterations ) );
 
-    annealingTemperature = vnl_math_max( annealingTemperature,
+    annealingTemperature = std::max( annealingTemperature,
                                          this->m_MinimumAnnealingTemperature );
 
     posteriorProbability = std::pow( static_cast<RealType>( posteriorProbability ),
-                                    static_cast<RealType>( 1.0 / annealingTemperature ) );
+                                    static_cast<RealType>( NumericTraits<RealType>::OneValue() / annealingTemperature ) );
     }
-  if( vnl_math_isnan( posteriorProbability ) ||
-      vnl_math_isinf( posteriorProbability ) )
+  if( std::isnan( posteriorProbability ) ||
+      std::isinf( posteriorProbability ) )
     {
     posteriorProbability = 0.0;
     }
@@ -1866,7 +1872,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   return posteriorProbability;
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::EvaluateMRFNeighborhoodWeights( ConstNeighborhoodIterator<TClassifiedImage> It,
@@ -1887,7 +1893,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 
   unsigned int neighborhoodSize = ( It.GetNeighborhood() ).Size();
 
-  if( mrfSmoothingFactor > 0.0 && neighborhoodSize > 1 )
+  if( mrfSmoothingFactor > NumericTraits<RealType>::ZeroValue() && neighborhoodSize > 1 )
     {
     for( unsigned int label = 1; label <= totalNumberOfClasses; label++ )
       {
@@ -1908,7 +1914,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         RealType distance = 0.0;
         for( unsigned int d = 0; d < ImageDimension; d++ )
           {
-          distance += vnl_math_sqr( offset[d] * this->m_ImageSpacing[d] );
+          distance += static_cast<RealType>( Math::sqr( offset[d] * this->m_ImageSpacing[d] ) );
           }
         distance = std::sqrt( distance );
 
@@ -1959,7 +1965,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     }
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 typename AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::RealImagePointer
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
@@ -2006,7 +2012,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
       this->m_SumPosteriorProbabilityImage =
         AllocImage<RealImageType>( this->GetOutput(), 0 );
 
-      RealImagePointer sumPriorProbabilityImage = ITK_NULLPTR;
+      RealImagePointer sumPriorProbabilityImage = nullptr;
 
       if( this->m_InitializationStrategy == PriorLabelImage ||
           this->m_InitializationStrategy == PriorProbabilityImages )
@@ -2034,14 +2040,14 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
               }
             else if( this->GetPriorLabelImage() )
               {
-              if( priorProbability == 0 )
+              if( Math::FloatAlmostEqual( priorProbability, NumericTraits<RealType>::ZeroValue() ) )
                 {
-                priorProbability = 1.0 / static_cast<RealType>(
-                    totalNumberOfClasses );
+                priorProbability = NumericTraits<RealType>::OneValue() /
+                  static_cast<RealType>( totalNumberOfClasses );
                 }
               else
                 {
-                priorProbability = 1.0;
+                priorProbability = NumericTraits<RealType>::OneValue();
                 }
               }
             ItS.Set( ItS.Get() + this->m_MixtureModelProportions[c]
@@ -2054,20 +2060,20 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         std::vector<RealImagePointer> smoothImages;
 
         if( this->m_InitializationStrategy == PriorProbabilityImages ||
-            (this->m_InitializationStrategy == PriorLabelImage &&
-             c < this->m_NumberOfTissueClasses) )
+            ( this->m_InitializationStrategy == PriorLabelImage &&
+             c < this->m_NumberOfTissueClasses ) )
           {
           for( unsigned int i = 0; i < this->m_NumberOfIntensityImages; i++ )
             {
             if( this->m_AdaptiveSmoothingWeights.size() > i &&
-                this->m_AdaptiveSmoothingWeights[i] > 0.0 )
+                this->m_AdaptiveSmoothingWeights[i] > NumericTraits<RealType>::ZeroValue() )
               {
               smoothImages.push_back(
                 this->GetSmoothIntensityImageFromPriorImage( i, c + 1 ) );
               }
             else
               {
-              smoothImages.push_back( ITK_NULLPTR );
+              smoothImages.push_back( nullptr );
               }
             }
           }
@@ -2103,21 +2109,21 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
             //
             // Perform mrf prior calculation
             //
-            RealType mrfPriorProbability = 1.0;
-            if( mrfSmoothingFactor > 0.0 && ( ItO.GetNeighborhood() ).Size() > 1 )
+            RealType mrfPriorProbability = NumericTraits<RealType>::OneValue();
+            if( mrfSmoothingFactor > NumericTraits<RealType>::ZeroValue() && ( ItO.GetNeighborhood() ).Size() > 1 )
               {
               Array<RealType> mrfNeighborhoodWeights;
               this->EvaluateMRFNeighborhoodWeights( ItO, mrfNeighborhoodWeights );
 
               RealType numerator = std::exp( -mrfSmoothingFactor
                                             * mrfNeighborhoodWeights[c] );
-              RealType denominator = 0.0;
+              RealType denominator = NumericTraits<RealType>::ZeroValue();
               for( unsigned int n = 0; n < totalNumberOfClasses; n++ )
                 {
                 denominator += std::exp( -mrfSmoothingFactor
                                         * mrfNeighborhoodWeights[n] );
                 }
-              if( denominator > 0.0 )
+              if( denominator > NumericTraits<RealType>::ZeroValue() )
                 {
                 mrfPriorProbability = numerator / denominator;
                 }
@@ -2144,14 +2150,14 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
                 }
               else if( this->GetPriorLabelImage() )
                 {
-                if( priorProbability == 0.0 )
+                if( Math::FloatAlmostEqual( priorProbability, NumericTraits<RealType>::ZeroValue() ) )
                   {
-                  priorProbability = 1.0
+                  priorProbability = NumericTraits<RealType>::OneValue()
                     / static_cast<RealType>( totalNumberOfClasses );
                   }
                 else
                   {
-                  priorProbability = 1.0;
+                  priorProbability = NumericTraits<RealType>::OneValue();
                   }
                 }
               RealType sumPriorProbability =
@@ -2178,7 +2184,8 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
                     this->m_InitializationStrategy == PriorLabelImage ) &&
                   smoothImages[i] )
                 {
-                measurement[i] = ( 1.0 - this->m_AdaptiveSmoothingWeights[i] )
+                measurement[i] = ( NumericTraits<RealType>::OneValue() -
+                    this->m_AdaptiveSmoothingWeights[i] )
                   * measurement[i] + this->m_AdaptiveSmoothingWeights[i]
                   * smoothImages[i]->GetPixel( ItO.GetIndex() );
                 }
@@ -2202,8 +2209,8 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
                 distancePriorProbability, mrfPriorProbability, likelihood,
                 ItO.GetIndex(), c + 1 );
 
-            if( vnl_math_isnan( posteriorProbability ) ||
-                vnl_math_isinf( posteriorProbability ) )
+            if( std::isnan( posteriorProbability ) ||
+                std::isinf( posteriorProbability ) )
               {
               posteriorProbability = 0.0;
               }
@@ -2228,7 +2235,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
           duplicator->Update();
 
           this->m_PosteriorProbabilityImages.push_back(
-            duplicator->GetModifiableOutput() );
+            duplicator->GetOutput() );
           }
         }
 
@@ -2271,7 +2278,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
       }
     else // whichClass > 1
       {
-      RealImagePointer sumPriorProbabilityImage = ITK_NULLPTR;
+      RealImagePointer sumPriorProbabilityImage = nullptr;
 
       if( this->m_InitializationStrategy == PriorLabelImage ||
           this->m_InitializationStrategy == PriorProbabilityImages )
@@ -2303,14 +2310,14 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
               }
             else if( this->GetPriorLabelImage() )
               {
-              if( priorProbability == 0.0 )
+              if( Math::FloatAlmostEqual( priorProbability, NumericTraits<RealType>::ZeroValue() ) )
                 {
-                priorProbability = 1.0 / static_cast<RealType>(
-                    totalNumberOfClasses );
+                priorProbability = NumericTraits<RealType>::OneValue() /
+                  static_cast<RealType>( totalNumberOfClasses );
                 }
               else
                 {
-                priorProbability = 1.0;
+                priorProbability = NumericTraits<RealType>::OneValue();
                 }
               }
             ItS.Set( ItS.Get() + this->m_MixtureModelProportions[c]
@@ -2327,14 +2334,14 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         for( unsigned int i = 0; i < this->m_NumberOfIntensityImages; i++ )
           {
           if( this->m_AdaptiveSmoothingWeights.size() > i &&
-              this->m_AdaptiveSmoothingWeights[i] > 0.0 )
+              this->m_AdaptiveSmoothingWeights[i] > NumericTraits<RealType>::ZeroValue() )
             {
             smoothImages.push_back(
               this->GetSmoothIntensityImageFromPriorImage( i, whichClass ) );
             }
           else
             {
-            smoothImages.push_back( ITK_NULLPTR );
+            smoothImages.push_back( nullptr );
             }
           }
         }
@@ -2364,20 +2371,20 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
           //
           // Perform mrf prior calculation
           //
-          RealType mrfPriorProbability = 1.0;
-          if( mrfSmoothingFactor > 0.0 && ( ItO.GetNeighborhood() ).Size() > 1 )
+          RealType mrfPriorProbability = NumericTraits<RealType>::OneValue();
+          if( mrfSmoothingFactor > NumericTraits<RealType>::ZeroValue() && ( ItO.GetNeighborhood() ).Size() > 1 )
             {
             Array<RealType> mrfNeighborhoodWeights;
             this->EvaluateMRFNeighborhoodWeights( ItO, mrfNeighborhoodWeights );
 
             RealType numerator = std::exp( -mrfSmoothingFactor
                                           * mrfNeighborhoodWeights[whichClass - 1] );
-            RealType denominator = 0.0;
+            RealType denominator = NumericTraits<RealType>::ZeroValue();
             for( unsigned int n = 0; n < totalNumberOfClasses; n++ )
               {
               denominator += std::exp( -mrfSmoothingFactor * mrfNeighborhoodWeights[n] );
               }
-            if( denominator > 0.0 )
+            if( denominator > NumericTraits<RealType>::ZeroValue() )
               {
               mrfPriorProbability = numerator / denominator;
               }
@@ -2387,8 +2394,8 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
           // Perform prior calculation using both the mixing proportions
           // and template-based prior images (if available)
           //
-          RealType priorProbability = 0.0;
-          RealType distancePriorProbability = 0.0;
+          RealType priorProbability = NumericTraits<RealType>::ZeroValue();
+          RealType distancePriorProbability = NumericTraits<RealType>::ZeroValue();
           if( this->m_InitializationStrategy == PriorLabelImage ||
               this->m_InitializationStrategy == PriorProbabilityImages )
             {
@@ -2426,7 +2433,8 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
                   this->m_InitializationStrategy == PriorLabelImage ) &&
                 smoothImages[i] )
               {
-              measurement[i] = ( 1.0 - this->m_AdaptiveSmoothingWeights[i] )
+              measurement[i] = ( NumericTraits<RealType>::OneValue()
+                  - this->m_AdaptiveSmoothingWeights[i] )
                 * measurement[i] + this->m_AdaptiveSmoothingWeights[i]
                 * smoothImages[i]->GetPixel( ItO.GetIndex() );
               }
@@ -2450,10 +2458,10 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
               distancePriorProbability, mrfPriorProbability, likelihood,
               ItO.GetIndex(), whichClass );
 
-          if( vnl_math_isnan( posteriorProbability ) ||
-              vnl_math_isinf( posteriorProbability ) )
+          if( std::isnan( posteriorProbability ) ||
+              std::isinf( posteriorProbability ) )
             {
-            posteriorProbability = 0.0;
+            posteriorProbability = NumericTraits<RealType>::ZeroValue();
             }
 
           posteriorProbabilityImage->SetPixel( ItO.GetIndex(),
@@ -2481,7 +2489,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     }
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 typename AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::RealImagePointer
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
@@ -2495,7 +2503,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
       ( whichClass > this->m_NumberOfTissueClasses && whichClass <=
         totalNumberOfClasses ) )
     {
-    return ITK_NULLPTR;
+    return nullptr;
     }
   if( this->m_NumberOfPartialVolumeClasses == 0 && whichClass
       > this->m_NumberOfTissueClasses )
@@ -2506,7 +2514,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     }
   else if( whichClass > this->m_NumberOfTissueClasses )
     {
-    return ITK_NULLPTR;
+    return nullptr;
     }
 
   //
@@ -2529,7 +2537,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     // the sum of the distance prior probability images needs to be calculated
     // for normalization purposes.  This sum is then saved for subsequent calls.
     //
-    RealImagePointer distancePriorProbabilityImage = ITK_NULLPTR;
+    RealImagePointer distancePriorProbabilityImage = nullptr;
 
     //
     // Calculate the sum of the distance probability images.  Also, store the
@@ -2623,7 +2631,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
             contour->GetOutput(), contour->GetOutput()->GetRequestedRegion() );
           for( ItC.GoToBegin(); !ItC.IsAtEnd(); ++ItC )
             {
-            if( ItC.Get() == contour->GetForegroundValue() )
+            if( Math::FloatAlmostEqual( ItC.Get(), contour->GetForegroundValue() ) )
               {
               NodeType node;
               node.SetValue( 0.0 );
@@ -2642,7 +2650,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
                                                   fastMarching->GetOutput()->GetRequestedRegion() );
           for( ItT.GoToBegin(), ItF.GoToBegin(); !ItT.IsAtEnd(); ++ItT, ++ItF )
             {
-            if( ItT.Get() == 1 )
+            if( Math::FloatAlmostEqual( ItT.Get(), NumericTraits<float>::OneValue() ) )
               {
               ItF.Set( -ItF.Get() );
               }
@@ -2658,9 +2666,9 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         for( ItD.GoToBegin(); !ItD.IsAtEnd(); ++ItD )
           {
           if( ItD.Get() < 0 &&
-              maximumInteriorDistance < vnl_math_abs( ItD.Get() ) )
+              maximumInteriorDistance < Math::abs( ItD.Get() ) )
             {
-            maximumInteriorDistance = vnl_math_abs( ItD.Get() );
+            maximumInteriorDistance = Math::abs( ItD.Get() );
             }
           }
 
@@ -2676,26 +2684,26 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
           }
         for( ItD.GoToBegin(); !ItD.IsAtEnd(); ++ItD )
           {
-          if( labelLambda == 0 )
+          if( Math::FloatAlmostEqual( labelLambda, NumericTraits<RealType>::ZeroValue() ) )
             {
-            if( ItD.Get() <= 0 )
+            if( ItD.Get() <= NumericTraits<float>::ZeroValue() )
               {
               ItD.Set( labelBoundaryProbability );
               }
             else
               {
-              ItD.Set( 0.0 );
+              ItD.Set( NumericTraits<RealType>::ZeroValue() );
               }
             }
-          else if( ItD.Get() >= 0 )
+          else if( ItD.Get() >= NumericTraits<float>::ZeroValue() )
             {
             ItD.Set( labelBoundaryProbability
                      * std::exp( -labelLambda * ItD.Get() ) );
             }
-          else if( ItD.Get() < 0 )
+          else if( ItD.Get() < NumericTraits<float>::ZeroValue() )
             {
-            ItD.Set( 1.0 - ( 1.0 - labelBoundaryProbability )
-                     * ( maximumInteriorDistance - vnl_math_abs( ItD.Get() ) )
+            ItD.Set( NumericTraits<RealType>::OneValue() - ( NumericTraits<RealType>::OneValue() - labelBoundaryProbability )
+                     * ( maximumInteriorDistance - Math::abs( ItD.Get() ) )
                      / ( maximumInteriorDistance ) );
             }
           }
@@ -2852,7 +2860,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
           contour->GetOutput(), contour->GetOutput()->GetRequestedRegion() );
         for( ItC.GoToBegin(); !ItC.IsAtEnd(); ++ItC )
           {
-          if( ItC.Get() == contour->GetForegroundValue() )
+          if( Math::FloatAlmostEqual( ItC.Get(), contour->GetForegroundValue() ) )
             {
             NodeType node;
             node.SetValue( 0.0 );
@@ -2871,7 +2879,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
                                                 fastMarching->GetOutput()->GetRequestedRegion() );
         for( ItT.GoToBegin(), ItF.GoToBegin(); !ItT.IsAtEnd(); ++ItT, ++ItF )
           {
-          if( ItT.Get() == 1 )
+          if( Math::FloatAlmostEqual( ItT.Get(), itk::NumericTraits<float>::OneValue() ) )
             {
             ItF.Set( -ItF.Get() );
             }
@@ -2888,9 +2896,9 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
       for( ItD.GoToBegin(); !ItD.IsAtEnd(); ++ItD )
         {
         if( ItD.Get() < 0 &&
-            maximumInteriorDistance < vnl_math_abs( ItD.Get() ) )
+            maximumInteriorDistance < Math::abs( ItD.Get() ) )
           {
-          maximumInteriorDistance = vnl_math_abs( ItD.Get() );
+          maximumInteriorDistance = Math::abs( ItD.Get() );
           }
         }
 
@@ -2906,26 +2914,26 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
         }
       for( ItD.GoToBegin(); !ItD.IsAtEnd(); ++ItD )
         {
-        if( labelLambda == 0 )
+        if( Math::FloatAlmostEqual( labelLambda, NumericTraits<RealType>::ZeroValue() ) )
           {
-          if( ItD.Get() <= 0 )
+          if( ItD.Get() <= NumericTraits<RealType>::ZeroValue() )
             {
             ItD.Set( labelBoundaryProbability );
             }
           else
             {
-            ItD.Set( 0.0 );
+            ItD.Set( NumericTraits<RealType>::ZeroValue() );
             }
           }
-        else if( ItD.Get() >= 0 )
+        else if( ItD.Get() >= NumericTraits<RealType>::ZeroValue() )
           {
           ItD.Set( labelBoundaryProbability
                    * std::exp( -labelLambda * ItD.Get() ) );
           }
         else if( ItD.Get() < 0 )
           {
-          ItD.Set( 1.0 - ( 1.0 - labelBoundaryProbability )
-                   * ( maximumInteriorDistance - vnl_math_abs( ItD.Get() ) )
+          ItD.Set( NumericTraits<RealType>::OneValue() - ( NumericTraits<RealType>::OneValue() - labelBoundaryProbability )
+                   * ( maximumInteriorDistance - Math::abs( ItD.Get() ) )
                    / ( maximumInteriorDistance ) );
           }
         }
@@ -2955,7 +2963,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     }
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 typename AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::RealImagePointer
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
@@ -2964,7 +2972,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 {
   typename ScalarImageType::Pointer bsplineImage;
 
-  if( this->m_ControlPointLattices[whichImage][whichClass - 1].GetPointer() != ITK_NULLPTR )
+  if( this->m_ControlPointLattices[whichImage][whichClass - 1].GetPointer() != nullptr )
     {
     typedef BSplineControlPointImageFilter<ControlPointLatticeType,
                                            ScalarImageType> BSplineReconstructorType;
@@ -3025,7 +3033,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
       {
       if( !this->GetMaskImage() || this->GetMaskImage()->GetPixel( ItP.GetIndex() ) != NumericTraits<MaskLabelType>::ZeroValue() )
         {
-        if( ItP.Get() >= 0.5 )
+        if( ItP.Get() >= static_cast<RealType>( 0.5 ) )
           {
           typename RealImageType::PointType imagePoint;
           probabilityImage->TransformIndexToPhysicalPoint(
@@ -3086,7 +3094,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   return caster->GetOutput();
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 typename AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::RealImagePointer
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
@@ -3106,14 +3114,14 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
     for( unsigned int i = 0; i < this->m_NumberOfIntensityImages; i++ )
       {
       if( this->m_AdaptiveSmoothingWeights.size() > i &&
-          this->m_AdaptiveSmoothingWeights[i] > 0.0 )
+          this->m_AdaptiveSmoothingWeights[i] > NumericTraits<RealType>::ZeroValue() )
         {
         smoothImages.push_back(
           this->GetSmoothIntensityImageFromPriorImage( i, whichClass ) );
         }
       else
         {
-        smoothImages.push_back( ITK_NULLPTR );
+        smoothImages.push_back( nullptr );
         }
       }
     }
@@ -3135,7 +3143,8 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
               this->m_InitializationStrategy == PriorLabelImage ) &&
             smoothImages[i] )
           {
-          measurement[i] = ( 1.0 - this->m_AdaptiveSmoothingWeights[i] )
+          measurement[i] = ( NumericTraits<RealType>::OneValue()
+              - this->m_AdaptiveSmoothingWeights[i] )
             * measurement[i] + this->m_AdaptiveSmoothingWeights[i]
             * smoothImages[i]->GetPixel( It.GetIndex() );
           }
@@ -3149,7 +3158,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   return likelihoodImage;
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::ComputeICMCodeImage()
@@ -3216,7 +3225,7 @@ AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
   this->m_MaximumICMCode--;
 }
 
-template <class TInputImage, class TMaskImage, class TClassifiedImage>
+template <typename TInputImage, typename TMaskImage, typename TClassifiedImage>
 void
 AtroposSegmentationImageFilter<TInputImage, TMaskImage, TClassifiedImage>
 ::PrintSelf( std::ostream& os, Indent indent ) const

@@ -22,7 +22,7 @@
 #include "itkImageRegionConstIterator.h"
 #include "itkImageRegionIterator.h"
 #include "itkImageIterator.h"
-#include "vnl/vnl_math.h"
+#include "itkMath.h"
 #include "itkDiscreteGaussianImageFilter.h"
 #include "itkImageRegionConstIteratorWithIndex.h"
 
@@ -31,7 +31,7 @@ namespace itk
 /**
  * Constructor
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField>
 AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField>
 ::AvantsMutualInformationRegistrationFunction()
 {
@@ -42,7 +42,7 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
   //  this->SetComputeGradient(false); // don't use the default gradient for no
 
   // Initialize PDFs to NULL
-  m_JointPDF = ITK_NULLPTR;
+  m_JointPDF = nullptr;
 
   m_OpticalFlow = false;
   typename TransformType::Pointer transformer = TransformType::New();
@@ -51,8 +51,8 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
   typename BSplineInterpolatorType::Pointer interpolator = BSplineInterpolatorType::New();
   this->SetInterpolator(interpolator);
 
-  m_FixedImageMask = ITK_NULLPTR;
-  m_MovingImageMask = ITK_NULLPTR;
+  m_FixedImageMask = nullptr;
+  m_MovingImageMask = nullptr;
 
   // Initialize memory
   m_MovingImageNormalizedMin = 0.0;
@@ -61,9 +61,9 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
   m_MovingImageTrueMax = 0.0;
   m_FixedImageBinSize = 0.0;
   m_MovingImageBinSize = 0.0;
-  m_CubicBSplineDerivativeKernel = ITK_NULLPTR;
-  m_BSplineInterpolator = ITK_NULLPTR;
-  m_DerivativeCalculator = ITK_NULLPTR;
+  m_CubicBSplineDerivativeKernel = nullptr;
+  m_BSplineInterpolator = nullptr;
+  m_DerivativeCalculator = nullptr;
   m_NumberOfParameters = ImageDimension;
 
   m_FixedImageGradientCalculator = GradientCalculatorType::New();
@@ -86,7 +86,7 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
 /**
  * Print out internal information about this class
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField>
 void
 AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField>
 ::PrintSelf(std::ostream& os, Indent indent) const
@@ -120,7 +120,7 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
 /**
  * Initialize
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField>
 void
 AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField>
 ::InitializeIteration()
@@ -165,10 +165,10 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
   m_NumberOfSpatialSamples = 1;
   for( unsigned int k = 0; k < ImageDimension; k++ )
     {
-    m_Normalizer += m_FixedImageSpacing[k] * m_FixedImageSpacing[k];
+    m_Normalizer += static_cast<float>( itk::Math::sqr( m_FixedImageSpacing[k] ) );
     m_NumberOfSpatialSamples *= this->m_FixedImage->GetLargestPossibleRegion().GetSize()[k];
     }
-  m_Normalizer /= static_cast<double>( ImageDimension );
+  m_Normalizer /= static_cast<float>( ImageDimension );
 
   /**
    * Compute binsize for the histograms.
@@ -209,7 +209,7 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
 
     if( this->m_FixedImageMask )
       {
-      if( this->m_FixedImageMask->GetPixel( movingImageIterator.GetIndex() ) < 1.e-6 )
+      if( this->m_FixedImageMask->GetPixel( movingImageIterator.GetIndex() ) < static_cast<typename FixedImageType::PixelType>( 1.e-6 ) )
         {
         takesample = false;
         }
@@ -325,7 +325,7 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
 /**
  * Get the both Value and Derivative Measure
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField>
 void
 AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField>
 ::GetProbabilities()
@@ -345,7 +345,7 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
     bool takesample = true;
     if( this->m_FixedImageMask )
       {
-      if( this->m_FixedImageMask->GetPixel( iter.GetIndex() ) < 1.e-6 )
+      if( this->m_FixedImageMask->GetPixel( iter.GetIndex() ) < static_cast<typename FixedImageType::PixelType>( 1.e-6 ) )
         {
         takesample = false;
         }
@@ -390,12 +390,12 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
   while( !jointPDFIterator.IsAtEnd() )
     {
     float temp = jointPDFIterator.Get();
-    jointPDFSum += temp;
+    jointPDFSum += static_cast<double>( temp );
     ++jointPDFIterator;
     }
 
 // of derivatives
-  if( jointPDFSum == 0.0 )
+  if( itk::Math::FloatAlmostEqual( jointPDFSum, itk::NumericTraits<double>::ZeroValue() ) )
     {
     itkExceptionMacro( "Joint PDF summed to zero" );
     }
@@ -433,7 +433,7 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
     double sum = 0.0;
     while( !linearIter.IsAtEndOfLine() )
       {
-      sum += linearIter.Get();
+      sum += static_cast<double>( linearIter.Get() );
       ++linearIter;
       }
 
@@ -452,7 +452,7 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
     double sum = 0.0;
     while( !linearIter.IsAtEndOfLine() )
       {
-      sum += linearIter.Get();
+      sum += static_cast<double>( linearIter.Get() );
       ++linearIter;
       }
 
@@ -467,7 +467,7 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
 /**
  * Get the both Value and Derivative Measure
  */
-template <class TFixedImage, class TMovingImage, class TDisplacementField>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField>
 double
 AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField>
 ::GetValueAndDerivative(IndexType oindex,
@@ -507,7 +507,7 @@ AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplace
   return value;
 }
 
-template <class TFixedImage, class TMovingImage, class TDisplacementField>
+template <typename TFixedImage, typename TMovingImage, typename TDisplacementField>
 double
 AvantsMutualInformationRegistrationFunction<TFixedImage, TMovingImage, TDisplacementField>
 ::GetValueAndDerivativeInv(IndexType oindex,

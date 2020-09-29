@@ -11,8 +11,8 @@
      PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
-#ifndef __itkLabeledPointSetFileWriter_h
-#define __itkLabeledPointSetFileWriter_h
+#ifndef itkLabeledPointSetFileWriter_h
+#define itkLabeledPointSetFileWriter_h
 
 #include "itkMesh.h"
 
@@ -27,8 +27,8 @@ namespace itk
  * Writes an itkMesh to a file in various txt file formats.
  *
  */
-template <class TInputMesh>
-class LabeledPointSetFileWriter : public Object
+template <typename TInputMesh>
+class LabeledPointSetFileWriter final : public Object
 {
 public:
   /** Standard "Self" typedef. */
@@ -38,7 +38,7 @@ public:
   typedef SmartPointer<const Self>  ConstPointer;
 
   /** Method for creation through the object factory */
-  itkNewMacro( Self );
+  itkNewMacro( Self )
 
   /** Write the Input mesh to the Output file.
    * Use either Update() or Write(). */
@@ -51,7 +51,7 @@ public:
                        TInputMesh::PointType::Dimension );
 
   /** Run-time type information (and related methods). */
-  itkTypeMacro( LabeledPointSetFileWriter, Object );
+  itkTypeMacro( LabeledPointSetFileWriter, Object )
 
   /** Hold on to the type information specified by the template parameters. */
   typedef TInputMesh                         InputMeshType;
@@ -80,30 +80,30 @@ public:
   void SetInput( InputMeshType * input );
 
   /** Set/Get the name of the file where data are written. */
-  itkSetStringMacro( FileName );
-  itkGetStringMacro( FileName );
+  itkSetStringMacro( FileName )
+  itkGetStringMacro( FileName )
 
   /** Specify other attributes */
-  itkSetMacro( Lines, typename LineSetType::Pointer );
+  itkSetMacro( Lines, typename LineSetType::Pointer )
 
   itkSetMacro( MultiComponentScalars,
-               typename MultiComponentScalarSetType::Pointer );
+               typename MultiComponentScalarSetType::Pointer )
 
   /** Specify image attributes if output is an image. */
-  itkSetMacro( ImageSize, ImageSizeType );
-  itkGetConstMacro( ImageSize, ImageSizeType );
+  itkSetMacro( ImageSize, ImageSizeType )
+  itkGetConstMacro( ImageSize, ImageSizeType )
 
-  itkSetMacro( ImageOrigin, ImageOriginType );
-  itkGetConstMacro( ImageOrigin, ImageOriginType );
+  itkSetMacro( ImageOrigin, ImageOriginType )
+  itkGetConstMacro( ImageOrigin, ImageOriginType )
 
-  itkSetMacro( ImageSpacing, ImageSpacingType );
-  itkGetConstMacro( ImageSpacing, ImageSpacingType );
+  itkSetMacro( ImageSpacing, ImageSpacingType )
+  itkGetConstMacro( ImageSpacing, ImageSpacingType )
 
-  itkSetMacro( ImageDirection, ImageDirectionType );
-  itkGetConstMacro( ImageDirection, ImageDirectionType );
+  itkSetMacro( ImageDirection, ImageDirectionType )
+  itkGetConstMacro( ImageDirection, ImageDirectionType )
 protected:
   LabeledPointSetFileWriter();
-  virtual ~LabeledPointSetFileWriter() ITK_OVERRIDE;
+  ~LabeledPointSetFileWriter() override;
 
   virtual void GenerateData();
 
@@ -121,11 +121,11 @@ protected:
   ImageOriginType    m_ImageOrigin;
   ImageDirectionType m_ImageDirection;
 
-  void PrintSelf(std::ostream& os, Indent indent) const ITK_OVERRIDE;
+  void PrintSelf(std::ostream& os, Indent indent) const override;
 
 private:
-  LabeledPointSetFileWriter(const Self &); // purposely not implemented
-  void operator=(const Self &);            // purposely not implemented
+  LabeledPointSetFileWriter(const Self &) = delete;
+  void operator=(const Self &) = delete;
 
   void WritePointsToAvantsFile();
 

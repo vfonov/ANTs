@@ -112,6 +112,12 @@ option(RUN_SHORT_TESTS    "Run the quick unit tests."                           
 option(RUN_LONG_TESTS     "Run the time consuming tests. i.e. real world registrations" ON  )
 option(OLD_BASELINE_TESTS "Use reported metrics from old tests"                         OFF )
 
+set(ANTS_SNAPSHOT_VERSION "" CACHE STRING "Version info for binaries. Only used if source is not a git repo. Identify source snapshot by commit hash or release tag")
+mark_as_advanced(ANTS_SNAPSHOT_VERSION)
+
+option(ANTS_INSTALL_LIBS_ONLY "Do not install binaries" OFF)
+mark_as_advanced(ANTS_INSTALL_LIBS_ONLY)
+
 #------------------------------------------------------------------------------
 # ${LOCAL_PROJECT_NAME} dependency list
 #------------------------------------------------------------------------------
@@ -196,6 +202,19 @@ list(APPEND ${CMAKE_PROJECT_NAME}_SUPERBUILD_EP_VARS
   CMAKE_MODULE_LINKER_FLAGS:STRING
   SITE:STRING
   BUILDNAME:STRING
+  CMAKE_SH:BOOL
+  C_LAUNCHER:STRING
+  CXX_LAUNCHER:STRING
+  CUDA_LAUNCHER:STRING
+  CMAKE_XCODE_ATTRIBUTE_CC:STRING
+  CMAKE_XCODE_ATTRIBUTE_CXX:STRING
+  CMAKE_XCODE_ATTRIBUTE_LD:STRING
+  CMAKE_XCODE_ATTRIBUTE_LDPLUSPLUS:STRING
+  CMAKE_C_COMPILER_LAUNCHER:STRING
+  CMAKE_CXX_COMPILER_LAUNCHER:STRING
+  CMAKE_CUDA_COMPILER_LAUNCHER:STRING
+  USE_SYSTEM_ITK:BOOL
+  USE_SYSTEM_VTK:BOOL
   )
 
 _expand_external_project_vars()
@@ -233,6 +252,8 @@ list(APPEND ${CMAKE_PROJECT_NAME}_SUPERBUILD_EP_VARS
   RUN_SHORT_TESTS:BOOL
   RUN_LONG_TESTS:BOOL
   OLD_BASELINE_TESTS:BOOL
+  ANTS_SNAPSHOT_VERSION:STRING
+  ANTS_INSTALL_LIBS_ONLY:BOOL
 
   ${LOCAL_PROJECT_NAME}_CLI_LIBRARY_OUTPUT_DIRECTORY:PATH
   ${LOCAL_PROJECT_NAME}_CLI_ARCHIVE_OUTPUT_DIRECTORY:PATH
@@ -280,6 +301,7 @@ ExternalProject_Add(${proj}
     ${CMAKE_OSX_EXTERNAL_PROJECT_ARGS}
     ${COMMON_EXTERNAL_PROJECT_ARGS}
     -D${LOCAL_PROJECT_NAME}_SUPERBUILD:BOOL=OFF
+    -DCMAKE_GENERATOR_PLATFORM:STRING=${CMAKE_GENERATOR_PLATFORM}
   INSTALL_COMMAND ""
   )
 

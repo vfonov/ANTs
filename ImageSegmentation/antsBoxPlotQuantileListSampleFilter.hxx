@@ -27,7 +27,7 @@ namespace ants
 {
 namespace Statistics
 {
-template <class TScalarListSample>
+template <typename TScalarListSample>
 BoxPlotQuantileListSampleFilter<TScalarListSample>
 ::BoxPlotQuantileListSampleFilter()
 {
@@ -40,13 +40,12 @@ BoxPlotQuantileListSampleFilter<TScalarListSample>
   this->m_UpperPercentile = 0.75;
 }
 
-template <class TScalarListSample>
+template <typename TScalarListSample>
 BoxPlotQuantileListSampleFilter<TScalarListSample>
 ::~BoxPlotQuantileListSampleFilter()
-{
-}
+= default;
 
-template <class TScalarListSample>
+template <typename TScalarListSample>
 void
 BoxPlotQuantileListSampleFilter<TScalarListSample>
 ::GenerateData()
@@ -98,7 +97,7 @@ BoxPlotQuantileListSampleFilter<TScalarListSample>
     MeasurementVectorType inputMeasurement = It.GetMeasurementVector();
     typename ScalarListSampleType::MeasurementVectorType outputMeasurement;
     outputMeasurement.SetSize( scalarMeasurementVectorSize );
-    if( inputMeasurement[0] < lowerBound || inputMeasurement[0] > upperBound )
+    if( static_cast<RealType>( inputMeasurement[0] ) < lowerBound || static_cast<RealType>( inputMeasurement[0] ) > upperBound )
       {
       this->m_OutlierInstanceIdentifiers.push_back( It.GetInstanceIdentifier() );
       if( this->m_OutlierHandling == None )
@@ -143,11 +142,11 @@ BoxPlotQuantileListSampleFilter<TScalarListSample>
       typename ScalarListSampleType::MeasurementVectorType outputMeasurement;
       outputMeasurement.SetSize( scalarMeasurementVectorSize );
       outputMeasurement[0] = inputMeasurement[0];
-      if( inputMeasurement[0] < lowerBound )
+      if( static_cast<RealType>( inputMeasurement[0] ) < lowerBound )
         {
         outputMeasurement[0] = lowerBound2;
         }
-      else if( inputMeasurement[0] > upperBound )
+      else if( static_cast<RealType>( inputMeasurement[0] ) > upperBound )
         {
         outputMeasurement[0] = upperBound2;
         }
@@ -157,7 +156,7 @@ BoxPlotQuantileListSampleFilter<TScalarListSample>
     }
 }
 
-template <class TScalarListSample>
+template <typename TScalarListSample>
 void
 BoxPlotQuantileListSampleFilter<TScalarListSample>
 ::PrintSelf( std::ostream& os, Indent indent ) const

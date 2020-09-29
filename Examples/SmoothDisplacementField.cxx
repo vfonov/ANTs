@@ -32,12 +32,12 @@ template <unsigned int ImageDimension>
 int SmoothDisplacementField( int argc, char *argv[] )
 {
 
-  typedef float RealType;
-  typedef itk::Image<RealType, ImageDimension> RealImageType;
-  typedef itk::Vector<RealType, ImageDimension> VectorType;
-  typedef itk::Image<VectorType, ImageDimension> DisplacementFieldType;
+  using RealType = float;
+  using RealImageType = itk::Image<RealType, ImageDimension>;
+  using VectorType = itk::Vector<RealType, ImageDimension>;
+  using DisplacementFieldType = itk::Image<VectorType, ImageDimension>;
 
-  typename DisplacementFieldType::Pointer field = ITK_NULLPTR;
+  typename DisplacementFieldType::Pointer field = nullptr;
   ReadImage<DisplacementFieldType>( field, argv[2] );
 
   typename DisplacementFieldType::Pointer smoothField = DisplacementFieldType::New();
@@ -49,17 +49,17 @@ int SmoothDisplacementField( int argc, char *argv[] )
     {
     float variance = var[0];
 
-    typedef itk::GaussianOperator<float, ImageDimension>                                             GaussianSmoothingOperatorType;
-    typedef itk::VectorNeighborhoodOperatorImageFilter<DisplacementFieldType, DisplacementFieldType> GaussianSmoothingSmootherType;
+    using GaussianSmoothingOperatorType = itk::GaussianOperator<float, ImageDimension>;
+    using GaussianSmoothingSmootherType = itk::VectorNeighborhoodOperatorImageFilter<DisplacementFieldType, DisplacementFieldType>;
 
     GaussianSmoothingOperatorType gaussianSmoothingOperator;
 
-    typedef itk::ImageDuplicator<DisplacementFieldType> DuplicatorType;
+    using DuplicatorType = itk::ImageDuplicator<DisplacementFieldType>;
     typename DuplicatorType::Pointer duplicator = DuplicatorType::New();
     duplicator->SetInputImage( field );
     duplicator->Update();
 
-    smoothField = duplicator->GetModifiableOutput();
+    smoothField = duplicator->GetOutput();
 
     itk::TimeProbe timer;
     timer.Start();
@@ -87,12 +87,12 @@ int SmoothDisplacementField( int argc, char *argv[] )
     const VectorType zeroVector( 0.0 );
 
     //make sure boundary does not move
-    float weight1 = 1.0;
-    if (variance < 0.5)
+    float weight1 = itk::NumericTraits<float>::OneValue();
+    if( variance < static_cast<float>( 0.5 ) )
       {
-      weight1 = 1.0 - 1.0 * ( variance / 0.5);
+      weight1 = itk::NumericTraits<float>::OneValue() - itk::NumericTraits<float>::OneValue() * ( variance / static_cast<float>( 0.5 ) );
       }
-    float weight2 = 1.0 - weight1;
+    float weight2 = itk::NumericTraits<float>::OneValue() - weight1;
 
     const typename DisplacementFieldType::RegionType region = field->GetLargestPossibleRegion();
     const typename DisplacementFieldType::SizeType size = region.GetSize();
@@ -127,18 +127,18 @@ int SmoothDisplacementField( int argc, char *argv[] )
     }
   else if( var.size() == ImageDimension )
     {
-    typedef itk::DisplacementFieldToBSplineImageFilter<DisplacementFieldType> BSplineFilterType;
+    using BSplineFilterType = itk::DisplacementFieldToBSplineImageFilter<DisplacementFieldType>;
 
     unsigned int numberOfLevels = 1;
     if( argc > 5 )
       {
-      numberOfLevels = atoi( argv[5] );
+      numberOfLevels = std::stoi( argv[5] );
       }
 
     unsigned int splineOrder = 3;
     if( argc > 6 )
       {
-      splineOrder = atoi( argv[6] );
+      splineOrder = std::stoi( argv[6] );
       }
 
     typename BSplineFilterType::ArrayType ncps;
@@ -158,12 +158,12 @@ int SmoothDisplacementField( int argc, char *argv[] )
 
     if( argc > 7 )
       {
-      bspliner->SetEstimateInverse( static_cast<bool>( atoi( argv[7] ) ) );
+      bspliner->SetEstimateInverse( static_cast<bool>( std::stoi( argv[7] ) ) );
       }
 
     if( argc > 8 )
       {
-      typename BSplineFilterType::RealImageType::Pointer confidenceImage = ITK_NULLPTR;
+      typename BSplineFilterType::RealImageType::Pointer confidenceImage = nullptr;
       ReadImage<typename BSplineFilterType::RealImageType>( confidenceImage, argv[8] );
       bspliner->SetConfidenceImage( confidenceImage );
       }
@@ -204,10 +204,10 @@ int SmoothDisplacementField( int argc, char *argv[] )
     ItR.Set( ( fieldIt.Get() - smoothedFieldIt.Get() ).GetSquaredNorm() );
     for( unsigned int d = 0; d < ImageDimension; d++ )
       {
-      rmse_comp[d] += vnl_math_sqr( fieldIt.Get()[d] - smoothedFieldIt.Get()[d] );
+      rmse_comp[d] += itk::Math::sqr ( fieldIt.Get()[d] - smoothedFieldIt.Get()[d] );
       }
-    rmse += ( fieldIt.Get() - smoothedFieldIt.Get() ).GetSquaredNorm();
-    N += 1.0;
+    rmse += static_cast<float>( ( fieldIt.Get() - smoothedFieldIt.Get() ).GetSquaredNorm() );
+    N += itk::NumericTraits<float>::OneValue();
     }
   rmse = std::sqrt( rmse / N );
 
@@ -225,7 +225,7 @@ int SmoothDisplacementField( int argc, char *argv[] )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int SmoothDisplacementField( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int SmoothDisplacementField( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -243,7 +243,7 @@ int SmoothDisplacementField( std::vector<std::string> args, std::ostream* /*out_
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -277,7 +277,7 @@ private:
     return EXIT_FAILURE;
     }
 
-  switch( atoi( argv[1] ) )
+  switch( std::stoi( argv[1] ) )
    {
    case 2:
      return SmoothDisplacementField<2>( argc, argv );

@@ -3,7 +3,7 @@
 #include <algorithm>
 #include "ReadWriteData.h"
 
-#include <stdio.h>
+#include <cstdio>
 
 #include "itkAffineTransform.h"
 #include "itkCenteredTransformInitializer.h"
@@ -41,7 +41,7 @@ int antsUtilitiesTesting( std::vector<std::string> args, std::ostream* itkNotUse
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -86,11 +86,11 @@ private:
 //////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-  const unsigned int ImageDimension = 2;
+  constexpr unsigned int ImageDimension = 2;
 
-  typedef double PixelType;
+  using PixelType = double;
 
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
 
   // read in test image
 
@@ -102,12 +102,12 @@ private:
   std::vector<std::string> trainingImageFileNames;
   for( int n = 8; n < argc; n++ )
     {
-    trainingImageFileNames.push_back( std::string( argv[n] ) );
+    trainingImageFileNames.emplace_back( argv[n] );
     }
 
   // Get number of iterations
 
-  unsigned int numberOfIterations = atoi( argv[3] );
+  unsigned int numberOfIterations = std::stoi( argv[3] );
 
   // Get scale parameters
 
@@ -119,23 +119,23 @@ private:
     }
   double scaleLowerBoundLog = std::log( scaleParameters[0] );
   double scaleUpperBoundLog = std::log( scaleParameters[1] );
-  unsigned int scaleNumberOfSamples = static_cast<unsigned int>( scaleParameters[2] );
+  auto scaleNumberOfSamples = static_cast<unsigned int>( scaleParameters[2] );
   double scaleDelta = ( scaleUpperBoundLog - scaleLowerBoundLog ) / static_cast<double>( scaleNumberOfSamples - 1 );
 
   // Get rotation sampling resolution
 
-  unsigned int rotationNumberOfSamples = static_cast<unsigned int>( atoi( argv[5] ) );
-  double rotationDelta = ( 2.0 * vnl_math::pi - 0.0 ) / static_cast<double>( rotationNumberOfSamples - 1 );
+  unsigned int rotationNumberOfSamples = static_cast<unsigned int>( std::stoi( argv[5] ) );
+  double rotationDelta = ( 2.0 * itk::Math::pi - 0.0 ) / static_cast<double>( rotationNumberOfSamples - 1 );
 
   // Set up metric
-  typedef itk::ImageToImageMetricv4<ImageType, ImageType, ImageType> ImageMetricType;
-  typedef ImageMetricType::FixedSampledPointSetType PointSetType;
+  using ImageMetricType = itk::ImageToImageMetricv4<ImageType, ImageType, ImageType>;
+  using PointSetType = ImageMetricType::FixedSampledPointSetType;
 
-  ImageMetricType::Pointer imageMetric = ITK_NULLPTR;
+  ImageMetricType::Pointer imageMetric = nullptr;
 
   if( strcmp( argv[2], "Mattes" ) == 0 )
     {
-    typedef itk::MattesMutualInformationImageToImageMetricv4<ImageType, ImageType, ImageType> MattesMetricType;
+    using MattesMetricType = itk::MattesMutualInformationImageToImageMetricv4<ImageType, ImageType, ImageType>;
     MattesMetricType::Pointer mattesMetric = MattesMetricType::New();
     mattesMetric->SetNumberOfHistogramBins( 20 );
 
@@ -143,14 +143,14 @@ private:
     }
   else if( strcmp( argv[2], "GC" ) == 0 )
     {
-    typedef itk::CorrelationImageToImageMetricv4<ImageType, ImageType, ImageType> GCMetricType;
+    using GCMetricType = itk::CorrelationImageToImageMetricv4<ImageType, ImageType, ImageType>;
     GCMetricType::Pointer gcMetric = GCMetricType::New();
 
     imageMetric = gcMetric;
     }
   else if( strcmp( argv[2], "MI" ) == 0 )
     {
-    typedef itk::JointHistogramMutualInformationImageToImageMetricv4<ImageType, ImageType> MIMetricType;
+    using MIMetricType = itk::JointHistogramMutualInformationImageToImageMetricv4<ImageType, ImageType>;
     MIMetricType::Pointer miMetric = MIMetricType::New();
     miMetric->SetNumberOfHistogramBins( 20 );
 
@@ -169,7 +169,7 @@ private:
 
   // identity transform for fixed image
 
-  typedef itk::IdentityTransform<double, ImageDimension> IdentityTransformType;
+  using IdentityTransformType = itk::IdentityTransform<double, ImageDimension>;
   IdentityTransformType::Pointer identityTransform = IdentityTransformType::New();
   identityTransform->SetIdentity();
 
@@ -196,15 +196,15 @@ private:
     count++;
     }
   imageMetric->SetFixedSampledPointSet( pointSet );
-  imageMetric->SetUseFixedSampledPointSet( true );
+  imageMetric->SetUseSampledPointSet( true );
 
   // Now go through the rotations + scalings to find the optimal pose.
 
-  typedef itk::AffineTransform<double, ImageDimension> AffineTransformType;
-  typedef itk::Similarity2DTransform<double> SimilarityTransformType;
+  using AffineTransformType = itk::AffineTransform<double, ImageDimension>;
+  using SimilarityTransformType = itk::Similarity2DTransform<double>;
 
   double optimalMetricValue = itk::NumericTraits<double>::max();
-  SimilarityTransformType::Pointer optimalTransform = ITK_NULLPTR;
+  SimilarityTransformType::Pointer optimalTransform = nullptr;
   unsigned int optimalMetricIndex = 0;
 
   for( unsigned int n = 0; n < trainingImageFileNames.size(); n++ )
@@ -220,7 +220,7 @@ private:
 
     AffineTransformType::Pointer initialTransform = AffineTransformType::New();
 
-    typedef itk::CenteredTransformInitializer<AffineTransformType, ImageType, ImageType> TransformInitializerType;
+    using TransformInitializerType = itk::CenteredTransformInitializer<AffineTransformType, ImageType, ImageType>;
     TransformInitializerType::Pointer initializer = TransformInitializerType::New();
     initializer->SetTransform( initialTransform );
     initializer->SetFixedImage( testImage );
@@ -229,7 +229,7 @@ private:
 
     initializer->InitializeTransform();
 
-    for( double angle = 0.0; angle < 2.0 * vnl_math::pi; angle += rotationDelta )
+    for( double angle = 0.0; angle < 2.0 * itk::Math::pi; angle += rotationDelta )
       {
       AffineTransformType::MatrixType rotationMatrix;
       rotationMatrix( 0, 0 ) = rotationMatrix( 1, 1 ) = std::cos( angle );
@@ -251,12 +251,12 @@ private:
 
         if( numberOfIterations > 0 )
           {
-          typedef itk::RegistrationParameterScalesFromPhysicalShift<ImageMetricType> ScalesEstimatorType;
+          using ScalesEstimatorType = itk::RegistrationParameterScalesFromPhysicalShift<ImageMetricType>;
           ScalesEstimatorType::Pointer scalesEstimator = ScalesEstimatorType::New();
           scalesEstimator->SetMetric( imageMetric );
           scalesEstimator->SetTransformForward( true );
 
-          typedef itk::ConjugateGradientLineSearchOptimizerv4Template<double> ConjugateGradientDescentOptimizerType;
+          using ConjugateGradientDescentOptimizerType = itk::ConjugateGradientLineSearchOptimizerv4Template<double>;
           ConjugateGradientDescentOptimizerType::Pointer optimizer = ConjugateGradientDescentOptimizerType::New();
           optimizer->SetLowerLimit( 0 );
           optimizer->SetUpperLimit( 2 );
@@ -322,7 +322,7 @@ private:
 
   if( strcmp( argv[7], "none" ) != 0 )
     {
-    typedef itk::TransformFileWriter TransformWriterType;
+    using TransformWriterType = itk::TransformFileWriter;
     TransformWriterType::Pointer transformWriter = TransformWriterType::New();
     transformWriter->SetInput( optimalTransform );
     transformWriter->SetFileName( argv[7] );
@@ -332,7 +332,7 @@ private:
     transformWriter->Update();
     }
 
-  if( static_cast<bool>( atoi( argv[6] ) ) )
+  if( static_cast<bool>( std::stoi( argv[6] ) ) )
     {
     std::cout << trainingImageFileNames[optimalMetricIndex] << std::endl;
     }

@@ -63,6 +63,8 @@
 
 #include "antsLandmarkBasedTransformInitializer.h"
 
+#include "AddNoiseToImage.h"
+
 #include "Atropos.h"
 
 #include "AverageAffineTransform.h"
@@ -192,6 +194,8 @@
 #include "SetOrigin.h"
 
 #include "SetSpacing.h"
+
+#include "SimulateDisplacementField.h"
 
 #include "SmoothImage.h"
 

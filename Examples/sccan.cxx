@@ -33,7 +33,7 @@
 namespace ants
 {
 // namespace antssccan {
-template <class TComp>
+template <typename TComp>
 double vnl_pearson_corr( vnl_vector<TComp> v1, vnl_vector<TComp> v2 )
 {
   double xysum = 0;
@@ -55,7 +55,7 @@ double vnl_pearson_corr( vnl_vector<TComp> v1, vnl_vector<TComp> v2 )
   return numer / denom;
 }
 
-template <class TImage, class TComp>
+template <typename TImage, typename TComp>
 void WriteVectorToSpatialImage( std::string filename, std::string post, vnl_vector<TComp> w_p,
                                 typename TImage::Pointer  mask )
 {
@@ -73,14 +73,14 @@ void WriteVectorToSpatialImage( std::string filename, std::string post, vnl_vect
       }
     }
 
-  typedef itk::ants::antsSCCANObject<TImage, TComp> SCCANType;
+  using SCCANType = itk::ants::antsSCCANObject<TImage, TComp>;
   typename SCCANType::Pointer sccanobj = SCCANType::New();
   typename TImage::Pointer weights =  sccanobj->ConvertVariateToSpatialImage(  w_p,  mask );
   std::string fn1 = filepre + post + extension;
   WriteImage<TImage>( weights, fn1.c_str() );
 }
 
-template <class T>
+template <typename T>
 inline std::string sccan_to_string(const T& t)
 {
   std::stringstream ss;
@@ -104,7 +104,7 @@ inline std::string sccan_to_string(const T& t)
   return stringout;
 }
 
-template <class TImage, class TComp>
+template <typename TImage, typename TComp>
 void WriteSortedVariatesToSpatialImage( std::string filename, std::string post, vnl_matrix<TComp> varmat,
                                         typename TImage::Pointer  mask,  vnl_matrix<TComp> data_mat, bool have_mask,
                                         vnl_vector<TComp> l_array,
@@ -135,7 +135,7 @@ void WriteSortedVariatesToSpatialImage( std::string filename, std::string post, 
     std::string colname = std::string("Variate") + sccan_to_string<unsigned int>(nv);
     ColumnHeaders1.push_back( colname );
     }
-  typedef itk::CSVNumericObjectFileWriter<double> WriterType;
+  using WriterType = itk::CSVNumericObjectFileWriter<double>;
   WriterType::Pointer writer1 = WriterType::New();
   writer1->SetFileName( fnmp1.c_str() );
   writer1->SetColumnHeaders(ColumnHeaders1);
@@ -177,7 +177,7 @@ void WriteSortedVariatesToSpatialImage( std::string filename, std::string post, 
     std::string colnameROI = std::string("Variate") + sccan_to_string<unsigned int>(nv);
     ColumnHeadersROI.push_back( colnameROI );
     }
-  typedef itk::CSVNumericObjectFileWriter<double> WriterType;
+  using WriterType = itk::CSVNumericObjectFileWriter<double>;
   WriterType::Pointer writerROI = WriterType::New();
   writerROI->SetFileName( fnmp_prior.c_str() );
   writerROI->SetColumnHeaders(ColumnHeadersROI);
@@ -231,7 +231,7 @@ void WriteSortedVariatesToSpatialImage( std::string filename, std::string post, 
     }
 }
 
-template <class TImage, class TComp>
+template <typename TImage, typename TComp>
 void WriteVariatesToSpatialImage( std::string filename, std::string post, vnl_matrix<TComp> varmat,
                                   typename TImage::Pointer  mask,  vnl_matrix<TComp> data_mat,
                                   bool have_mask, vnl_matrix<TComp> u_mat  )
@@ -259,7 +259,7 @@ void WriteVariatesToSpatialImage( std::string filename, std::string post, vnl_ma
     std::string colname = std::string("Variate") + sccan_to_string<unsigned int>(nv);
     ColumnHeaders.push_back( colname );
     }
-  typedef itk::CSVNumericObjectFileWriter<double, 1, 1> WriterType;
+  using WriterType = itk::CSVNumericObjectFileWriter<double, 1, 1>;
   WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( fnmp.c_str() );
   writer->SetColumnHeaders(ColumnHeaders);
@@ -268,7 +268,7 @@ void WriteVariatesToSpatialImage( std::string filename, std::string post, vnl_ma
     {
     writer->Write();
     }
-  catch( itk::ExceptionObject& exp )
+  catch( itk::ExceptionObject& itkNotUsed( exp ) )
     {
     // std::cerr << "Exception caught!" << std::endl;
     // std::cerr << exp << std::endl;
@@ -302,7 +302,7 @@ void WriteVariatesToSpatialImage( std::string filename, std::string post, vnl_ma
       {
       writer->Write();
       }
-    catch( itk::ExceptionObject& exp )
+    catch( itk::ExceptionObject& itkNotUsed( exp ) )
       {
       // std::cerr << "Exception caught!" << std::endl;
       // std::cerr << exp << std::endl;
@@ -310,7 +310,7 @@ void WriteVariatesToSpatialImage( std::string filename, std::string post, vnl_ma
       }
     }
 
-  if( u_mat.size() > 0 )
+  if( !u_mat.empty() )
     {
     // write out the array2D object for U matrix
     ColumnHeaders.clear();
@@ -328,7 +328,7 @@ void WriteVariatesToSpatialImage( std::string filename, std::string post, vnl_ma
       {
       writer->Write();
       }
-    catch( itk::ExceptionObject& exp )
+    catch( itk::ExceptionObject& itkNotUsed( exp ) )
       {
       // std::cerr << "Exception caught!" << std::endl;
       // std::cerr << exp << std::endl;
@@ -337,11 +337,11 @@ void WriteVariatesToSpatialImage( std::string filename, std::string post, vnl_ma
     }
 }
 
-template <class TImage, class TComp>
+template <typename TImage, typename TComp>
 vnl_matrix<TComp>
 CopyImageToVnlMatrix( typename TImage::Pointer   p_img )
 {
-  typedef vnl_matrix<TComp> vMatrix;
+  using vMatrix = vnl_matrix<TComp>;
 
   typename TImage::SizeType  pMatSize = p_img->GetLargestPossibleRegion().GetSize();
   vMatrix p(pMatSize[0], pMatSize[1]);             // a (size)x(size+1)-matrix of int's
@@ -359,11 +359,11 @@ CopyImageToVnlMatrix( typename TImage::Pointer   p_img )
   return p;
 }
 
-template <class TImage, class TComp>
+template <typename TImage, typename TComp>
 vnl_matrix<TComp>
 DeleteRow(vnl_matrix<TComp> p_in, unsigned int row)
 {
-  typedef vnl_matrix<TComp> vMatrix;
+  using vMatrix = vnl_matrix<TComp>;
   unsigned int nrows = p_in.rows() - 1;
   if( row >= nrows )
     {
@@ -387,11 +387,11 @@ int sccanRandom(int n)
   return rand() % n;
 }
 
-template <class TComp>
+template <typename TComp>
 vnl_matrix<TComp>
 PermuteMatrix( vnl_matrix<TComp> q, bool doperm = true)
 {
-  typedef vnl_matrix<TComp> vMatrix;
+  using vMatrix = vnl_matrix<TComp>;
 
   std::vector<unsigned long> permvec;
   for( unsigned long i = 0; i < q.rows(); i++ )
@@ -420,14 +420,14 @@ PermuteMatrix( vnl_matrix<TComp> q, bool doperm = true)
   return q_perm;
 }
 
-template <unsigned int ImageDimension, class PixelType>
+template <unsigned int ImageDimension, typename PixelType>
 int matrixOperation( itk::ants::CommandLineParser::OptionType *option,
-                     itk::ants::CommandLineParser::OptionType * /* outputOption */ = ITK_NULLPTR )
+                     itk::ants::CommandLineParser::OptionType * /* outputOption */ = nullptr )
 {
   std::string funcName = std::string("matrixOperation");
 
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
-  typename ImageType::Pointer outputImage = ITK_NULLPTR;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  typename ImageType::Pointer outputImage = nullptr;
 
   //   option->SetUsageOption( 2, "multires_matrix_invert[list.txt,maskhighres.nii.gz,masklowres.nii.gz,matrix.mhd]" );
 
@@ -444,7 +444,7 @@ int matrixOperation( itk::ants::CommandLineParser::OptionType *option,
   return EXIT_SUCCESS;
 }
 
-template <class RealType>
+template <typename RealType>
 int
 CompareMatrixSizes(  vnl_matrix<RealType> & p,  vnl_matrix<RealType> & q )
 {
@@ -460,17 +460,17 @@ CompareMatrixSizes(  vnl_matrix<RealType> & p,  vnl_matrix<RealType> & q )
   return 0;
 }
 
-template <class PixelType>
+template <typename PixelType>
 void
 ReadMatrixFromCSVorImageSet( std::string matname, vnl_matrix<PixelType> & p )
 {
-  typedef PixelType                             Scalar;
-  typedef itk::Image<PixelType, 2>              MatrixImageType;
-  typedef itk::ImageFileReader<MatrixImageType> matReaderType;
+  using Scalar = PixelType;
+  using MatrixImageType = itk::Image<PixelType, 2>;
+  using matReaderType = itk::ImageFileReader<MatrixImageType>;
   std::string ext = itksys::SystemTools::GetFilenameExtension( matname );
   if( strcmp(ext.c_str(), ".csv") == 0 )
     {
-    typedef itk::CSVArray2DFileReader<double> ReaderType;
+    using ReaderType = itk::CSVArray2DFileReader<double>;
     typename ReaderType::Pointer reader = ReaderType::New();
     reader->SetFileName( matname.c_str() );
     reader->SetFieldDelimiterCharacter( ',' );
@@ -482,12 +482,12 @@ ReadMatrixFromCSVorImageSet( std::string matname, vnl_matrix<PixelType> & p )
       {
       reader->Update();
       }
-    catch( itk::ExceptionObject& exp )
+    catch( itk::ExceptionObject& itkNotUsed(exp) )
       {
       // std::cerr << "Exception caught!" << std::endl;
       // std::cerr << exp << std::endl;
       }
-    typedef itk::CSVArray2DDataObject<double> DataFrameObjectType;
+    using DataFrameObjectType = itk::CSVArray2DDataObject<double>;
     DataFrameObjectType::Pointer dfo = reader->GetOutput();
     p = dfo->GetMatrix();
     return;
@@ -499,25 +499,24 @@ ReadMatrixFromCSVorImageSet( std::string matname, vnl_matrix<PixelType> & p )
     matreader1->Update();
     p = CopyImageToVnlMatrix<MatrixImageType, Scalar>( matreader1->GetOutput() );
     }
-  return;
-}
+  }
 
-template <unsigned int ImageDimension, class PixelType>
+template <unsigned int ImageDimension, typename PixelType>
 itk::Array2D<double>
 ConvertImageListToMatrix( std::string imagelist, std::string maskfn, std::string outname  )
 {
   std::string ext = itksys::SystemTools::GetFilenameExtension( outname );
 
-  typedef itk::Array2D<double> MatrixType;
+  using MatrixType = itk::Array2D<double>;
   std::vector<std::string> ColumnHeaders;
   MatrixType               zmat(1, 1);
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
-  typedef itk::Image<PixelType, 2>              MatrixImageType;
-  typedef itk::ImageFileReader<ImageType>       ReaderType;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  using MatrixImageType = itk::Image<PixelType, 2>;
+  using ReaderType = itk::ImageFileReader<ImageType>;
   typename ImageType::Pointer mask;
   ReadImage<ImageType>( mask, maskfn.c_str() );
   unsigned long voxct = 0;
-  typedef itk::ImageRegionIteratorWithIndex<ImageType> Iterator;
+  using Iterator = itk::ImageRegionIteratorWithIndex<ImageType>;
   Iterator mIter( mask, mask->GetLargestPossibleRegion() );
   for(  mIter.GoToBegin(); !mIter.IsAtEnd(); ++mIter )
     {
@@ -528,7 +527,7 @@ ConvertImageListToMatrix( std::string imagelist, std::string maskfn, std::string
     }
   std::vector<std::string> image_fn_list;
   // first, count the number of files
-  const unsigned int maxChar = 512;
+  constexpr unsigned int maxChar = 512;
   char               lineBuffer[maxChar];
   char               filenm[maxChar];
   unsigned int       filecount = 0;
@@ -548,7 +547,7 @@ ConvertImageListToMatrix( std::string imagelist, std::string maskfn, std::string
         }
       else
         {
-        image_fn_list.push_back(std::string(filenm) );
+        image_fn_list.emplace_back(filenm );
         filecount++;
         }
       }
@@ -594,7 +593,7 @@ ConvertImageListToMatrix( std::string imagelist, std::string maskfn, std::string
   if( strcmp(ext.c_str(), ".csv") == 0 )
     {
     // write out the array2D object
-    typedef itk::CSVNumericObjectFileWriter<double, 1, 1> WriterType;
+    using WriterType = itk::CSVNumericObjectFileWriter<double, 1, 1>;
     WriterType::Pointer writer = WriterType::New();
     writer->SetFileName( outname );
     writer->SetInput( &matrix );
@@ -603,7 +602,7 @@ ConvertImageListToMatrix( std::string imagelist, std::string maskfn, std::string
       {
       writer->Write();
       }
-    catch( itk::ExceptionObject& exp )
+    catch( itk::ExceptionObject& itkNotUsed(exp) )
       {
       // std::cerr << "Exception caught!" << std::endl;
       // std::cerr << exp << std::endl;
@@ -639,7 +638,7 @@ ConvertImageListToMatrix( std::string imagelist, std::string maskfn, std::string
         }
       }
 
-    typedef itk::ImageFileWriter<MatrixImageType> WriterType;
+    using WriterType = itk::ImageFileWriter<MatrixImageType>;
     typename WriterType::Pointer writer = WriterType::New();
     writer->SetFileName( outname );
     writer->SetInput( matimage );
@@ -648,27 +647,27 @@ ConvertImageListToMatrix( std::string imagelist, std::string maskfn, std::string
   return matrix;
 }
 
-template <class PixelType>
+template <typename PixelType>
 int
 ConvertTimeSeriesImageToMatrix( std::string imagefn, std::string maskfn, std::string outname, double space_smoother,
                                 double time_smoother )
 {
-  const unsigned int ImageDimension = 4;
+  constexpr unsigned int ImageDimension = 4;
 
-  typedef itk::Image<PixelType, ImageDimension>        ImageType;
-  typedef itk::Image<PixelType, ImageDimension - 1>    OutImageType;
-  typedef typename OutImageType::IndexType             OutIndexType;
-  typedef typename ImageType::IndexType                IndexType;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  using OutImageType = itk::Image<PixelType, ImageDimension - 1>;
+  using OutIndexType = typename OutImageType::IndexType;
+  using IndexType = typename ImageType::IndexType;
 
-  typedef double Scalar;
+  using Scalar = double;
   std::string ext = itksys::SystemTools::GetFilenameExtension( outname );
   if( strcmp(ext.c_str(), ".csv") != 0 )
     {
     // std::cerr << " must use .csv as output file extension " << std::endl;
     return EXIT_FAILURE;
     }
-  typename ImageType::Pointer image1 = ITK_NULLPTR;
-  typename OutImageType::Pointer mask = ITK_NULLPTR;
+  typename ImageType::Pointer image1 = nullptr;
+  typename OutImageType::Pointer mask = nullptr;
   // std::cerr << " imagefn " << imagefn << std::endl;
   if( imagefn.length() > 3 )
     {
@@ -687,7 +686,7 @@ ConvertTimeSeriesImageToMatrix( std::string imagefn, std::string maskfn, std::st
     // basically, don't do any dim-4 smoothing
     spacing2[3] = sqrt(spacing[0] * spacing[0] + spacing[1] * spacing[1] + spacing[2] * spacing[2]) * 1.e6;
     image1->SetSpacing(spacing2);
-    typedef itk::DiscreteGaussianImageFilter<ImageType, ImageType> dgf;
+    using dgf = itk::DiscreteGaussianImageFilter<ImageType, ImageType>;
     typename dgf::Pointer filter = dgf::New();
     filter->SetVariance(space_smoother);
     filter->SetUseImageSpacingOn();
@@ -708,7 +707,7 @@ ConvertTimeSeriesImageToMatrix( std::string imagefn, std::string maskfn, std::st
     spacing2.Fill(bigspace);
     spacing2[3] = 1;
     image1->SetSpacing(spacing2);
-    typedef itk::DiscreteGaussianImageFilter<ImageType, ImageType> dgf;
+    using dgf = itk::DiscreteGaussianImageFilter<ImageType, ImageType>;
     typename dgf::Pointer filter = dgf::New();
     filter->SetVariance(time_smoother);
     filter->SetUseImageSpacingOn();
@@ -730,17 +729,17 @@ ConvertTimeSeriesImageToMatrix( std::string imagefn, std::string maskfn, std::st
     }
   unsigned int  timedims = image1->GetLargestPossibleRegion().GetSize()[ImageDimension - 1];
   unsigned long voxct = 0;
-  typedef itk::ExtractImageFilter<ImageType, OutImageType> ExtractFilterType;
-  typedef itk::ImageRegionIteratorWithIndex<OutImageType>  SliceIt;
+  using ExtractFilterType = itk::ExtractImageFilter<ImageType, OutImageType>;
+  using SliceIt = itk::ImageRegionIteratorWithIndex<OutImageType>;
   SliceIt mIter( mask, mask->GetLargestPossibleRegion() );
-  typedef std::vector<unsigned int> LabelSetType;
+  using LabelSetType = std::vector<unsigned int>;
   unsigned int maxlabel = 0;
   LabelSetType myLabelSet1;
     {
     /** count the labels in the mask image */
     for( mIter.GoToBegin(); !mIter.IsAtEnd(); ++mIter )
       {
-      unsigned int label = static_cast<unsigned int>( mIter.Get() + 0.5 );
+      auto label = static_cast<unsigned int>( mIter.Get() + 0.5 );
       if( label > 0 )
         {
         if( find( myLabelSet1.begin(), myLabelSet1.end(), label )
@@ -776,11 +775,11 @@ ConvertTimeSeriesImageToMatrix( std::string imagefn, std::string maskfn, std::st
   typename OutImageType::Pointer outimage = extractFilter->GetOutput();
   outimage->FillBuffer(0);
 
-  typedef itk::ImageRegionIteratorWithIndex<OutImageType> SliceIt;
+  using SliceIt = itk::ImageRegionIteratorWithIndex<OutImageType>;
 
-  typedef vnl_vector<Scalar> timeVectorType;
+  using timeVectorType = vnl_vector<Scalar>;
   timeVectorType mSample(timedims, 0);
-  typedef itk::Array2D<double> MatrixType;
+  using MatrixType = itk::Array2D<double>;
   std::vector<std::string> ColumnHeaders;
   if( myLabelSet1.size() > 1 )
     {
@@ -794,7 +793,7 @@ ConvertTimeSeriesImageToMatrix( std::string imagefn, std::string maskfn, std::st
       ColumnHeaders.push_back( colname );
       vectorindexMap[myLabelSet1[i]] = i;
       }
-    typedef vnl_vector<unsigned int> countVectorType;
+    using countVectorType = vnl_vector<unsigned int>;
     countVectorType countVector( myLabelSet1.size(), 0 );
     // std::cout << "Will map the image to its ROIs" << std::endl;
     MatrixType matrix(timedims, myLabelSet1.size() );
@@ -804,7 +803,7 @@ ConvertTimeSeriesImageToMatrix( std::string imagefn, std::string maskfn, std::st
     for(  vfIter2.GoToBegin(); !vfIter2.IsAtEnd(); ++vfIter2 )
       {
       OutIndexType ind = vfIter2.GetIndex();
-      unsigned int label = static_cast<unsigned int>( mask->GetPixel( ind ) + 0.5 );
+      auto label = static_cast<unsigned int>( mask->GetPixel( ind ) + 0.5 );
       if( label > 0 )
         {
         unsigned int vind = vectorindexMap[label];
@@ -828,7 +827,7 @@ ConvertTimeSeriesImageToMatrix( std::string imagefn, std::string maskfn, std::st
       {
       matrix.set_column( i, matrix.get_column( i ) / ( double ) countVector[i]   );
       }
-    typedef itk::CSVNumericObjectFileWriter<double, 1, 1> WriterType;
+    using WriterType = itk::CSVNumericObjectFileWriter<double, 1, 1>;
     WriterType::Pointer writer = WriterType::New();
     writer->SetFileName( outname );
     writer->SetInput( &matrix );
@@ -837,7 +836,7 @@ ConvertTimeSeriesImageToMatrix( std::string imagefn, std::string maskfn, std::st
       {
       writer->Write();
       }
-    catch( itk::ExceptionObject& exp )
+    catch( itk::ExceptionObject& itkNotUsed(exp) )
       {
       // std::cerr << "Exception caught!" << std::endl;
       // std::cerr << exp << std::endl;
@@ -874,7 +873,7 @@ ConvertTimeSeriesImageToMatrix( std::string imagefn, std::string maskfn, std::st
       } // check mask
     }
 
-  typedef itk::CSVNumericObjectFileWriter<double, 1, 1> WriterType;
+  using WriterType = itk::CSVNumericObjectFileWriter<double, 1, 1>;
   WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( outname );
   writer->SetInput( &matrix );
@@ -883,7 +882,7 @@ ConvertTimeSeriesImageToMatrix( std::string imagefn, std::string maskfn, std::st
     {
     writer->Write();
     }
-  catch( itk::ExceptionObject& exp )
+  catch( itk::ExceptionObject& itkNotUsed(exp) )
     {
     // std::cerr << "Exception caught!" << std::endl;
     // std::cerr << exp << std::endl;
@@ -893,21 +892,21 @@ ConvertTimeSeriesImageToMatrix( std::string imagefn, std::string maskfn, std::st
   return EXIT_SUCCESS;
 }
 
-template <class PixelType>
+template <typename PixelType>
 int
 ConvertCSVVectorToImage( std::string csvfn, std::string maskfn, std::string outname, unsigned long rowOrCol )
 {
-  typedef PixelType             Scalar;
-  typedef vnl_matrix<PixelType> vMatrix;
-  const unsigned int ImageDimension = 3;
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
+  using Scalar = PixelType;
+  using vMatrix = vnl_matrix<PixelType>;
+  constexpr unsigned int ImageDimension = 3;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
   /** read the  images */
-  typename ImageType::Pointer mask = ITK_NULLPTR;
+  typename ImageType::Pointer mask = nullptr;
   ReadImage<ImageType>(mask, maskfn.c_str() );
-  typename ImageType::Pointer outimage = ITK_NULLPTR;
+  typename ImageType::Pointer outimage = nullptr;
   ReadImage<ImageType>(outimage, maskfn.c_str() );
   outimage->FillBuffer(0);
-  typedef itk::ImageRegionIteratorWithIndex<ImageType> Iterator;
+  using Iterator = itk::ImageRegionIteratorWithIndex<ImageType>;
   unsigned long mct = 0;
   Iterator      mIter( mask, mask->GetLargestPossibleRegion() );
   for(  mIter.GoToBegin(); !mIter.IsAtEnd(); ++mIter )
@@ -963,7 +962,7 @@ ConvertCSVVectorToImage( std::string csvfn, std::string maskfn, std::string outn
         }
       }
     }
-  typedef itk::ImageFileWriter<ImageType> WriterType;
+  using WriterType = itk::ImageFileWriter<ImageType>;
   typename WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( outname );
   writer->SetInput( outimage );
@@ -972,18 +971,18 @@ ConvertCSVVectorToImage( std::string csvfn, std::string maskfn, std::string outn
 }
 
 // p.d.
-template <unsigned int ImageDimension, class PixelType>
+template <unsigned int ImageDimension, typename PixelType>
 void ConvertImageVecListToProjection( std::string veclist, std::string imagelist, std::string outname, bool average  )
 {
   // typedef itk::Image<PixelType,ImageDimension> ImageType;
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
-  typedef itk::ImageFileReader<ImageType>       ReaderType;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  using ReaderType = itk::ImageFileReader<ImageType>;
 
   std::vector<std::string> image_fn_list;
   std::vector<std::string> vec_fn_list;
 
   // first, count the number of files
-  const unsigned int maxChar = 512;
+  constexpr unsigned int maxChar = 512;
   char               lineBuffer[maxChar], lineBufferVec[maxChar];
   char               filenm[maxChar], filenmVec[maxChar];
   unsigned int       filecount = 0, filecountVec = 0;
@@ -1003,7 +1002,7 @@ void ConvertImageVecListToProjection( std::string veclist, std::string imagelist
         }
       else
         {
-        image_fn_list.push_back(std::string(filenm) );
+        image_fn_list.emplace_back(filenm );
         filecount++;
         }
       }
@@ -1027,7 +1026,7 @@ void ConvertImageVecListToProjection( std::string veclist, std::string imagelist
         }
       else
         {
-        vec_fn_list.push_back(std::string(filenmVec) );
+        vec_fn_list.emplace_back(filenmVec );
         filecountVec++;
         }
       }
@@ -1038,14 +1037,14 @@ void ConvertImageVecListToProjection( std::string veclist, std::string imagelist
   std::ofstream myfile;
   std::string   fnmp = outname + std::string(".csv");
   myfile.open(fnmp.c_str(), std::ios::out );
-  typedef itk::ImageRegionIteratorWithIndex<ImageType> Iterator;
-  for( unsigned int j = 0; j < image_fn_list.size(); j++ )
+  using Iterator = itk::ImageRegionIteratorWithIndex<ImageType>;
+  for(auto & j : image_fn_list)
     {
     for( unsigned int k = 0; k < vec_fn_list.size(); k++ )
       {
       double proj = 0, dotSum = 0, dotCounter = 0, dotTotal = 0;
       typename ReaderType::Pointer reader1 = ReaderType::New();
-      reader1->SetFileName( image_fn_list[j] );
+      reader1->SetFileName( j );
       reader1->Update();
       typename ReaderType::Pointer reader2 = ReaderType::New();
       reader2->SetFileName( vec_fn_list[k] );
@@ -1079,20 +1078,20 @@ void ConvertImageVecListToProjection( std::string veclist, std::string imagelist
   myfile.close();
 }
 
-template <unsigned int ImageDimension, class PixelType>
+template <unsigned int ImageDimension, typename PixelType>
 int SVD_One_View( itk::ants::CommandLineParser *sccanparser, unsigned int permct, unsigned int n_evec,
                   unsigned int robustify, unsigned int p_cluster_thresh, unsigned int iterct,
                   unsigned int svd_option, PixelType usel1, PixelType row_sparseness, PixelType smoother,
                   unsigned int covering, bool verbosity,
-                  bool getSmall=0 )
+                  bool getSmall=false )
 {
   // std::cout << "SVD_One_View" << std::endl;
 
-  typedef itk::Image<PixelType, ImageDimension>         ImageType;
-  typedef double                                        Scalar;
-  typedef itk::ants::antsSCCANObject<ImageType, Scalar> SCCANType;
-  typedef typename SCCANType::MatrixType                vMatrix;
-  typedef typename SCCANType::VectorType                vVector;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  using Scalar = double;
+  using SCCANType = itk::ants::antsSCCANObject<ImageType, Scalar>;
+  using vMatrix = typename SCCANType::MatrixType;
+  using vVector = typename SCCANType::VectorType;
   typename SCCANType::Pointer sccanobj = SCCANType::New();
   sccanobj->SetGetSmall( static_cast<bool>(getSmall)  );
   vMatrix priorROIMat;
@@ -1151,7 +1150,7 @@ int SVD_One_View( itk::ants::CommandLineParser *sccanparser, unsigned int permct
     }
   itk::ants::CommandLineParser::OptionType::Pointer option =
     sccanparser->GetOption( "svd" );
-  PixelType gradstep = vnl_math_abs( usel1 );
+  PixelType gradstep = itk::Math::abs ( usel1 );
   sccanobj->SetCovering( covering );
   sccanobj->SetSilent(  ! verbosity  );
   if( usel1 > 0 )
@@ -1172,10 +1171,10 @@ int SVD_One_View( itk::ants::CommandLineParser *sccanparser, unsigned int permct
   std::string pmatname = std::string(option->GetFunction( 0 )->GetParameter( 0 ) );
   vMatrix     p;
   ReadMatrixFromCSVorImageSet<Scalar>(pmatname, p);
-  typename ImageType::Pointer mask1 = ITK_NULLPTR;
+  typename ImageType::Pointer mask1 = nullptr;
   bool have_p_mask = false;
   have_p_mask = ReadImage<ImageType>(mask1, option->GetFunction( 0 )->GetParameter( 1 ).c_str() );
-  double  FracNonZero1 = sccanparser->Convert<double>( option->GetFunction( 0 )->GetParameter( 2 ) );
+  auto  FracNonZero1 = sccanparser->Convert<double>( option->GetFunction( 0 )->GetParameter( 2 ) );
   vMatrix priorScaleMat;
   if( svd_option == 7 )
     {
@@ -1328,7 +1327,7 @@ int SVD_One_View( itk::ants::CommandLineParser *sccanparser, unsigned int permct
     std::vector<std::string> ColumnHeaders;
     std::string              colname = std::string("Eigenvalue");
     ColumnHeaders.push_back( colname );
-    typedef itk::CSVNumericObjectFileWriter<double, 1, 1> CWriterType;
+    using CWriterType = itk::CSVNumericObjectFileWriter<double, 1, 1>;
     CWriterType::Pointer cwriter = CWriterType::New();
     cwriter->SetFileName( fnmp.c_str() );
     cwriter->SetColumnHeaders(ColumnHeaders);
@@ -1376,7 +1375,7 @@ int SVD_One_View( itk::ants::CommandLineParser *sccanparser, unsigned int permct
   return EXIT_SUCCESS;
 }
 
-template <unsigned int ImageDimension, class PixelType>
+template <unsigned int ImageDimension, typename PixelType>
 int SCCA_vnl( itk::ants::CommandLineParser *sccanparser, unsigned int permct, unsigned int n_evec, unsigned int newimp,
               unsigned int robustify, unsigned int p_cluster_thresh, unsigned int q_cluster_thresh, unsigned int iterct,
               PixelType usel1, PixelType uselong, PixelType row_sparseness, PixelType smoother, unsigned int covering,
@@ -1397,11 +1396,11 @@ int SCCA_vnl( itk::ants::CommandLineParser *sccanparser, unsigned int permct, un
     }
   itk::ants::CommandLineParser::OptionType::Pointer option =
     sccanparser->GetOption( "scca" );
-  typedef itk::Image<PixelType, ImageDimension>         ImageType;
-  typedef double                                        Scalar;
-  typedef itk::ants::antsSCCANObject<ImageType, Scalar> SCCANType;
-  typedef typename SCCANType::MatrixType                vMatrix;
-  typedef typename SCCANType::VectorType                vVector;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  using Scalar = double;
+  using SCCANType = itk::ants::antsSCCANObject<ImageType, Scalar>;
+  using vMatrix = typename SCCANType::MatrixType;
+  using vVector = typename SCCANType::VectorType;
   typename SCCANType::Pointer sccanobj = SCCANType::New();
   sccanobj->SetCovering( covering );
   sccanobj->SetSilent(  ! verbosity  );
@@ -1411,7 +1410,7 @@ int SCCA_vnl( itk::ants::CommandLineParser *sccanparser, unsigned int permct, un
     {
     sccanobj->SetUseLongitudinalFormulation( uselong );
     }
-  PixelType gradstep = vnl_math_abs( usel1 );
+  PixelType gradstep = itk::Math::abs ( usel1 );
   if( usel1 > 0 )
     {
     sccanobj->SetUseL1( true );
@@ -1479,7 +1478,7 @@ int SCCA_vnl( itk::ants::CommandLineParser *sccanparser, unsigned int permct, un
     return EXIT_FAILURE;
     }
 
-  typename ImageType::Pointer mask1 = ITK_NULLPTR;
+  typename ImageType::Pointer mask1 = nullptr;
   std::string mask1fn = option->GetFunction( 0 )->GetParameter( 2 );
   bool have_p_mask = false;
   if ( mask1fn.length() > 5 )
@@ -1487,7 +1486,7 @@ int SCCA_vnl( itk::ants::CommandLineParser *sccanparser, unsigned int permct, un
     have_p_mask = ReadImage<ImageType>(mask1, mask1fn.c_str()  );
     }
 
-  typename ImageType::Pointer mask2 = ITK_NULLPTR;
+  typename ImageType::Pointer mask2 = nullptr;
   std::string mask2fn = option->GetFunction( 0 )->GetParameter( 3 );
   bool have_q_mask = false;
   if ( mask2fn.length() > 5 )
@@ -1496,13 +1495,13 @@ int SCCA_vnl( itk::ants::CommandLineParser *sccanparser, unsigned int permct, un
     }
 
   /** the penalties define the fraction of non-zero values for each view */
-  double FracNonZero1 = sccanparser->Convert<double>( option->GetFunction( 0 )->GetParameter( 4 ) );
+  auto FracNonZero1 = sccanparser->Convert<double>( option->GetFunction( 0 )->GetParameter( 4 ) );
   if( FracNonZero1 < 0 )
     {
     FracNonZero1 = fabs(FracNonZero1);
     sccanobj->SetKeepPositiveP(false);  // true if P sparsity > 0
     }
-  double FracNonZero2 = sccanparser->Convert<double>( option->GetFunction( 0 )->GetParameter( 5 ) );
+  auto FracNonZero2 = sccanparser->Convert<double>( option->GetFunction( 0 )->GetParameter( 5 ) );
   if( FracNonZero2 < 0 )
     {
     FracNonZero2 = fabs(FracNonZero2);
@@ -1680,7 +1679,7 @@ int SCCA_vnl( itk::ants::CommandLineParser *sccanparser, unsigned int permct, un
   return EXIT_SUCCESS;
 }
 
-template <unsigned int ImageDimension, class PixelType>
+template <unsigned int ImageDimension, typename PixelType>
 int mSCCA_vnl( itk::ants::CommandLineParser *sccanparser,
                unsigned int permct, bool run_partial_scca = false, unsigned int n_e_vecs = 3, unsigned int newimp = 0,
                unsigned int robustify = 0, unsigned int p_cluster_thresh = 100, unsigned int q_cluster_thresh = 1,
@@ -1697,19 +1696,19 @@ int mSCCA_vnl( itk::ants::CommandLineParser *sccanparser,
   // std::cout << " newimp " << newimp << std::endl;
   itk::ants::CommandLineParser::OptionType::Pointer option =
     sccanparser->GetOption( "scca" );
-  typedef itk::Image<PixelType, ImageDimension>         ImageType;
-  typedef double                                        Scalar;
-  typedef itk::ants::antsSCCANObject<ImageType, Scalar> SCCANType;
-  typedef itk::Image<Scalar, 2>                         MatrixImageType;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  using Scalar = double;
+  using SCCANType = itk::ants::antsSCCANObject<ImageType, Scalar>;
+  using MatrixImageType = itk::Image<Scalar, 2>;
   typename SCCANType::Pointer sccanobj = SCCANType::New();
   sccanobj->SetMaximumNumberOfIterations(iterct);
-  typedef typename SCCANType::MatrixType         vMatrix;
-  typedef typename SCCANType::VectorType         vVector;
+  using vMatrix = typename SCCANType::MatrixType;
+  using vVector = typename SCCANType::VectorType;
 
   /** we refer to the two view matrices as P and Q */
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
-  typedef double                                Scalar;
-  typedef itk::Image<Scalar, 2>                 MatrixImageType;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  using Scalar = double;
+  using MatrixImageType = itk::Image<Scalar, 2>;
 
   /** read the matrix images */
   std::string pmatname = std::string(option->GetFunction( 0 )->GetParameter( 0 ) );
@@ -1734,26 +1733,26 @@ int mSCCA_vnl( itk::ants::CommandLineParser *sccanparser,
     return EXIT_FAILURE;
     }
 
-  typename ImageType::Pointer mask1 = ITK_NULLPTR;
+  typename ImageType::Pointer mask1 = nullptr;
   bool have_p_mask = ReadImage<ImageType>(mask1, option->GetFunction( 0 )->GetParameter( 3 ).c_str() );
-  typename ImageType::Pointer mask2 = ITK_NULLPTR;
+  typename ImageType::Pointer mask2 = nullptr;
   bool have_q_mask = ReadImage<ImageType>(mask2, option->GetFunction( 0 )->GetParameter( 4 ).c_str() );
-  typename ImageType::Pointer mask3 = ITK_NULLPTR;
+  typename ImageType::Pointer mask3 = nullptr;
 
   /** the penalties define the fraction of non-zero values for each view */
-  double FracNonZero1 = sccanparser->Convert<double>( option->GetFunction( 0 )->GetParameter( 6 ) );
+  auto FracNonZero1 = sccanparser->Convert<double>( option->GetFunction( 0 )->GetParameter( 6 ) );
   if( FracNonZero1 < 0 )
     {
     FracNonZero1 = fabs(FracNonZero1);
     sccanobj->SetKeepPositiveP(false);
     }
-  double FracNonZero2 = sccanparser->Convert<double>( option->GetFunction( 0 )->GetParameter( 7 ) );
+  auto FracNonZero2 = sccanparser->Convert<double>( option->GetFunction( 0 )->GetParameter( 7 ) );
   if( FracNonZero2 < 0 )
     {
     FracNonZero2 = fabs(FracNonZero2);
     sccanobj->SetKeepPositiveQ(false);
     }
-  double FracNonZero3 = sccanparser->Convert<double>( option->GetFunction( 0 )->GetParameter( 8 ) );
+  auto FracNonZero3 = sccanparser->Convert<double>( option->GetFunction( 0 )->GetParameter( 8 ) );
   if( FracNonZero3 < 0 )
     {
     FracNonZero3 = fabs(FracNonZero3);
@@ -2085,8 +2084,8 @@ int mSCCA_vnl( itk::ants::CommandLineParser *sccanparser,
 int sccan( itk::ants::CommandLineParser *sccanparser )
 {
   // Define dimensionality
-  const unsigned int ImageDimension = 3;
-  typedef double                                matPixelType;
+  constexpr unsigned int ImageDimension = 3;
+  using matPixelType = double;
 
   itk::ants::CommandLineParser::OptionType::Pointer outputOption =
     sccanparser->GetOption( "output" );
@@ -2212,15 +2211,12 @@ int sccan( itk::ants::CommandLineParser *sccanparser )
     priorWeight = sccanparser->Convert<matPixelType>( pwoption->GetFunction()->GetName() );
     }
 
-  bool                                      getSmall = 0;
+  bool                                      getSmall = false;
   itk::ants::CommandLineParser::OptionType::Pointer getsmallopt =
     sccanparser->GetOption( "get-small" );
-  if( !getsmallopt || getsmallopt->GetNumberOfFunctions() == 0 )
+  if( getsmallopt && getsmallopt->GetNumberOfFunctions() > 0 )
     {
-    }
-  else
-    {
-    getSmall = sccanparser->Convert<matPixelType>(
+    getSmall = sccanparser->Convert<bool>(
         getsmallopt->GetFunction()->GetName() );
     }
 
@@ -2320,7 +2316,7 @@ int sccan( itk::ants::CommandLineParser *sccanparser )
     std::string   outname = outputOption->GetFunction( 0 )->GetName();
     std::string   csvfn = matrixOptionV2I->GetFunction( 0 )->GetParameter( 0 );
     std::string   maskfn = matrixOptionV2I->GetFunction( 0 )->GetParameter( 1 );
-    unsigned long rowOrCol = sccanparser->Convert<unsigned long>( matrixOptionV2I->GetFunction( 0 )->GetParameter( 2 ) );
+    auto rowOrCol = sccanparser->Convert<unsigned long>( matrixOptionV2I->GetFunction( 0 )->GetParameter( 2 ) );
     ConvertCSVVectorToImage<double>( csvfn,  maskfn, outname, rowOrCol );
     // std::cout << " V2I done " << outname << std::endl;
     return EXIT_SUCCESS;
@@ -2463,7 +2459,7 @@ int sccan( itk::ants::CommandLineParser *sccanparser )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int sccan( std::vector<std::string> args, std::ostream * /*out_stream = ITK_NULLPTR */ )
+int sccan( std::vector<std::string> args, std::ostream * /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -2482,7 +2478,7 @@ int sccan( std::vector<std::string> args, std::ostream * /*out_stream = ITK_NULL
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -2522,7 +2518,7 @@ private:
 
   /** in this function, list all the operations you will perform */
 
-  typedef itk::ants::CommandLineParser::OptionType OptionType;
+  using OptionType = itk::ants::CommandLineParser::OptionType;
     {
     std::string         description = std::string( "Print the help menu (short version)." );
     OptionType::Pointer option = OptionType::New();
@@ -2896,8 +2892,7 @@ private:
       itk::ants::CommandLineParser::OptionListType::const_iterator it;
       for( it = options.begin(); it != options.end(); ++it )
         {
-        const char *longName = ( ( *it )->GetLongName() ).c_str();
-        if( strstr( longName, value.c_str() ) == longName  )
+        if( ( *it )->GetLongName().find( value ) == 0  )
           {
           sccanparser->PrintMenu( std::cout, 5, false );
           }

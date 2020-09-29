@@ -14,10 +14,10 @@ namespace ants
 template <unsigned int ImageDimension>
 int TileImages( unsigned int argc, char *argv[] )
 {
-  typedef float                                 PixelType;
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
+  using PixelType = float;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
 
-  typedef itk::TileImageFilter<ImageType, ImageType> FilterType;
+  using FilterType = itk::TileImageFilter<ImageType, ImageType>;
   typename FilterType::Pointer filter = FilterType::New();
   typename FilterType::LayoutArrayType array;
 
@@ -49,11 +49,11 @@ int CreateMosaic( unsigned int argc, char *argv[] )
     return EXIT_FAILURE;
     }
 
-  const unsigned int ImageDimension = 3;
+  constexpr unsigned int ImageDimension = 3;
 
-  typedef float                                   PixelType;
-  typedef itk::Image<PixelType, ImageDimension>   ImageType;
-  typedef itk::Image<PixelType, ImageDimension-1> SliceType;
+  using PixelType = float;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  using SliceType = itk::Image<PixelType, ImageDimension - 1>;
 
   ImageType::Pointer inputImage;
   ReadImage<ImageType>( inputImage, argv[4] );
@@ -78,7 +78,7 @@ int CreateMosaic( unsigned int argc, char *argv[] )
     unsigned int maxIndex = 0;
     for( unsigned int d = 1; d < ImageDimension; d++ )
       {
-      if( spacing[d] > maxSpacing )
+      if( spacing[d] > static_cast<double>( maxSpacing ) )
         {
         maxSpacing = spacing[d];
         maxIndex = d;
@@ -89,8 +89,8 @@ int CreateMosaic( unsigned int argc, char *argv[] )
 
   unsigned long numberOfSlices = size[layout[0]];
 
-  int numberOfRows = vnl_math_min( static_cast<int>( layout[1] ), static_cast<int>( numberOfSlices ) );
-  int numberOfColumns = vnl_math_min( static_cast<int>( layout[2] ), static_cast<int>( numberOfSlices ) );
+  int numberOfRows = std::min( static_cast<int>( layout[1] ), static_cast<int>( numberOfSlices ) );
+  int numberOfColumns = std::min( static_cast<int>( layout[2] ), static_cast<int>( numberOfSlices ) );
 
   if( numberOfRows <= 0 && numberOfColumns > 0 )
     {
@@ -110,7 +110,7 @@ int CreateMosaic( unsigned int argc, char *argv[] )
   std::cout << "Rows:  " << numberOfRows << std::endl;
   std::cout << "Columns:  " << numberOfColumns << std::endl;
 
-  typedef itk::TileImageFilter<SliceType, SliceType> FilterType;
+  using FilterType = itk::TileImageFilter<SliceType, SliceType>;
   FilterType::LayoutArrayType array;
 
   array[0] = numberOfColumns;
@@ -130,7 +130,7 @@ int CreateMosaic( unsigned int argc, char *argv[] )
     region.SetIndex( index );
     region.SetSize( size );
 
-    typedef itk::ExtractImageFilter<ImageType, SliceType> ExtracterType;
+    using ExtracterType = itk::ExtractImageFilter<ImageType, SliceType>;
     ExtracterType::Pointer extracter = ExtracterType::New();
     extracter->SetInput( inputImage );
     extracter->SetExtractionRegion( region );
@@ -148,7 +148,7 @@ int CreateMosaic( unsigned int argc, char *argv[] )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int TileImages( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int TileImages( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -166,7 +166,7 @@ int TileImages( std::vector<std::string> args, std::ostream* /*out_stream = ITK_
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -229,7 +229,7 @@ private:
     return EXIT_FAILURE;
     }
 
-  const int ImageDimension = static_cast<int>( atoi( argv[1] ) );
+  const int ImageDimension = static_cast<int>( std::stoi( argv[1] ) );
 
   if( ImageDimension == 3 && argc == 5 )
     {

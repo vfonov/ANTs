@@ -77,13 +77,13 @@ namespace ants
 /** \class antsRegistrationCommandIterationUpdate
  *  \brief change parameters between iterations of registration
  */
-template <class TFilter>
+template <typename TFilter>
 class antsSliceRegularizedRegistrationCommandIterationUpdate : public itk::Command
 {
 public:
-  typedef antsSliceRegularizedRegistrationCommandIterationUpdate Self;
-  typedef itk::Command                           Superclass;
-  typedef itk::SmartPointer<Self>                Pointer;
+  using Self = antsSliceRegularizedRegistrationCommandIterationUpdate<TFilter>;
+  using Superclass = itk::Command;
+  using Pointer = itk::SmartPointer<Self>;
   itkNewMacro( Self );
 protected:
   antsSliceRegularizedRegistrationCommandIterationUpdate()
@@ -93,14 +93,14 @@ protected:
 
 public:
 
-  void Execute(itk::Object *caller, const itk::EventObject & event) ITK_OVERRIDE
+  void Execute(itk::Object *caller, const itk::EventObject & event) override
   {
     Execute( (const itk::Object *) caller, event);
   }
 
-  void Execute(const itk::Object * object, const itk::EventObject & event) ITK_OVERRIDE
+  void Execute(const itk::Object * object, const itk::EventObject & event) override
   {
-    TFilter * filter = const_cast<TFilter *>( dynamic_cast<const TFilter *>( object ) );
+    auto * filter = const_cast<TFilter *>( dynamic_cast<const TFilter *>( object ) );
 
     unsigned int currentLevel = 0;
 
@@ -123,8 +123,8 @@ public:
       this->Logger() << "    required fixed parameters = " << adaptors[currentLevel]->GetRequiredFixedParameters()
                      << std::endl;
 
-      typedef itk::ConjugateGradientLineSearchOptimizerv4 GradientDescentOptimizerType;
-      GradientDescentOptimizerType * optimizer = reinterpret_cast<GradientDescentOptimizerType *>( filter->GetModifiableOptimizer() );
+      using GradientDescentOptimizerType = itk::ConjugateGradientLineSearchOptimizerv4;
+      auto * optimizer = reinterpret_cast<GradientDescentOptimizerType *>( filter->GetModifiableOptimizer() );
       optimizer->SetNumberOfIterations( this->m_NumberOfIterations[currentLevel] );
       optimizer->SetMinimumConvergenceValue( 1.e-7 );
       optimizer->SetConvergenceWindowSize( 10 );
@@ -154,7 +154,7 @@ private:
   std::ostream *            m_LogStream;
 };
 
-template <class T>
+template <typename T>
 inline std::string ants_slice_regularized_to_string(const T& t)
 {
   std::stringstream ss;
@@ -163,16 +163,16 @@ inline std::string ants_slice_regularized_to_string(const T& t)
   return ss.str();
 }
 
-template <class ImageType>
+template <typename ImageType>
 typename ImageType::Pointer sliceRegularizedPreprocessImage( ImageType * inputImage,
                                              typename ImageType::PixelType lowerScaleFunction,
                                              typename ImageType::PixelType upperScaleFunction,
                                              float winsorizeLowerQuantile, float winsorizeUpperQuantile,
-                                             ImageType *histogramMatchSourceImage = ITK_NULLPTR )
+                                             ImageType *histogramMatchSourceImage = nullptr )
 {
-  typedef itk::Statistics::ImageToHistogramFilter<ImageType>   HistogramFilterType;
-  typedef typename HistogramFilterType::InputBooleanObjectType InputBooleanObjectType;
-  typedef typename HistogramFilterType::HistogramSizeType      HistogramSizeType;
+  using HistogramFilterType = itk::Statistics::ImageToHistogramFilter<ImageType>;
+  using InputBooleanObjectType = typename HistogramFilterType::InputBooleanObjectType;
+  using HistogramSizeType = typename HistogramFilterType::HistogramSizeType;
 
   HistogramSizeType histogramSize( 1 );
   histogramSize[0] = 256;
@@ -189,7 +189,7 @@ typename ImageType::Pointer sliceRegularizedPreprocessImage( ImageType * inputIm
 
   float lowerFunction = histogramFilter->GetOutput()->Quantile( 0, winsorizeLowerQuantile );
   float upperFunction = histogramFilter->GetOutput()->Quantile( 0, winsorizeUpperQuantile );
-  typedef itk::IntensityWindowingImageFilter<ImageType, ImageType> IntensityWindowingImageFilterType;
+  using IntensityWindowingImageFilterType = itk::IntensityWindowingImageFilter<ImageType, ImageType>;
 
   typename IntensityWindowingImageFilterType::Pointer windowingFilter = IntensityWindowingImageFilterType::New();
   windowingFilter->SetInput( inputImage );
@@ -199,10 +199,10 @@ typename ImageType::Pointer sliceRegularizedPreprocessImage( ImageType * inputIm
   windowingFilter->SetOutputMaximum( upperScaleFunction );
   windowingFilter->Update();
 
-  typename ImageType::Pointer outputImage = ITK_NULLPTR;
+  typename ImageType::Pointer outputImage = nullptr;
   if( histogramMatchSourceImage )
     {
-    typedef itk::HistogramMatchingImageFilter<ImageType, ImageType> HistogramMatchingFilterType;
+    using HistogramMatchingFilterType = itk::HistogramMatchingImageFilter<ImageType, ImageType>;
     typename HistogramMatchingFilterType::Pointer matchingFilter = HistogramMatchingFilterType::New();
     matchingFilter->SetSourceImage( windowingFilter->GetOutput() );
     matchingFilter->SetReferenceImage( histogramMatchSourceImage );
@@ -215,16 +215,16 @@ typename ImageType::Pointer sliceRegularizedPreprocessImage( ImageType * inputIm
     outputImage->Update();
     outputImage->DisconnectPipeline();
 
-    typedef itk::MinimumMaximumImageCalculator<ImageType> CalculatorType;
+    using CalculatorType = itk::MinimumMaximumImageCalculator<ImageType>;
     typename CalculatorType::Pointer calc = CalculatorType::New();
     calc->SetImage( inputImage );
     calc->ComputeMaximum();
     calc->ComputeMinimum();
-    if( vnl_math_abs( calc->GetMaximum() - calc->GetMinimum() ) < 1.e-9 )
+    if( itk::Math::abs( calc->GetMaximum() - calc->GetMinimum() ) < static_cast<float>( 1.e-9 ) )
       {
       std::cout << "Warning: bad time point - too little intensity variation"
         << calc->GetMinimum() << " " <<  calc->GetMaximum() << std::endl;
-      return ITK_NULLPTR;
+      return nullptr;
       }
     }
   else
@@ -236,7 +236,7 @@ typename ImageType::Pointer sliceRegularizedPreprocessImage( ImageType * inputIm
   return outputImage;
 }
 
-template <class T>
+template <typename T>
 struct ants_slice_regularized_index_cmp
   {
   ants_slice_regularized_index_cmp(const T _arr) : arr(_arr)
@@ -251,28 +251,26 @@ struct ants_slice_regularized_index_cmp
   const T arr;
   };
 
-template <class TFilter>
-class CommandIterationUpdate : public itk::Command
+template <typename TFilter>
+class CommandIterationUpdate final : public itk::Command
 {
 public:
-  typedef CommandIterationUpdate  Self;
-  typedef itk::Command            Superclass;
-  typedef itk::SmartPointer<Self> Pointer;
+  using Self = CommandIterationUpdate<TFilter>;
+  using Superclass = itk::Command;
+  using Pointer = itk::SmartPointer<Self>;
   itkNewMacro( Self );
 protected:
-  CommandIterationUpdate()
-  {
-  };
+  CommandIterationUpdate() = default;
 public:
 
-  void Execute(itk::Object *caller, const itk::EventObject & event) ITK_OVERRIDE
+  void Execute(itk::Object *caller, const itk::EventObject & event) override
   {
     Execute( (const itk::Object *) caller, event);
   }
 
-  void Execute(const itk::Object * object, const itk::EventObject & event) ITK_OVERRIDE
+  void Execute(const itk::Object * object, const itk::EventObject & event) override
   {
-    TFilter * filter = const_cast<TFilter *>( dynamic_cast<const TFilter *>( object ) );
+    auto * filter = const_cast<TFilter *>( dynamic_cast<const TFilter *>( object ) );
 
     if( typeid( event ) != typeid( itk::IterationEvent ) )
       {
@@ -283,8 +281,8 @@ public:
     typename TFilter::TransformParametersAdaptorsContainerType adaptors =
       filter->GetTransformParametersAdaptorsPerLevel();
 
-    typedef itk::ConjugateGradientLineSearchOptimizerv4 OptimizerType;
-    OptimizerType * optimizer = reinterpret_cast<OptimizerType *>( filter->GetModifiableOptimizer() );
+    using OptimizerType = itk::ConjugateGradientLineSearchOptimizerv4;
+    auto * optimizer = reinterpret_cast<OptimizerType *>( filter->GetModifiableOptimizer() );
     optimizer->SetNumberOfIterations( this->m_NumberOfIterations[currentLevel] );
     optimizer->SetMinimumConvergenceValue( 1.e-7 );
     optimizer->SetConvergenceWindowSize( 10 );
@@ -312,11 +310,11 @@ void ants_slice_poly_regularize(
   vnl_matrix<double> param_values,
   unsigned int whichCol )
 {
-  typedef double RealType;
-  typedef vnl_vector<RealType>                      vVector;
+  using RealType = double;
+  using vVector = vnl_vector<RealType>;
   for ( unsigned int z = 0; z < timedims; z++ )
     {
-    RealType zz = static_cast<RealType>( z + 1 );
+    auto zz = static_cast<RealType>( z + 1 );
     A(z,0) = zz;
     for ( unsigned int lcol = 1; lcol < A.cols(); lcol++ )
       {
@@ -341,30 +339,30 @@ void ants_slice_poly_regularize(
   }
 
 
-template <unsigned int ImageDimension, class TXType>
+template <unsigned int ImageDimension, typename TXType>
 int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
 {
   // We infer the number of stages by the number of transformations
   // specified by the user which should match the number of metrics.
   unsigned numberOfStages = 0;
 
-  typedef float                                     PixelType;
-  typedef double                                    RealType;
-  typedef itk::Image<PixelType, ImageDimension>     FixedIOImageType;
-  typedef itk::Image<PixelType, ImageDimension-1>   FixedImageType;
-  typedef itk::Image<PixelType, ImageDimension>     MovingIOImageType;
-  typedef itk::Image<PixelType, ImageDimension-1>   MovingImageType;
+  using PixelType = float;
+  using RealType = double;
+  using FixedIOImageType = itk::Image<PixelType, ImageDimension>;
+  using FixedImageType = itk::Image<PixelType, ImageDimension - 1>;
+  using MovingIOImageType = itk::Image<PixelType, ImageDimension>;
+  using MovingImageType = itk::Image<PixelType, ImageDimension - 1>;
 
-  typedef itk::Vector<RealType, ImageDimension>     VectorIOType;
-  typedef itk::Image<VectorIOType, ImageDimension>  DisplacementIOFieldType;
-  typedef itk::Vector<RealType, ImageDimension-1>   VectorType;
-  typedef itk::Image<VectorType, ImageDimension-1>  DisplacementFieldType;
+  using VectorIOType = itk::Vector<RealType, ImageDimension>;
+  using DisplacementIOFieldType = itk::Image<VectorIOType, ImageDimension>;
+  using VectorType = itk::Vector<RealType, ImageDimension - 1>;
+  using DisplacementFieldType = itk::Image<VectorType, ImageDimension - 1>;
 
-  typedef vnl_matrix<RealType>                      vMatrix;
-  typedef vnl_vector<RealType>                      vVector;
+  using vMatrix = vnl_matrix<RealType>;
+  using vVector = vnl_vector<RealType>;
   vMatrix param_values;
-  typedef typename itk::ants::CommandLineParser     ParserType;
-  typedef typename ParserType::OptionType           OptionType;
+  using ParserType = typename itk::ants::CommandLineParser;
+  using OptionType = typename ParserType::OptionType;
 
   typename OptionType::Pointer transformOption = parser->GetOption( "transform" );
   if( transformOption && transformOption->GetNumberOfFunctions() )
@@ -396,10 +394,10 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
     ConvertToLowerCase( whichInterpolator );
     }
 
-  typedef MovingImageType ImageType;
+  using ImageType = MovingImageType;
   typename ImageType::SpacingType
     cache_spacing_for_smoothing_sigmas(itk::NumericTraits<typename ImageType::SpacingType::ValueType>::ZeroValue());
-  unsigned int VImageDimension = ImageDimension - 1;
+  const unsigned int VImageDimension = ImageDimension - 1;
   #include "make_interpolator_snip.tmpl"
 
   typename OptionType::Pointer iterationsOption = parser->GetOption( "iterations" );
@@ -447,17 +445,16 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
 
   itk::TimeProbe totalTimer;
   totalTimer.Start();
-  typedef itk::ImageRegistrationMethodv4<FixedImageType, MovingImageType, TXType>
-                                                           TranslationRegistrationType;
+  using TranslationRegistrationType = itk::ImageRegistrationMethodv4<FixedImageType, MovingImageType, TXType>;
   // We iterate backwards because the command line options are stored as a stack (first in last out)
-  typedef typename TXType::Pointer       SingleTransformItemType;
+  using SingleTransformItemType = typename TXType::Pointer;
   std::vector<SingleTransformItemType>                     transformList;
   std::vector<SingleTransformItemType>                     transformUList;
   std::vector<typename FixedImageType::Pointer>            fixedSliceList;
   std::vector<typename FixedImageType::Pointer>            movingSliceList;
   typename FixedIOImageType::Pointer                       maskImage;
-  typedef itk::Image< unsigned char, ImageDimension-1 >    ImageMaskType;
-  typename ImageMaskType::Pointer mask_time_slice = ITK_NULLPTR;
+  using ImageMaskType = itk::Image<unsigned char, ImageDimension - 1>;
+  typename ImageMaskType::Pointer mask_time_slice = nullptr;
   if ( maskfn.length() > 3 )
     ReadImage<FixedIOImageType>( maskImage, maskfn.c_str() );
 
@@ -469,8 +466,8 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
     // Get the fixed and moving images
     std::string fixedImageFileName = metricOption->GetFunction( currentStage )->GetParameter( 0 );
     std::string movingImageFileName = metricOption->GetFunction( currentStage )->GetParameter( 1 );
-    typename FixedImageType::Pointer fixed_time_slice = ITK_NULLPTR;
-    typename FixedImageType::Pointer moving_time_slice = ITK_NULLPTR;
+    typename FixedImageType::Pointer fixed_time_slice = nullptr;
+    typename FixedImageType::Pointer moving_time_slice = nullptr;
     typename FixedIOImageType::Pointer fixedImage;
     ReadImage<FixedIOImageType>( fixedImage, fixedImageFileName.c_str() );
     unsigned int timedims = fixedImage->GetLargestPossibleRegion().GetSize()[ImageDimension-1];
@@ -552,9 +549,9 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
     {
     polydegree.resize( nparams, polydegree[ 0 ] );
     }
-  for ( unsigned int pind = 0; pind < polydegree.size(); pind++ )
+  for (unsigned int & pind : polydegree)
     {
-    if ( polydegree[pind] > (timedims-2) ) polydegree[pind] = timedims-2;
+    if ( pind > (timedims-2) ) pind = timedims-2;
     }
 
     // the fixed image slice is a reference image in 2D while the moving is a 2D slice image
@@ -563,9 +560,9 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
     // Set up the image metric and scales estimator
     for( unsigned int timedim = 0; timedim < timedims; timedim++ )
       {
-      typedef itk::IdentityTransform<RealType, ImageDimension-1> IdentityTransformType;
+      using IdentityTransformType = itk::IdentityTransform<RealType, ImageDimension - 1>;
       typename IdentityTransformType::Pointer identityTransform = IdentityTransformType::New();
-      typedef itk::ExtractImageFilter<FixedIOImageType, FixedImageType> ExtractFilterType;
+      using ExtractFilterType = itk::ExtractImageFilter<FixedIOImageType, FixedImageType>;
       typename FixedIOImageType::RegionType extractRegion = movingImage->GetLargestPossibleRegion();
       extractRegion.SetSize(ImageDimension-1, 0);
       extractRegion.SetIndex(ImageDimension-1, timedim );
@@ -590,7 +587,7 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
 
       if ( maskfn.length() > 3 )
         {
-        typedef itk::ExtractImageFilter<FixedIOImageType, ImageMaskType> ExtractFilterTypeX;
+        using ExtractFilterTypeX = itk::ExtractImageFilter<FixedIOImageType, ImageMaskType>;
         typename ExtractFilterTypeX::Pointer extractFilterX = ExtractFilterTypeX::New();
         extractFilterX->SetInput( maskImage );
         extractFilterX->SetDirectionCollapseToSubmatrix();
@@ -612,7 +609,7 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
       }
 
     // implement a gradient descent on the polynomial parameters by looping over registration results
-    typedef itk::ImageToImageMetricv4<FixedImageType, FixedImageType> MetricType;
+    using MetricType = itk::ImageToImageMetricv4<FixedImageType, FixedImageType>;
     typename MetricType::Pointer metric;
     unsigned int maxloop = 2;
     for ( unsigned int loop = 0; loop < maxloop; loop++ )
@@ -624,7 +621,7 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
       typename FixedImageType::Pointer preprocessFixedImage =
         sliceRegularizedPreprocessImage<FixedImageType>( fixedSliceList[timedim], 0,
                                          1, 0.005, 0.995,
-                                         ITK_NULLPTR );
+                                         nullptr );
 
       typename FixedImageType::Pointer preprocessMovingImage =
         sliceRegularizedPreprocessImage<FixedImageType>( movingSliceList[timedim],
@@ -666,11 +663,10 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
 
       if( std::strcmp( whichMetric.c_str(), "cc" ) == 0 )
         {
-        unsigned int radiusOption = parser->Convert<unsigned int>( metricOption->GetFunction(
+        auto radiusOption = parser->Convert<unsigned int>( metricOption->GetFunction(
                                                                      currentStage )->GetParameter(  3 ) );
 
-        typedef itk::ANTSNeighborhoodCorrelationImageToImageMetricv4<FixedImageType,
-                                                                     FixedImageType> CorrelationMetricType;
+        using CorrelationMetricType = itk::ANTSNeighborhoodCorrelationImageToImageMetricv4<FixedImageType, FixedImageType>;
         typename CorrelationMetricType::Pointer correlationMetric = CorrelationMetricType::New();
         typename CorrelationMetricType::RadiusType radius;
         radius.Fill( radiusOption );
@@ -681,12 +677,11 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
         }
       else if( std::strcmp( whichMetric.c_str(), "mi" ) == 0 )
         {
-        unsigned int binOption =
+        auto binOption =
           parser->Convert<unsigned int>( metricOption->GetFunction( currentStage )->GetParameter(  3 ) );
-        typedef itk::MattesMutualInformationImageToImageMetricv4<FixedImageType,
-                                                                 FixedImageType> MutualInformationMetricType;
+        using MutualInformationMetricType = itk::MattesMutualInformationImageToImageMetricv4<FixedImageType, FixedImageType>;
         typename MutualInformationMetricType::Pointer mutualInformationMetric = MutualInformationMetricType::New();
-        mutualInformationMetric = mutualInformationMetric;
+        //mutualInformationMetric = mutualInformationMetric;
         mutualInformationMetric->SetNumberOfHistogramBins( binOption );
         mutualInformationMetric->SetUseMovingImageGradientFilter( false );
         mutualInformationMetric->SetUseFixedImageGradientFilter( false );
@@ -694,14 +689,14 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
         }
       else if( std::strcmp( whichMetric.c_str(), "meansquares" ) == 0 )
         {
-        typedef itk::MeanSquaresImageToImageMetricv4<FixedImageType, FixedImageType> MSQMetricType;
+        using MSQMetricType = itk::MeanSquaresImageToImageMetricv4<FixedImageType, FixedImageType>;
         typename MSQMetricType::Pointer demonsMetric = MSQMetricType::New();
-        demonsMetric = demonsMetric;
+        //demonsMetric = demonsMetric;
         metric = demonsMetric;
         }
       else if( std::strcmp( whichMetric.c_str(), "gc" ) == 0 )
         {
-        typedef itk::CorrelationImageToImageMetricv4<FixedImageType, FixedImageType> corrMetricType;
+        using corrMetricType = itk::CorrelationImageToImageMetricv4<FixedImageType, FixedImageType>;
         typename corrMetricType::Pointer corrMetric = corrMetricType::New();
         metric = corrMetric;
         }
@@ -713,21 +708,21 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
       metric->SetVirtualDomainFromImage(  fixedSliceList[timedim] );
       if ( maskfn.length() > 3 )
         {
-        typedef itk::ImageMaskSpatialObject<ImageDimension-1> spMaskType;
+        using spMaskType = itk::ImageMaskSpatialObject<ImageDimension - 1>;
         typename spMaskType::Pointer  spatialObjectMask = spMaskType::New();
         spatialObjectMask->SetImage( mask_time_slice );
         metric->SetFixedImageMask( spatialObjectMask );
         if ( ( verbose ) && ( loop == 0 ) && ( timedim == 0 ) )
            std::cout << " setting mask " << maskfn << std::endl;
         }
-      typedef itk::RegistrationParameterScalesFromPhysicalShift<MetricType> ScalesEstimatorType;
+      using ScalesEstimatorType = itk::RegistrationParameterScalesFromPhysicalShift<MetricType>;
       typename ScalesEstimatorType::Pointer scalesEstimator = ScalesEstimatorType::New();
       scalesEstimator->SetMetric( metric );
       scalesEstimator->SetTransformForward( true );
-      float learningRate = parser->Convert<float>(
+      auto learningRate = parser->Convert<float>(
         transformOption->GetFunction( currentStage )->GetParameter(  0 ) );
 
-      typedef itk::ConjugateGradientLineSearchOptimizerv4 OptimizerType;
+      using OptimizerType = itk::ConjugateGradientLineSearchOptimizerv4;
       typename OptimizerType::Pointer optimizer = OptimizerType::New();
       optimizer->SetNumberOfIterations( iterations[0] );
       optimizer->SetMinimumConvergenceValue( 1.e-7 );
@@ -770,7 +765,7 @@ int ants_slice_regularized_registration( itk::ants::CommandLineParser *parser )
         translationRegistration->SetMetric( metric );
         translationRegistration->SetOptimizer( optimizer );
 
-        typedef CommandIterationUpdate<TranslationRegistrationType> TranslationCommandType;
+        using TranslationCommandType = CommandIterationUpdate<TranslationRegistrationType>;
         typename TranslationCommandType::Pointer translationObserver = TranslationCommandType::New();
         translationObserver->SetNumberOfIterations( iterations );
         translationRegistration->AddObserver( itk::IterationEvent(), translationObserver );
@@ -900,7 +895,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
       colname = std::string("Ts");
       ColumnHeaders.push_back( colname );
       }
-    typedef itk::CSVNumericObjectFileWriter<double, 1, 1> WriterType;
+    using WriterType = itk::CSVNumericObjectFileWriter<double, 1, 1>;
     WriterType::Pointer writer = WriterType::New();
     std::string         fnmp;
     fnmp = outputPrefix + std::string("TxTy_poly.csv");
@@ -910,9 +905,9 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
     writer->Write();
     }
     /** Handle all output: images and displacement fields */
-    typedef itk::IdentityTransform<RealType, ImageDimension> IdentityIOTransformType;
+    using IdentityIOTransformType = itk::IdentityTransform<RealType, ImageDimension>;
     typename IdentityIOTransformType::Pointer identityIOTransform = IdentityIOTransformType::New();
-    typedef typename itk::TransformToDisplacementFieldFilter<DisplacementIOFieldType, RealType> ConverterType;
+    using ConverterType = typename itk::TransformToDisplacementFieldFilter<DisplacementIOFieldType, RealType>;
     typename ConverterType::Pointer idconverter = ConverterType::New();
     idconverter->SetOutputOrigin( outputImage->GetOrigin() );
     idconverter->SetOutputStartIndex( outputImage->GetBufferedRegion().GetIndex() );
@@ -931,8 +926,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
     displacementinv->FillBuffer( displacementout->GetPixel( dind ) );
     for( unsigned int timedim = 0; timedim < timedims; timedim++ )
       {
-      typedef typename itk::TransformToDisplacementFieldFilter<DisplacementFieldType, RealType>
-               _ConverterType;
+      using _ConverterType = typename itk::TransformToDisplacementFieldFilter<DisplacementFieldType, RealType>;
       typename _ConverterType::Pointer converter = _ConverterType::New();
       converter->SetOutputOrigin( fixedSliceList[timedim]->GetOrigin() );
       converter->SetOutputStartIndex( fixedSliceList[timedim]->GetBufferedRegion().GetIndex() );
@@ -944,7 +938,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
 
       // resample the moving image and then put it in its place
       interpolator->SetInputImage( movingSliceList[timedim] );
-      typedef itk::ResampleImageFilter<FixedImageType, FixedImageType> ResampleFilterType;
+      using ResampleFilterType = itk::ResampleImageFilter<FixedImageType, FixedImageType>;
       typename ResampleFilterType::Pointer resampler = ResampleFilterType::New();
       resampler->SetTransform( transformList[timedim] );
       resampler->SetInterpolator( interpolator );
@@ -954,7 +948,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
       resampler->Update();
 
       /** Here, we put the resampled 2D image into the 3D volume */
-      typedef itk::ImageRegionIteratorWithIndex<FixedImageType> Iterator;
+      using Iterator = itk::ImageRegionIteratorWithIndex<FixedImageType>;
       Iterator vfIter2(  resampler->GetOutput(), resampler->GetOutput()->GetLargestPossibleRegion() );
       for(  vfIter2.GoToBegin(); !vfIter2.IsAtEnd(); ++vfIter2 )
         {
@@ -963,7 +957,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
 	      VectorIOType vecout;
 	      vecout.Fill( 0 );
         typename MovingIOImageType::IndexType ind;
-        for( unsigned int xx = 0; xx < ImageDimension; xx++ )
+        for( itk::SizeValueType xx = 0; xx < ImageDimension-1; xx++ )
           {
           ind[xx] = vfIter2.GetIndex()[xx];
           vecout[xx] = vec[xx];
@@ -973,7 +967,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
           {
           tdim = timedims - 1;
           }
-        ind[ImageDimension-1] = tdim;
+        ind[MovingIOImageType::ImageDimension-1] = tdim;
         outputImage->SetPixel(ind, fval);
         displacementout->SetPixel( ind, vecout );
         }
@@ -983,8 +977,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
       unsigned int timedimX = 0;
       for( timedimX = 0; timedimX < timedims; timedimX++ )
         {
-        typedef typename itk::TransformToDisplacementFieldFilter<DisplacementFieldType, RealType>
-          _ConverterType;
+        using _ConverterType = typename itk::TransformToDisplacementFieldFilter<DisplacementFieldType, RealType>;
         typename _ConverterType::Pointer converter = _ConverterType::New();
         converter->SetOutputOrigin( movingSliceList[ timedimX ]->GetOrigin() );
         converter->SetOutputStartIndex(
@@ -1003,7 +996,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
         converter->Update();
 
         // resample the moving image and then put it in its place
-        typedef itk::ResampleImageFilter<FixedImageType, FixedImageType> ResampleFilterType;
+        using ResampleFilterType = itk::ResampleImageFilter<FixedImageType, FixedImageType>;
         typename ResampleFilterType::Pointer resampler =
           ResampleFilterType::New();
         resampler->SetTransform( invtx );
@@ -1015,7 +1008,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
         resampler->Update();
 
         /** Here, we put the resampled 2D image into the 3D volume */
-        typedef itk::ImageRegionIteratorWithIndex<FixedImageType> Iterator;
+        using Iterator = itk::ImageRegionIteratorWithIndex<FixedImageType>;
         Iterator vfIter2(  resampler->GetOutput(),
           resampler->GetOutput()->GetLargestPossibleRegion() );
         for(  vfIter2.GoToBegin(); !vfIter2.IsAtEnd(); ++vfIter2 )
@@ -1025,7 +1018,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
           VectorIOType vecout;
           vecout.Fill( 0 );
           typename MovingIOImageType::IndexType ind;
-          for( unsigned int xx = 0; xx < ImageDimension; xx++ )
+          for( itk::SizeValueType xx = 0; xx < ImageDimension-1; xx++ )
             {
             ind[xx] = vfIter2.GetIndex()[xx];
             vecout[xx] = vec[xx];
@@ -1035,7 +1028,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
             {
             tdim = timedims - 1;
             }
-          ind[ImageDimension-1] = tdim;
+          ind[MovingIOImageType::ImageDimension-1] = tdim;
           displacementinv->SetPixel( ind, vecout );
           }
         }
@@ -1057,7 +1050,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
       }
       {
       std::string dispfn = outputPrefix + std::string("Warp.nii.gz");
-      typedef  itk::ImageFileWriter<DisplacementIOFieldType> DisplacementFieldWriterType;
+      using DisplacementFieldWriterType = itk::ImageFileWriter<DisplacementIOFieldType>;
       typename DisplacementFieldWriterType::Pointer displacementFieldWriter = DisplacementFieldWriterType::New();
       displacementFieldWriter->SetInput( displacementout );
       displacementFieldWriter->SetFileName( dispfn.c_str() );
@@ -1065,7 +1058,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
       }
       {
       std::string dispfn = outputPrefix + std::string("InverseWarp.nii.gz");
-      typedef  itk::ImageFileWriter<DisplacementIOFieldType> DisplacementFieldWriterType;
+      using DisplacementFieldWriterType = itk::ImageFileWriter<DisplacementIOFieldType>;
       typename DisplacementFieldWriterType::Pointer displacementFieldWriter = DisplacementFieldWriterType::New();
       displacementFieldWriter->SetInput( displacementinv );
       displacementFieldWriter->SetFileName( dispfn.c_str() );
@@ -1079,7 +1072,7 @@ for ( unsigned int i = 0; i < transformList.size(); i++)
 
 void antsSliceRegularizedRegistrationInitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
-  typedef itk::ants::CommandLineParser::OptionType OptionType;
+  using OptionType = itk::ants::CommandLineParser::OptionType;
 
     {
     std::string description = std::string( "Four image metrics are available--- " )
@@ -1094,17 +1087,17 @@ void antsSliceRegularizedRegistrationInitializeCommandLineOptions( itk::ants::Co
     option->SetShortName( 'm' );
     option->SetUsageOption(
       0,
-      "CC[fixedImage,movingImage,metricWeight,radius,<samplingStrategy={Regular,Random}>,<samplingPercentage=[0,1]>]" );
+      "CC[fixedImage,movingImage,metricWeight,radius,<samplingStrategy={Regular,Random,None}>,<samplingPercentage=[0,1]>]" );
     option->SetUsageOption(
       1,
-      "MI[fixedImage,movingImage,metricWeight,numberOfBins,<samplingStrategy={Regular,Random}>,<samplingPercentage=[0,1]>]" );
+      "MI[fixedImage,movingImage,metricWeight,numberOfBins,<samplingStrategy={Regular,Random,None}>,<samplingPercentage=[0,1]>]" );
     option->SetUsageOption(
       2,
 
-      "MeanSquares[fixedImage,movingImage,metricWeight,radius,<samplingStrategy={Regular,Random}>,<samplingPercentage=[0,1]>]" );
+      "MeanSquares[fixedImage,movingImage,metricWeight,radius,<samplingStrategy={Regular,Random,None}>,<samplingPercentage=[0,1]>]" );
     option->SetUsageOption(
       3,
-      "GC[fixedImage,movingImage,metricWeight,radius,<samplingStrategy={Regular,Random}>,<samplingPercentage=[0,1]>]" );
+      "GC[fixedImage,movingImage,metricWeight,radius,<samplingStrategy={Regular,Random,None}>,<samplingPercentage=[0,1]>]" );
     option->SetDescription( description );
     parser->AddOption( option );
     }
@@ -1243,7 +1236,7 @@ void antsSliceRegularizedRegistrationInitializeCommandLineOptions( itk::ants::Co
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int antsSliceRegularizedRegistration( std::vector<std::string> args, std::ostream * /*out_stream = ITK_NULLPTR */ )
+int antsSliceRegularizedRegistration( std::vector<std::string> args, std::ostream * /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -1261,7 +1254,7 @@ int antsSliceRegularizedRegistration( std::vector<std::string> args, std::ostrea
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -1333,10 +1326,10 @@ private:
 
   // Get dimensionality
   unsigned int dimension = 3;
-  typedef double                                    RealType;
-  typedef itk::TranslationTransform<RealType, 2> TranslationTransformType;
-  typedef itk::Euler2DTransform<RealType> EulerTransformType;
-  typedef itk::Similarity2DTransform<RealType> SimilarityTransformType;
+  using RealType = double;
+  using TranslationTransformType = itk::TranslationTransform<RealType, 2>;
+  using EulerTransformType = itk::Euler2DTransform<RealType>;
+  using SimilarityTransformType = itk::Similarity2DTransform<RealType>;
 
   itk::ants::CommandLineParser::OptionType::Pointer transformOption =
     parser->GetOption( "transform" );

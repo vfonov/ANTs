@@ -50,14 +50,15 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
 {
   this->SetNumberOfRequiredInputs( 1 );
 
-  this->m_MeanImage = ITK_NULLPTR;
-  this->m_VarianceImage = ITK_NULLPTR;
-  this->m_IntensitySquaredDistanceImage = ITK_NULLPTR;
-  this->m_ThreadContributionCountImage = ITK_NULLPTR;
+  this->m_MeanImage = nullptr;
+  this->m_VarianceImage = nullptr;
+  this->m_IntensitySquaredDistanceImage = nullptr;
+  this->m_ThreadContributionCountImage = nullptr;
 
-  this->m_RicianBiasImage = ITK_NULLPTR;
+  this->m_RicianBiasImage = nullptr;
 
   this->m_NeighborhoodRadiusForLocalMeanAndVariance.Fill( 1 );
+  this->DynamicMultiThreadingOff();
 }
 
 template<typename TInputImage, typename TOutputImage, typename TMaskImage>
@@ -191,13 +192,13 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
 
         const RealType varianceRatio = varianceCenterPixel / varianceNeighborhoodPixel;
 
-        if( ( ( meanRatio > this->m_MeanThreshold && meanRatio < 1.0 / this->m_MeanThreshold ) ||
-            ( meanRatioInverse > this->m_MeanThreshold && meanRatioInverse < 1.0 / this->m_MeanThreshold ) ) &&
-            varianceRatio > this->m_VarianceThreshold && varianceRatio < 1.0 / this->m_VarianceThreshold )
+        if( ( ( meanRatio > this->m_MeanThreshold && meanRatio < itk::NumericTraits<RealType>::OneValue() / this->m_MeanThreshold ) ||
+            ( meanRatioInverse > this->m_MeanThreshold && meanRatioInverse < itk::NumericTraits<RealType>::OneValue() / this->m_MeanThreshold ) ) &&
+            varianceRatio > this->m_VarianceThreshold && varianceRatio < itk::NumericTraits<RealType>::OneValue() / this->m_VarianceThreshold )
           {
 
-          RealType averageDistance = 0.0;
-          RealType count = 0.0;
+          RealType averageDistance = itk::NumericTraits<RealType>::ZeroValue();
+          RealType count = itk::NumericTraits<RealType>::ZeroValue();
 
           for( unsigned int n = 0; n < neighborhoodPatchSize; n++ )
             {
@@ -209,12 +210,12 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
               }
             RealType neighborhoodInputImagePixel = static_cast<RealType>( inputImage->GetPixel( neighborhoodPatchIndex ) );
             RealType neighborhoodMeanImagePixel = this->m_MeanImage->GetPixel( neighborhoodPatchIndex );
-            averageDistance += vnl_math_sqr( neighborhoodInputImagePixel - neighborhoodMeanImagePixel );
+            averageDistance += itk::Math::sqr( neighborhoodInputImagePixel - neighborhoodMeanImagePixel );
 
-            count += 1.0;
+            count += itk::NumericTraits<RealType>::OneValue();
             }
           averageDistance /= count;
-          minimumDistance = vnl_math_min( averageDistance, minimumDistance );
+          minimumDistance = std::min( averageDistance, minimumDistance );
           }
         }
 
@@ -276,9 +277,9 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
 
         const RealType varianceRatio = varianceCenterPixel / varianceNeighborhoodPixel;
 
-        if( ( ( meanRatio > this->m_MeanThreshold && meanRatio < 1.0 / this->m_MeanThreshold ) ||
-            ( meanRatioInverse > this->m_MeanThreshold && meanRatioInverse < 1.0 / this->m_MeanThreshold ) ) &&
-            varianceRatio > this->m_VarianceThreshold && varianceRatio < 1.0 / this->m_VarianceThreshold )
+        if( ( ( meanRatio > this->m_MeanThreshold && meanRatio < itk::NumericTraits<RealType>::OneValue()/ this->m_MeanThreshold ) ||
+            ( meanRatioInverse > this->m_MeanThreshold && meanRatioInverse < itk::NumericTraits<RealType>::OneValue() / this->m_MeanThreshold ) ) &&
+            varianceRatio > this->m_VarianceThreshold && varianceRatio < itk::NumericTraits<RealType>::OneValue() / this->m_VarianceThreshold )
           {
 
           RealType averageDistance = 0.0;
@@ -291,17 +292,17 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
               {
               continue;
               }
-            RealType distance1 = inputImage->GetPixel( searchNeighborhoodPatchIndex ) - 
+            RealType distance1 = inputImage->GetPixel( searchNeighborhoodPatchIndex ) -
                                  this->m_MeanImage->GetPixel( searchNeighborhoodPatchIndex );
-            RealType distance2 = inputImage->GetPixel( centerNeighborhoodPatchIndex ) - 
+            RealType distance2 = inputImage->GetPixel( centerNeighborhoodPatchIndex ) -
                                  this->m_MeanImage->GetPixel( centerNeighborhoodPatchIndex );
-            averageDistance += vnl_math_sqr( distance1 - distance2 );
-            count += 1.0;
+            averageDistance += itk::Math::sqr( distance1 - distance2 );
+            count += itk::NumericTraits<RealType>::OneValue();
             }
           averageDistance /= count;
 
-          RealType weight = 0.0;
-          if( averageDistance <= 3.0 * minimumDistance )
+          RealType weight = itk::NumericTraits<RealType>::ZeroValue();
+          if( averageDistance <= static_cast<RealType>( 3.0 ) * minimumDistance )
             {
             weight = std::exp( -averageDistance / minimumDistance );
             }
@@ -310,7 +311,7 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
             maxWeight = weight;
             }
 
-          if( weight > 0.0 )
+          if( weight > itk::NumericTraits<RealType>::ZeroValue() )
             {
             for( unsigned int n = 0; n < neighborhoodPatchSize; n++ )
               {
@@ -321,7 +322,7 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
                 }
               if( this->m_UseRicianNoiseModel )
                 {
-                weightedAverageIntensities[n] += weight * vnl_math_sqr( inputImage->GetPixel( neighborhoodPatchIndex ) );
+                weightedAverageIntensities[n] += weight * itk::Math::sqr( inputImage->GetPixel( neighborhoodPatchIndex ) );
                 }
               else
                 {
@@ -352,7 +353,7 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
         }
       if( this->m_UseRicianNoiseModel )
         {
-        weightedAverageIntensities[n] += maxWeight * vnl_math_sqr( inputImage->GetPixel( neighborhoodPatchIndex ) );
+        weightedAverageIntensities[n] += maxWeight * itk::Math::sqr( inputImage->GetPixel( neighborhoodPatchIndex ) );
         }
       else
         {
@@ -361,7 +362,7 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
       }
     sumOfWeights += maxWeight;
 
-    if( sumOfWeights > 0.0 )
+    if( sumOfWeights > itk::NumericTraits<RealType>::ZeroValue() )
       {
       for( unsigned int n = 0; n < neighborhoodPatchSize; n++ )
         {
@@ -374,7 +375,7 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
         estimate += ( weightedAverageIntensities[n] / sumOfWeights );
 
         outputImage->SetPixel( neighborhoodPatchIndex, estimate );
-        this->m_ThreadContributionCountImage->SetPixel( neighborhoodPatchIndex, 
+        this->m_ThreadContributionCountImage->SetPixel( neighborhoodPatchIndex,
          this->m_ThreadContributionCountImage->GetPixel( neighborhoodPatchIndex ) + 1 );
         }
       }
@@ -411,15 +412,15 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
 
     while( !ItS.IsAtEnd() )
       {
-      if( ItS.Get() > 0.0 && ( !maskImage || maskImage->GetPixel( ItM.GetIndex() ) != NumericTraits<MaskPixelType>::ZeroValue() ) )
+      if( ItS.Get() > itk::NumericTraits<RealType>::ZeroValue() && ( !maskImage || maskImage->GetPixel( ItM.GetIndex() ) != NumericTraits<MaskPixelType>::ZeroValue() ) )
         {
         const RealType snr = ItM.Get() / std::sqrt( ItS.Get() );
 
-        RealType bias = 2.0 * ItS.Get() / this->CalculateCorrectionFactor( snr );
+        RealType bias = static_cast<RealType>( 2.0 ) * ItS.Get() / this->CalculateCorrectionFactor( snr );
 
-        if( vnl_math_isnan( bias ) || vnl_math_isinf( bias ) )
+        if( std::isnan( bias ) || std::isinf( bias ) )
           {
-          bias = 0.0;
+          bias = itk::NumericTraits<RealType>::ZeroValue();
           }
         ItB.Set( bias );
         }
@@ -439,7 +440,7 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
     {
     RealType estimate = ItO.Get();
 
-    if( ItL.Get() == 0.0 )
+    if( itk::Math::FloatAlmostEqual( ItL.Get(), itk::NumericTraits<RealType>::ZeroValue() ) )
       {
       continue;
       }
@@ -451,9 +452,9 @@ AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
       RealType bias = this->m_RicianBiasImage->GetPixel( ItO.GetIndex() );
 
       estimate -= bias;
-      if( estimate < 0.0 )
+      if( estimate < itk::NumericTraits<RealType>::ZeroValue() )
         {
-        estimate = 0.0;
+        estimate = itk::NumericTraits<RealType>::ZeroValue();
         }
       estimate = std::sqrt( estimate );
       }
@@ -467,15 +468,17 @@ typename AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TM
 AdaptiveNonLocalMeansDenoisingImageFilter<TInputImage, TOutputImage, TMaskImage>
 ::CalculateCorrectionFactor( RealType snr )
 {
-   const RealType snrSquared = vnl_math_sqr( snr );
+   const RealType snrSquared = itk::Math::sqr( snr );
 
-   RealType value = 2.0 + snrSquared - 0.125 * Math::pi * std::exp( -0.5 * snrSquared ) *
-     vnl_math_sqr( ( 2.0 + snrSquared ) * this->m_ModifiedBesselCalculator.ModifiedBesselI0( 0.25 * snrSquared ) +
-     snrSquared * this->m_ModifiedBesselCalculator.ModifiedBesselI1( 0.25 * snrSquared ) );
+   RealType value = static_cast<RealType>( 2.0 ) + snrSquared - static_cast<RealType>( 0.125 ) *
+     static_cast<RealType>( Math::pi ) * static_cast<RealType>( std::exp( static_cast<RealType>( -0.5 ) * snrSquared ) ) *
+     itk::Math::sqr( ( static_cast<RealType>( 2.0 ) + snrSquared ) *
+     static_cast<RealType>( this->m_ModifiedBesselCalculator.ModifiedBesselI0( static_cast<RealType>( 0.25 ) * snrSquared ) ) +
+     snrSquared * static_cast<RealType>( this->m_ModifiedBesselCalculator.ModifiedBesselI1( static_cast<RealType>( 0.25 ) * snrSquared ) ) );
 
-   if( value < 0.001 || value > 10.0 )
+   if( value < static_cast<RealType>( 0.001 ) || value > static_cast<RealType>( 10.0 ) )
      {
-     value = 1.0;
+     value = itk::NumericTraits<RealType>::OneValue();
      }
    return value;
 }

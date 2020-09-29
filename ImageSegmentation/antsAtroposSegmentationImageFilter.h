@@ -59,10 +59,10 @@ namespace ants
  *
  */
 
-template <class TInputImage, class TMaskImage
+template <typename TInputImage, typename TMaskImage
             = Image<unsigned char, TInputImage::ImageDimension>,
           class TClassifiedImage = TMaskImage>
-class AtroposSegmentationImageFilter :
+class AtroposSegmentationImageFilter final :
   public         ImageToImageFilter<TInputImage, TClassifiedImage>
 {
 public:
@@ -252,7 +252,7 @@ public:
    * cause a greater spatial homogeneity in the final labeling.  Default value
    * = 0.3.
    */
-  itkSetClampMacro( MRFSmoothingFactor, RealType, 0.0, NumericTraits<RealType>::max() );
+  itkSetClampMacro( MRFSmoothingFactor, RealType,  NumericTraits<RealType>::ZeroValue(), NumericTraits<RealType>::max() );
 
   /**
    * Get the MRF smoothing parameter.
@@ -289,7 +289,7 @@ public:
    * (likelihoods * priors)^(1/T) where T is specified annealing temperature
    * raised to the number of elapsed iterations.  Default value = 1.0.
    */
-  itkSetClampMacro( InitialAnnealingTemperature, RealType, 0.0, NumericTraits<RealType>::max() );
+  itkSetClampMacro( InitialAnnealingTemperature, RealType,  NumericTraits<RealType>::ZeroValue(), NumericTraits<RealType>::max() );
 
   /**
    * Get the initial annealing temperature.  For values
@@ -305,8 +305,8 @@ public:
    * Typically, the algorithm becomes unstable for values < 0.1.  Default value
    * = 0.1.
    */
-  itkSetClampMacro( MinimumAnnealingTemperature, RealType, 0.0,
-                    NumericTraits<RealType>::max() );
+  itkSetClampMacro( MinimumAnnealingTemperature, RealType,
+    NumericTraits<RealType>::ZeroValue(), NumericTraits<RealType>::max() );
 
   /**
    * Get the minimum annealing temperature for ICM asynchronous updating.
@@ -322,7 +322,8 @@ public:
    * (likelihoods * priors)^(1/T) where T is specified annealing temperature
    * raised to the number of elapsed iterations. Default value = 1.0.
    */
-  itkSetClampMacro( AnnealingRate, RealType, 0.0, 1.0 );
+  itkSetClampMacro( AnnealingRate, RealType,
+    NumericTraits<RealType>::ZeroValue(), NumericTraits<RealType>::OneValue() );
 
   /**
    * Set the annealing rate for ICM asynchronous updating.  For values
@@ -421,7 +422,8 @@ public:
    * values are included in the sparse representation of the prior probability
    * images.  Default value =
    */
-  itkSetClampMacro( ProbabilityThreshold, RealType, 0.0, 1.0 );
+  itkSetClampMacro( ProbabilityThreshold, RealType,
+    NumericTraits<RealType>::ZeroValue(), NumericTraits<RealType>::OneValue() );
 
   /**
    * Get the prior probability threshold value.
@@ -470,8 +472,8 @@ public:
    */
   void SetAdaptiveSmoothingWeight( unsigned int idx, RealType weight )
   {
-    RealType clampedWeight = vnl_math_min( NumericTraits<RealType>::OneValue(),
-                                           vnl_math_max( NumericTraits<RealType>::ZeroValue(), weight ) );
+    RealType clampedWeight = std::min( NumericTraits<RealType>::OneValue(),
+                                           std::max( NumericTraits<RealType>::ZeroValue(), weight ) );
 
     if( idx >= this->m_AdaptiveSmoothingWeights.size() )
       {
@@ -479,7 +481,7 @@ public:
       this->m_AdaptiveSmoothingWeights[idx] = clampedWeight;
       this->Modified();
       }
-    if( this->m_AdaptiveSmoothingWeights[idx] != weight )
+    if( ! itk::Math::FloatAlmostEqual( this->m_AdaptiveSmoothingWeights[idx], weight ) )
       {
       this->m_AdaptiveSmoothingWeights[idx] = clampedWeight;
       this->Modified();
@@ -528,7 +530,7 @@ public:
    * prior probability information should be included in the posterior
    * probability information.
    */
-  itkSetClampMacro( PriorProbabilityWeight, RealType, 0.0, 1.e9 );
+  itkSetClampMacro( PriorProbabilityWeight, RealType,  NumericTraits<RealType>::ZeroValue(), static_cast<RealType>( 1.e9 ) );
 
   /**
    * Get the prior probability weight.
@@ -608,7 +610,7 @@ public:
   /**
    * Set the outlier handling filter.  This takes the intensity samples from the
    * input images and modifies the sample such that the outlier effects of the
-   * sample points are removed.  Default = ITK_NULLPTR.
+   * sample points are removed.  Default = nullptr.
    */
   itkSetObjectMacro( OutlierHandlingFilter, OutlierHandlingFilterType );
 
@@ -649,7 +651,7 @@ public:
       }
     else
       {
-      return ITK_NULLPTR;
+      return nullptr;
       }
   }
 
@@ -737,15 +739,15 @@ public:
 #endif
 protected:
   AtroposSegmentationImageFilter();
-  virtual ~AtroposSegmentationImageFilter() ITK_OVERRIDE;
+  ~AtroposSegmentationImageFilter() override;
 
-  void PrintSelf( std::ostream& os, Indent indent ) const ITK_OVERRIDE;
+  void PrintSelf( std::ostream& os, Indent indent ) const override;
 
-  void GenerateData() ITK_OVERRIDE;
+  void GenerateData() override;
 
 private:
-  AtroposSegmentationImageFilter( const Self & ); // purposely not implemented
-  void operator=( const Self & );                 // purposely not implemented
+  AtroposSegmentationImageFilter( const Self & ) = delete;
+  void operator=( const Self & ) = delete;
 
   /**
    * Initialize the segmentation labeling.

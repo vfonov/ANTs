@@ -3,7 +3,7 @@
 #include "ReadWriteData.h"
 #include <algorithm>
 
-#include <stdio.h>
+#include <cstdio>
 
 #include "itkCastImageFilter.h"
 #include "itkImage.h"
@@ -22,9 +22,9 @@ namespace ants
 template <unsigned int ImageDimension>
 int ExtractRegionFromImage( int argc, char *argv[] )
 {
-  typedef float PixelType;
+  using PixelType = float;
 
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
 
   typename ImageType::Pointer inputImage = ImageType::New();
   ReadImage<ImageType>( inputImage, argv[2] );
@@ -50,24 +50,23 @@ int ExtractRegionFromImage( int argc, char *argv[] )
     {
     typename ImageType::Pointer labimg;
     ReadImage<ImageType>( labimg, argv[5] );
-    typedef itk::Image<unsigned short, ImageDimension>      ShortImageType;
-    typedef itk::CastImageFilter<ImageType, ShortImageType> CasterType;
+    using ShortImageType = itk::Image<unsigned short, ImageDimension>;
+    using CasterType = itk::CastImageFilter<ImageType, ShortImageType>;
     typename CasterType::Pointer caster = CasterType::New();
     caster->SetInput( labimg );
     caster->Update();
 
-    typedef itk::LabelStatisticsImageFilter<ShortImageType, ShortImageType>
-      StatsFilterType;
+    using StatsFilterType = itk::LabelStatisticsImageFilter<ShortImageType, ShortImageType>;
     typename StatsFilterType::Pointer stats = StatsFilterType::New();
     stats->SetLabelInput( caster->GetOutput() );
     stats->SetInput( caster->GetOutput() );
     stats->Update();
 
-    region = stats->GetRegion( atoi( argv[4] ) );
+    region = stats->GetRegion( std::stoi( argv[4] ) );
     }
   else
     {
-    typename ImageType::Pointer domainImage = ITK_NULLPTR;
+    typename ImageType::Pointer domainImage = nullptr;
     ReadImage<ImageType>( domainImage, argv[4] );
 
     if( domainImage.IsNotNull() )
@@ -117,24 +116,23 @@ int ExtractRegionFromImage( int argc, char *argv[] )
       }
     else
       {
-      typedef itk::Image<unsigned short, ImageDimension>      ShortImageType;
-      typedef itk::CastImageFilter<ImageType, ShortImageType> CasterType;
+      using ShortImageType = itk::Image<unsigned short, ImageDimension>;
+      using CasterType = itk::CastImageFilter<ImageType, ShortImageType>;
       typename CasterType::Pointer caster = CasterType::New();
       caster->SetInput( inputImage );
       caster->Update();
 
-      typedef itk::LabelStatisticsImageFilter<ShortImageType, ShortImageType>
-        StatsFilterType;
+      using StatsFilterType = itk::LabelStatisticsImageFilter<ShortImageType, ShortImageType>;
       typename StatsFilterType::Pointer stats = StatsFilterType::New();
       stats->SetLabelInput( caster->GetOutput() );
       stats->SetInput( caster->GetOutput() );
       stats->Update();
 
-      region = stats->GetRegion( atoi( argv[4] ) );
+      region = stats->GetRegion( std::stoi( argv[4] ) );
       }
     }
 
-  typedef itk::ExtractImageFilter<ImageType, ImageType> CropperType;
+  using CropperType = itk::ExtractImageFilter<ImageType, ImageType>;
   typename CropperType::Pointer cropper = CropperType::New();
   cropper->SetInput( inputImage );
   cropper->SetExtractionRegion( region );
@@ -148,7 +146,7 @@ int ExtractRegionFromImage( int argc, char *argv[] )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ExtractRegionFromImage( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int ExtractRegionFromImage( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -166,7 +164,7 @@ int ExtractRegionFromImage( std::vector<std::string> args, std::ostream* /*out_s
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -210,7 +208,7 @@ private:
     return EXIT_FAILURE;
     }
 
-  switch( atoi( argv[1] ) )
+  switch( std::stoi( argv[1] ) )
     {
     case 2:
       {

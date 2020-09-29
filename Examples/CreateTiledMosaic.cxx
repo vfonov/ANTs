@@ -23,23 +23,23 @@ namespace ants
 {
 int CreateMosaic( itk::ants::CommandLineParser *parser )
 {
-  const unsigned int ImageDimension = 3;
+  constexpr unsigned int ImageDimension = 3;
 
-  typedef float                                      RealType;
+  using RealType = float;
 
-  typedef RealType                                   PixelType;
-  typedef unsigned char                              RgbComponentType;
-  typedef itk::RGBPixel<RgbComponentType>            RgbPixelType;
+  using PixelType = RealType;
+  using RgbComponentType = unsigned char;
+  using RgbPixelType = itk::RGBPixel<RgbComponentType>;
 
-  typedef itk::Image<PixelType, ImageDimension>      ImageType;
-  typedef itk::Image<PixelType, ImageDimension-1>    SliceType;
-  typedef itk::Image<RgbPixelType, ImageDimension-1> RgbSliceType;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  using SliceType = itk::Image<PixelType, ImageDimension - 1>;
+  using RgbSliceType = itk::Image<RgbPixelType, ImageDimension - 1>;
 
-  typedef itk::Image<RgbPixelType, ImageDimension>   RgbImageType;
+  using RgbImageType = itk::Image<RgbPixelType, ImageDimension>;
 
   // Read in input image
 
-  ImageType::Pointer inputImage = ITK_NULLPTR;
+  ImageType::Pointer inputImage = nullptr;
 
   itk::ants::CommandLineParser::OptionType::Pointer inputImageOption =
     parser->GetOption( "input-image" );
@@ -57,7 +57,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
 
   // Read in optional mask image
 
-  ImageType::Pointer maskImage = ITK_NULLPTR;
+  ImageType::Pointer maskImage = nullptr;
   ImageType::RegionType maskRegion;
 
   itk::ants::CommandLineParser::OptionType::Pointer maskImageOption =
@@ -67,13 +67,13 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
     std::string maskFile = maskImageOption->GetFunction( 0 )->GetName();
     ReadImage<ImageType>( maskImage, maskFile.c_str() );
 
-    typedef itk::Image<unsigned short, ImageDimension>      ShortImageType;
-    typedef itk::CastImageFilter<ImageType, ShortImageType> CasterType;
+    using ShortImageType = itk::Image<unsigned short, ImageDimension>;
+    using CasterType = itk::CastImageFilter<ImageType, ShortImageType>;
     CasterType::Pointer caster = CasterType::New();
     caster->SetInput( maskImage );
     caster->Update();
 
-    typedef itk::LabelStatisticsImageFilter<ShortImageType, ShortImageType> StatsFilterType;
+    using StatsFilterType = itk::LabelStatisticsImageFilter<ShortImageType, ShortImageType>;
     StatsFilterType::Pointer stats = StatsFilterType::New();
     stats->SetLabelInput( caster->GetOutput() );
     stats->SetInput( caster->GetOutput() );
@@ -84,7 +84,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
 
   // Read in optional Rgb image
 
-  RgbImageType::Pointer rgbImage = ITK_NULLPTR;
+  RgbImageType::Pointer rgbImage = nullptr;
 
   itk::ants::CommandLineParser::OptionType::Pointer rgbImageOption =
     parser->GetOption( "rgb-image" );
@@ -98,7 +98,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
   RealType maxIntensityValue = 1.0;
   if( inputImage )
     {
-    typedef itk::StatisticsImageFilter<ImageType> StatisticsImageFilterType;
+    using StatisticsImageFilterType = itk::StatisticsImageFilter<ImageType>;
     StatisticsImageFilterType::Pointer statisticsImageFilter = StatisticsImageFilterType::New();
     statisticsImageFilter->SetInput( inputImage );
     statisticsImageFilter->Update();
@@ -115,7 +115,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
     {
     alpha = parser->Convert<RealType>( alphaOption->GetFunction( 0 )->GetName() );
 
-    if( alpha < 0 || alpha > 1.0 )
+    if( alpha < itk::NumericTraits<RealType>::ZeroValue() || alpha > itk::NumericTraits<RealType>::OneValue() )
       {
       std::cerr << "The alpha parameter must be between 0 and 1." << std::endl;
       return EXIT_FAILURE;
@@ -140,13 +140,13 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
       maskImage->Allocate();
       maskImage->FillBuffer( 1 );
 
-      typedef itk::Image<unsigned short, ImageDimension>      ShortImageType;
-      typedef itk::CastImageFilter<ImageType, ShortImageType> CasterType;
+      using ShortImageType = itk::Image<unsigned short, ImageDimension>;
+      using CasterType = itk::CastImageFilter<ImageType, ShortImageType>;
       CasterType::Pointer caster = CasterType::New();
       caster->SetInput( maskImage );
       caster->Update();
 
-      typedef itk::LabelStatisticsImageFilter<ShortImageType, ShortImageType> StatsFilterType;
+      using StatsFilterType = itk::LabelStatisticsImageFilter<ShortImageType, ShortImageType>;
       StatsFilterType::Pointer stats = StatsFilterType::New();
       stats->SetLabelInput( caster->GetOutput() );
       stats->SetInput( caster->GetOutput() );
@@ -174,7 +174,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
 
       std::string rgbFileName = functionalOverlayOption->GetFunction( n )->GetParameter( 0 );
 
-      typedef itk::ImageFileReader<RgbImageType> RgbReaderType;
+      using RgbReaderType = itk::ImageFileReader<RgbImageType>;
       RgbReaderType::Pointer rgbReader = RgbReaderType::New();
       rgbReader->SetFileName( rgbFileName.c_str() );
       try
@@ -186,13 +186,13 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
         std::cerr << "Error reading RGB file " << rgbFileName << std::endl;
         return EXIT_FAILURE;
         }
-      functionalRgbImages.push_back( rgbReader->GetOutput() );
+      functionalRgbImages.emplace_back(rgbReader->GetOutput() );
 
       // read mask
 
       std::string maskFileName = functionalOverlayOption->GetFunction( n )->GetParameter( 1 );
 
-      typedef itk::ImageFileReader<ImageType> MaskReaderType;
+      using MaskReaderType = itk::ImageFileReader<ImageType>;
       MaskReaderType::Pointer maskReader = MaskReaderType::New();
       maskReader->SetFileName( maskFileName.c_str() );
       try
@@ -204,11 +204,11 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
         std::cerr << "Error reading mask file " << maskFileName << std::endl;
         return EXIT_FAILURE;
         }
-      functionalMaskImages.push_back( maskReader->GetOutput() );
+      functionalMaskImages.emplace_back(maskReader->GetOutput() );
 
       if( functionalOverlayOption->GetFunction( n )->GetNumberOfParameters() > 2 )
         {
-        RealType localAlpha = parser->Convert<RealType>(
+        auto localAlpha = parser->Convert<RealType>(
           functionalOverlayOption->GetFunction( n )->GetParameter( 2 ) );
         functionalAlphaValues.push_back( localAlpha );
         }
@@ -279,7 +279,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
 
         ImageType::PointType::VectorType directionalVector = point - pointOrigin;
 
-        if( vnl_math_abs( directionalVector[physicalCoordinateComponent] ) > maxComponentValue )
+        if( itk::Math::abs( directionalVector[physicalCoordinateComponent] ) > static_cast<double>( maxComponentValue ) )
           {
           direction = d;
           }
@@ -292,8 +292,8 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
   int paddingType = 0;
   RealType padValue = 0;
 
-  unsigned long lowerBound[ImageDimension];
-  unsigned long upperBound[ImageDimension];
+  itk::SizeValueType lowerBound[ImageDimension];
+  itk::SizeValueType upperBound[ImageDimension];
 
   SliceType::RegionType              croppedSliceRegion;
   SliceType::RegionType::SizeType    croppedSliceSize;
@@ -333,9 +333,9 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
           {
           if( d != direction )
             {
-            croppedSliceSize[count] = size[d] - ( vnl_math_abs( lowerBoundVector[count] )
-              + vnl_math_abs( upperBoundVector[count] ) );
-            croppedSliceIndex[count] = vnl_math_abs( lowerBoundVector[count] );
+            croppedSliceSize[count] = size[d] - ( itk::Math::abs ( lowerBoundVector[count] )
+              + itk::Math::abs ( upperBoundVector[count] ) );
+            croppedSliceIndex[count] = itk::Math::abs ( lowerBoundVector[count] );
             count++;
             }
           }
@@ -413,8 +413,8 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
             {
             if( d != direction )
               {
-              croppedSliceSize[count] = size[d] - 2 * vnl_math_abs( padWidth );
-              croppedSliceIndex[count] = vnl_math_abs( padWidth );
+              croppedSliceSize[count] = size[d] - 2 * itk::Math::abs ( padWidth );
+              croppedSliceIndex[count] = itk::Math::abs ( padWidth );
               count++;
               }
             }
@@ -566,16 +566,16 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
         endSlice = parser->Convert<unsigned int>( endSliceString );
         }
 
-      startingSlice = vnl_math_max( itk::NumericTraits<int>::ZeroValue(), startingSlice );
-      startingSlice = vnl_math_min( startingSlice, static_cast<int>( size[direction] - 1 ) );
+      startingSlice = std::max( itk::NumericTraits<int>::ZeroValue(), startingSlice );
+      startingSlice = std::min( startingSlice, static_cast<int>( size[direction] - 1 ) );
 
-      endSlice = vnl_math_max( itk::NumericTraits<int>::ZeroValue(), endSlice );
-      endSlice = vnl_math_min( endSlice, static_cast<int>( size[direction] - 1 ) );
+      endSlice = std::max( itk::NumericTraits<int>::ZeroValue(), endSlice );
+      endSlice = std::min( endSlice, static_cast<int>( size[direction] - 1 ) );
 
       whichSlices.clear();
       if( reverseOrder )
         {
-        for( int n = endSlice; n >= startingSlice; n -= vnl_math_abs( numberOfSlicesToIncrement ) )
+        for( int n = endSlice; n >= startingSlice; n -= itk::Math::abs ( numberOfSlicesToIncrement ) )
           {
           whichSlices.push_back( n );
           }
@@ -607,8 +607,8 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
       std::cerr << "Tile geometry is specified as numberOfRowsxnumberOfColumns" << std::endl;
       return EXIT_FAILURE;
       }
-    numberOfRows = vnl_math_min( static_cast<int>( layout[0] ), static_cast<int>( numberOfSlices ) );
-    numberOfColumns = vnl_math_min( static_cast<int>( layout[1] ), static_cast<int>( numberOfSlices ) );
+    numberOfRows = std::min( static_cast<int>( layout[0] ), static_cast<int>( numberOfSlices ) );
+    numberOfColumns = std::min( static_cast<int>( layout[1] ), static_cast<int>( numberOfSlices ) );
     }
 
   if( numberOfRows <= 0 && numberOfColumns > 0 )
@@ -660,7 +660,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
   std::cout << "Columns:  " << numberOfColumns << std::endl;
 
 
-  typedef itk::TileImageFilter<SliceType, SliceType> TileFilterType;
+  using TileFilterType = itk::TileImageFilter<SliceType, SliceType>;
   TileFilterType::LayoutArrayType array;
 
   array[0] = numberOfColumns;
@@ -672,7 +672,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
   TileFilterType::Pointer tileFilter = TileFilterType::New();
   tileFilter->SetLayout( array );
 
-  typedef itk::TileImageFilter<RgbSliceType, RgbSliceType> RgbTileFilterType;
+  using RgbTileFilterType = itk::TileImageFilter<RgbSliceType, RgbSliceType>;
   RgbTileFilterType::Pointer rgbTileFilter = RgbTileFilterType::New();
   rgbTileFilter->SetLayout( array );
 
@@ -688,18 +688,18 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
     region.SetIndex( index );
     region.SetSize( size );
 
-    typedef itk::ExtractImageFilter<ImageType, SliceType> ExtracterType;
+    using ExtracterType = itk::ExtractImageFilter<ImageType, SliceType>;
     ExtracterType::Pointer extracter = ExtracterType::New();
     extracter->SetInput( inputImage );
     extracter->SetExtractionRegion( region );
     extracter->SetDirectionCollapseToIdentity();
 
-    SliceType::Pointer outputSlice = ITK_NULLPTR;
-    SliceType::Pointer outputSlice2 = ITK_NULLPTR;
+    SliceType::Pointer outputSlice = nullptr;
+    SliceType::Pointer outputSlice2 = nullptr;
 
     if( paddingType == -1 )
       {
-      typedef itk::ExtractImageFilter<SliceType, SliceType> ExtracterType2;
+      using ExtracterType2 = itk::ExtractImageFilter<SliceType, SliceType>;
       ExtracterType2::Pointer extracter2 = ExtracterType2::New();
       extracter2->SetInput( extracter->GetOutput() );
       extracter2->SetExtractionRegion( croppedSliceRegion );
@@ -711,7 +711,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
       }
     else if( paddingType == 1 )
       {
-      typedef itk::ConstantPadImageFilter<SliceType, SliceType> PadderType;
+      using PadderType = itk::ConstantPadImageFilter<SliceType, SliceType>;
       PadderType::Pointer padder = PadderType::New();
       padder->SetInput( extracter->GetOutput() );
       padder->SetPadLowerBound( lowerBound );
@@ -729,7 +729,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
       outputSlice->DisconnectPipeline();
       }
 
-    typedef itk::FlipImageFilter<SliceType> FlipFilterType;
+    using FlipFilterType = itk::FlipImageFilter<SliceType>;
     FlipFilterType::Pointer flipper = FlipFilterType::New();
     FlipFilterType::FlipAxesArrayType flipArray;
     flipArray[0] = doFlipHorizontally;
@@ -738,7 +738,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
     flipper->SetInput( outputSlice );
     flipper->SetFlipAxes( flipArray );
 
-    typedef itk::PermuteAxesImageFilter<SliceType> PermuteAxesImageFilterType;
+    using PermuteAxesImageFilterType = itk::PermuteAxesImageFilter<SliceType>;
     itk::FixedArray<unsigned int, 2> order;
     order[0] = 0;
     order[1] = 1;
@@ -755,15 +755,15 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
     outputSlice2->Update();
     outputSlice2->DisconnectPipeline();
 
-    if( functionalRgbImages.size() > 0 )
+    if( !functionalRgbImages.empty() )
       {
-      RgbSliceType::Pointer compositeRgbSlice = ITK_NULLPTR;
+      RgbSliceType::Pointer compositeRgbSlice = nullptr;
       RealType compositeAlpha = 1.0;
 
       for( unsigned int n = 0; n < functionalRgbImages.size(); n++ )
         {
-        SliceType::Pointer outputMaskSlice = ITK_NULLPTR;
-        SliceType::Pointer outputMaskSlice2 = ITK_NULLPTR;
+        SliceType::Pointer outputMaskSlice = nullptr;
+        SliceType::Pointer outputMaskSlice2 = nullptr;
 
         ExtracterType::Pointer maskExtracter = ExtracterType::New();
         maskExtracter->SetInput( functionalMaskImages[n] );
@@ -772,7 +772,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
 
         if( paddingType == -1 )
           {
-          typedef itk::ExtractImageFilter<SliceType, SliceType> ExtracterType2;
+          using ExtracterType2 = itk::ExtractImageFilter<SliceType, SliceType>;
           ExtracterType2::Pointer maskExtracter2 = ExtracterType2::New();
           maskExtracter2->SetInput( maskExtracter->GetOutput() );
           maskExtracter2->SetExtractionRegion( croppedSliceRegion );
@@ -784,7 +784,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
           }
         else if( paddingType == 1 )
           {
-          typedef itk::ConstantPadImageFilter<SliceType, SliceType> PadderType;
+          using PadderType = itk::ConstantPadImageFilter<SliceType, SliceType>;
           PadderType::Pointer maskPadder = PadderType::New();
           maskPadder->SetInput( maskExtracter->GetOutput() );
           maskPadder->SetPadLowerBound( lowerBound );
@@ -814,18 +814,18 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
         outputMaskSlice2->Update();
         outputMaskSlice2->DisconnectPipeline();
 
-        typedef itk::ExtractImageFilter<RgbImageType, RgbSliceType> RgbExtracterType;
+        using RgbExtracterType = itk::ExtractImageFilter<RgbImageType, RgbSliceType>;
         RgbExtracterType::Pointer rgbExtracter = RgbExtracterType::New();
         rgbExtracter->SetInput( functionalRgbImages[n] );
         rgbExtracter->SetExtractionRegion( region );
         rgbExtracter->SetDirectionCollapseToIdentity();
 
-        RgbSliceType::Pointer outputRgbSlice = ITK_NULLPTR;
-        RgbSliceType::Pointer outputRgbSlice2 = ITK_NULLPTR;
+        RgbSliceType::Pointer outputRgbSlice = nullptr;
+        RgbSliceType::Pointer outputRgbSlice2 = nullptr;
 
         if( paddingType == -1 )
           {
-          typedef itk::ExtractImageFilter<RgbSliceType, RgbSliceType> RgbExtracterType2;
+          using RgbExtracterType2 = itk::ExtractImageFilter<RgbSliceType, RgbSliceType>;
           RgbExtracterType2::Pointer rgbExtracter2 = RgbExtracterType2::New();
           rgbExtracter2->SetInput( rgbExtracter->GetOutput() );
           rgbExtracter2->SetExtractionRegion( croppedSliceRegion );
@@ -837,7 +837,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
           }
         else if( paddingType == 1 )
           {
-          typedef itk::ConstantPadImageFilter<RgbSliceType, RgbSliceType> RgbPadderType;
+          using RgbPadderType = itk::ConstantPadImageFilter<RgbSliceType, RgbSliceType>;
           RgbPadderType::Pointer rgbPadder = RgbPadderType::New();
           rgbPadder->SetInput( rgbExtracter->GetOutput() );
           rgbPadder->SetPadLowerBound( lowerBound );
@@ -855,7 +855,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
           outputRgbSlice->DisconnectPipeline();
           }
 
-        typedef itk::FlipImageFilter<RgbSliceType> RgbFlipFilterType;
+        using RgbFlipFilterType = itk::FlipImageFilter<RgbSliceType>;
         RgbFlipFilterType::Pointer rgbFlipper = RgbFlipFilterType::New();
         RgbFlipFilterType::FlipAxesArrayType rgbFlipArray;
         rgbFlipArray[0] = doFlipHorizontally;
@@ -864,7 +864,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
         rgbFlipper->SetInput( outputRgbSlice );
         rgbFlipper->SetFlipAxes( rgbFlipArray );
 
-        typedef itk::PermuteAxesImageFilter<RgbSliceType> RgbPermuteAxesImageFilterType;
+        using RgbPermuteAxesImageFilterType = itk::PermuteAxesImageFilter<RgbSliceType>;
         itk::FixedArray<unsigned int, 2> rgbOrder;
         rgbOrder[0] = 0;
         rgbOrder[1] = 1;
@@ -883,7 +883,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
 
         RealType functionalAlpha = functionalAlphaValues[n];
         RealType backgroundAlpha = compositeAlpha;
-        RealType currentAlpha = 1.0 - ( 1.0 - functionalAlpha ) * ( 1.0 - backgroundAlpha );
+        RealType currentAlpha = itk::NumericTraits<RealType>::OneValue() - ( itk::NumericTraits<RealType>::OneValue() - functionalAlpha ) * ( itk::NumericTraits<RealType>::OneValue() - backgroundAlpha );
 
         // combine grayscale slice and rgb slice
         itk::ImageRegionConstIteratorWithIndex<SliceType> It( outputSlice2,
@@ -898,11 +898,11 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
             {
             PixelType pixel = 255 * ( It.Get() - minIntensityValue ) / ( maxIntensityValue - minIntensityValue );
 
-            if( outputMaskSlice2 && outputMaskSlice2->GetPixel( It.GetIndex() ) != 0 )
+            if( outputMaskSlice2 && ! itk::Math::FloatAlmostEqual( outputMaskSlice2->GetPixel( It.GetIndex() ), itk::NumericTraits<PixelType>::ZeroValue() ) )
               {
-              rgbPixel.SetRed( static_cast<RgbComponentType>( ( 1.0 - functionalAlpha ) * pixel + functionalAlpha * rgbPixel.GetRed() ) );
-              rgbPixel.SetGreen( static_cast<RgbComponentType>( ( 1.0 - functionalAlpha ) * pixel + functionalAlpha * rgbPixel.GetGreen() ) );
-              rgbPixel.SetBlue( static_cast<RgbComponentType>( ( 1.0 - functionalAlpha ) * pixel + functionalAlpha * rgbPixel.GetBlue() ) );
+              rgbPixel.SetRed( static_cast<RgbComponentType>( ( itk::NumericTraits<RealType>::OneValue() - functionalAlpha ) * pixel + functionalAlpha * rgbPixel.GetRed() ) );
+              rgbPixel.SetGreen( static_cast<RgbComponentType>( ( itk::NumericTraits<RealType>::OneValue() - functionalAlpha ) * pixel + functionalAlpha * rgbPixel.GetGreen() ) );
+              rgbPixel.SetBlue( static_cast<RgbComponentType>( ( itk::NumericTraits<RealType>::OneValue() - functionalAlpha ) * pixel + functionalAlpha * rgbPixel.GetBlue() ) );
               }
             else
               {
@@ -918,26 +918,25 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
             // or
             // http://en.wikipedia.org/wiki/Alpha_compositing
 
-            if( outputMaskSlice2 && outputMaskSlice2->GetPixel( It.GetIndex() ) != 0 )
+            if( outputMaskSlice2 && ! itk::Math::FloatAlmostEqual( outputMaskSlice2->GetPixel( It.GetIndex() ), itk::NumericTraits<RealType>::ZeroValue() ) )
               {
-
-              RealType functionalRed = rgbPixel.GetRed() / 255.0;
-              RealType functionalGreen = rgbPixel.GetGreen() / 255.0;
-              RealType functionalBlue = rgbPixel.GetBlue() / 255.0;
+              RealType functionalRed = rgbPixel.GetRed() / static_cast<RealType>( 255.0 );
+              RealType functionalGreen = rgbPixel.GetGreen() / static_cast<RealType>( 255.0 );
+              RealType functionalBlue = rgbPixel.GetBlue() / static_cast<RealType>( 255.0 );
 
               RgbPixelType backgroundRgbPixel = compositeRgbSlice->GetPixel( It.GetIndex() );
 
-              RealType backgroundRed   = backgroundRgbPixel.GetRed() / 255.0;
-              RealType backgroundGreen = backgroundRgbPixel.GetGreen() / 255.0;
-              RealType backgroundBlue  = backgroundRgbPixel.GetBlue() / 255.0;
+              RealType backgroundRed   = backgroundRgbPixel.GetRed() / static_cast<RealType>( 255.0 );
+              RealType backgroundGreen = backgroundRgbPixel.GetGreen() / static_cast<RealType>( 255.0 );
+              RealType backgroundBlue  = backgroundRgbPixel.GetBlue() / static_cast<RealType>( 255.0 );
 
-              RealType currentRed   = functionalRed   * functionalAlpha / currentAlpha + backgroundRed   * backgroundAlpha * ( 1.0 - functionalAlpha ) / currentAlpha;
-              RealType currentGreen = functionalGreen * functionalAlpha / currentAlpha + backgroundGreen * backgroundAlpha * ( 1.0 - functionalAlpha ) / currentAlpha;
-              RealType currentBlue  = functionalBlue  * functionalAlpha / currentAlpha + backgroundBlue  * backgroundAlpha * ( 1.0 - functionalAlpha ) / currentAlpha;
+              RealType currentRed   = functionalRed   * functionalAlpha / currentAlpha + backgroundRed   * backgroundAlpha * ( itk::NumericTraits<RealType>::OneValue() - functionalAlpha ) / currentAlpha;
+              RealType currentGreen = functionalGreen * functionalAlpha / currentAlpha + backgroundGreen * backgroundAlpha * ( itk::NumericTraits<RealType>::OneValue() - functionalAlpha ) / currentAlpha;
+              RealType currentBlue  = functionalBlue  * functionalAlpha / currentAlpha + backgroundBlue  * backgroundAlpha * ( itk::NumericTraits<RealType>::OneValue() - functionalAlpha ) / currentAlpha;
 
-              rgbPixel.SetRed( currentRed * 255.0 );
-              rgbPixel.SetGreen( currentGreen * 255.0 );
-              rgbPixel.SetBlue( currentBlue * 255.0 );
+              rgbPixel.SetRed( currentRed * static_cast<RealType>( 255.0 ) );
+              rgbPixel.SetGreen( currentGreen * static_cast<RealType>( 255.0 ) );
+              rgbPixel.SetBlue( currentBlue * static_cast<RealType>( 255.0 ) );
 
               compositeRgbSlice->SetPixel( It.GetIndex(), rgbPixel );
               }
@@ -945,12 +944,12 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
           }
         if( n == 0 )
           {
-          typedef itk::ImageDuplicator<RgbSliceType> DuplicatorType;
+          using DuplicatorType = itk::ImageDuplicator<RgbSliceType>;
           DuplicatorType::Pointer duplicator = DuplicatorType::New();
           duplicator->SetInputImage( outputRgbSlice2 );
           duplicator->Update();
 
-          compositeRgbSlice = duplicator->GetModifiableOutput();
+          compositeRgbSlice = duplicator->GetOutput();
           }
         compositeAlpha = currentAlpha;
         }
@@ -967,7 +966,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
   if( outputOption && outputOption->GetNumberOfFunctions() )
     {
     std::string outputFile = outputOption->GetFunction( 0 )->GetName();
-    if( functionalRgbImages.size() > 0 )
+    if( !functionalRgbImages.empty() )
       {
       rgbTileFilter->Update();
       WriteImage<RgbSliceType>( rgbTileFilter->GetOutput(), outputFile.c_str() );
@@ -989,7 +988,7 @@ int CreateMosaic( itk::ants::CommandLineParser *parser )
 
 void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
-  typedef itk::ants::CommandLineParser::OptionType OptionType;
+  using OptionType = itk::ants::CommandLineParser::OptionType;
 
     {
     std::string description =
@@ -1118,7 +1117,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
       + std::string( "simply padding with negative voxel-widths.  If one pads (+), the " )
       + std::string( "user can also specify a constant pad value (default = 0). If a mask is " )
       + std::string( "specified, the user can use the mask to define the region, by using " )
-      + std::string( "the keyword \"mask\" plus an offset, e.g. \"-p mask+3\"." );
+      + std::string( R"(the keyword "mask" plus an offset, e.g. "-p mask+3".)" );
 
     OptionType::Pointer option = OptionType::New();
     option->SetLongName( "pad-or-crop" );
@@ -1140,7 +1139,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
       + std::string( "for the numberOfSlicesToIncrement causes rendering in the reverse " )
       + std::string( "order.  For the third option, minSlice < maxSlice.  If a mask is " )
       + std::string( "specified, the user can use the mask to define the region, by using " )
-      + std::string( "the keyword \"mask\" plus an offset, e.g. \"-s [1,mask-3,200]\"." )
+      + std::string( R"(the keyword "mask" plus an offset, e.g. "-s [1,mask-3,200]".)" )
       + std::string( "For the third option, minSlice < maxSlice." );
 
     OptionType::Pointer option = OptionType::New();
@@ -1156,7 +1155,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
     {
     std::string description =
       std::string( "Flip individual slice images horizontally and/or vertically, specified " )
-      + std::string( "e.g. as \'0x1\' or \'1x1\'.");
+      + std::string( R"(e.g. as '0x1' or '1x1'.)");
 
     OptionType::Pointer option = OptionType::New();
     option->SetLongName( "flip-slice" );
@@ -1199,7 +1198,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int CreateTiledMosaic( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int CreateTiledMosaic( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -1217,7 +1216,7 @@ int CreateTiledMosaic( std::vector<std::string> args, std::ostream* /*out_stream
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -1287,7 +1286,7 @@ private:
     filename = imageOption->GetFunction( 0 )->GetName();
 
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(
-        filename.c_str(), itk::ImageIOFactory::ReadMode );
+        filename.c_str(), itk::ImageIOFactory::FileModeEnum::ReadMode );
     unsigned int dimension = imageIO->GetNumberOfDimensions();
 
     if( dimension == 3 )

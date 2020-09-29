@@ -17,11 +17,11 @@ template <unsigned int VImageDimension>
 int compareTransforms( const typename itk::Transform<double, VImageDimension, VImageDimension>::Pointer & firstTransform,
                        const typename itk::Transform<double, VImageDimension, VImageDimension>::Pointer & secondTransform )
 {
-  typedef typename itk::CompositeTransform<double, VImageDimension>            CompositeTransformType;
-  typedef typename CompositeTransformType::ScalarType                          RealType;
+  using CompositeTransformType = typename itk::CompositeTransform<double, VImageDimension>;
+  using RealType = typename CompositeTransformType::ScalarType;
 
-  typedef typename itk::DisplacementFieldTransform<RealType, VImageDimension>  DisplacementFieldTransformType;
-  typedef typename DisplacementFieldTransformType::DisplacementFieldType       DisplacementFieldType;
+  using DisplacementFieldTransformType = typename itk::DisplacementFieldTransform<RealType, VImageDimension>;
+  using DisplacementFieldType = typename DisplacementFieldTransformType::DisplacementFieldType;
 
   const std::string CompositeTransformID ("CompositeTransform");
 
@@ -63,7 +63,7 @@ int compareTransforms( const typename itk::Transform<double, VImageDimension, VI
              const typename DisplacementFieldType::ConstPointer DispField1 = DispTrans1->GetDisplacementField();
              const typename DisplacementFieldType::ConstPointer DispField2 = DispTrans2->GetDisplacementField();
 
-             typedef itk::ImageRegionConstIteratorWithIndex<DisplacementFieldType> DispIteratorType;
+             using DispIteratorType = itk::ImageRegionConstIteratorWithIndex<DisplacementFieldType>;
              DispIteratorType dit1( DispField1, DispField1->GetLargestPossibleRegion() );
              DispIteratorType dit2( DispField2, DispField2->GetLargestPossibleRegion() );
 
@@ -115,7 +115,7 @@ int compareTransforms( const typename itk::Transform<double, VImageDimension, VI
       const typename DisplacementFieldType::ConstPointer DispField1 = DispTrans1->GetDisplacementField();
       const typename DisplacementFieldType::ConstPointer DispField2 = DispTrans2->GetDisplacementField();
 
-      typedef itk::ImageRegionConstIteratorWithIndex<DisplacementFieldType> DispIteratorType;
+      using DispIteratorType = itk::ImageRegionConstIteratorWithIndex<DisplacementFieldType>;
       DispIteratorType dit1( DispField1, DispField1->GetLargestPossibleRegion() );
       DispIteratorType dit2( DispField2, DispField2->GetLargestPossibleRegion() );
 
@@ -139,7 +139,7 @@ int compareTransforms( const typename itk::Transform<double, VImageDimension, VI
       }
     else
       {
-      std::cout << "The input tranforms are neither composite transform nor displacement field transform." << std::endl;
+      std::cout << "The input transforms are neither composite transform nor displacement field transform." << std::endl;
       std::cout << "First Transform Type: " << firstTransform->GetNameOfClass() << std::endl;
       std::cout << "Second Transform Type: " << secondTransform->GetNameOfClass() << std::endl;
       if( firstTransform->GetFixedParameters() != secondTransform->GetFixedParameters() ||
@@ -154,7 +154,7 @@ int compareTransforms( const typename itk::Transform<double, VImageDimension, VI
   return EXIT_SUCCESS;
 }
 
-int compareTwoTransforms( std::vector<std::string> args, std::ostream* /* out_stream = ITK_NULLPTR */ )
+int compareTwoTransforms( std::vector<std::string> args, std::ostream* /* out_stream = nullptr */ )
 {
   // the arguments coming in as 'args' is a replacement for the standard (argc,argv) format
   // Just notice that the argv[i] equals to args[i-1]
@@ -173,7 +173,7 @@ int compareTwoTransforms( std::vector<std::string> args, std::ostream* /* out_st
   itk::Transform<double, 2, 2>::Pointer secondTransform = itk::ants::ReadTransform<double, 2>(args[1]);
   if( firstTransform.IsNotNull() && secondTransform.IsNotNull() )
     {
-    typedef itk::BSplineTransform< double, 2, 2>     BSplineTransformType;
+    using BSplineTransformType = itk::BSplineTransform<double, 2, 2>;
     BSplineTransformType::Pointer bsplineInput1 = dynamic_cast<BSplineTransformType *>( firstTransform.GetPointer() );
     BSplineTransformType::Pointer bsplineInput2 = dynamic_cast<BSplineTransformType *>( secondTransform.GetPointer() );
     if( bsplineInput1.IsNull() && bsplineInput2.IsNull() )
@@ -192,7 +192,7 @@ int compareTwoTransforms( std::vector<std::string> args, std::ostream* /* out_st
   itk::Transform<double, 3, 3>::Pointer secondTransform = itk::ants::ReadTransform<double, 3>(args[1]);
   if( firstTransform.IsNotNull() && secondTransform.IsNotNull() )
     {
-    typedef itk::BSplineTransform< double, 3, 3>     BSplineTransformType;
+    using BSplineTransformType = itk::BSplineTransform<double, 3, 3>;
     BSplineTransformType::Pointer bsplineInput1 = dynamic_cast<BSplineTransformType *>(firstTransform.GetPointer() );
     BSplineTransformType::Pointer bsplineInput2 = dynamic_cast<BSplineTransformType *>(secondTransform.GetPointer() );
     if( bsplineInput1.IsNull() && bsplineInput2.IsNull() )

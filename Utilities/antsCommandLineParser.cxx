@@ -14,6 +14,8 @@
 
 #include <algorithm>
 
+#include "itkMath.h"
+
 namespace itk
 {
 namespace ants
@@ -21,7 +23,7 @@ namespace ants
 
   std::string ConvertToHumanReadable(const std::string & input)
     {
-    typedef std::map<std::string,std::string> TypeMapType;
+    using TypeMapType = std::map<std::string, std::string>;
     TypeMapType cnvtMap;
     cnvtMap[typeid(signed char).name()] = "signed int";
     cnvtMap[typeid(unsigned char).name()] = "unsigned int";
@@ -36,7 +38,7 @@ namespace ants
     cnvtMap[typeid(std::string).name()] = "std::string";
     cnvtMap[typeid(char *).name()] = "char *";
 
-    TypeMapType::iterator mi=cnvtMap.find(input);
+    auto mi=cnvtMap.find(input);
     if ( mi == cnvtMap.end() )
       {
       return std::string("Unmapped Type");
@@ -119,16 +121,16 @@ CommandLineParser
       {
       name = argument.substr( 1, 2 );
       }
-    if( atof( name.c_str() ) )
+    if( ! itk::Math::FloatAlmostEqual( atof( name.c_str() ), 0.0 ) )
       {
       continue;
       }
-    if ( name.size() > 0 )
+    if ( !name.empty() )
       {
       allFlagsAreValid &= this->ValidateFlag( name );
       }
     if( ( !( name.empty() ) ) &&
-        ( name.size() > 0 )
+        ( !name.empty() )
       )
       {
       OptionType::Pointer option = this->GetOption( name );
@@ -184,7 +186,7 @@ CommandLineParser
           for( unsigned int m = n; m < arguments.size(); m++ )
             {
             std::string function = arguments[m];
-            if( !starts_with( function, "-" ) || atof( function.c_str() ) )
+            if( !starts_with( function, "-" ) || ! itk::Math::FloatAlmostEqual( atof( function.c_str() ), 0.0 ) )
               {
               option->AddFunction( function,
                                    this->m_LeftDelimiter, this->m_RightDelimiter, order++ );
@@ -252,7 +254,7 @@ CommandLineParser
         std::size_t leftDelimiterPosition = a.find( this->m_LeftDelimiter );
         if( leftDelimiterPosition != std::string::npos )
           {
-          itkExceptionMacro( "Incorrect command line specification. Missing leftDelimiterPosition? " << a );
+          itkExceptionMacro( "Incorrect command line specification. Missing leftDelimiterPosition? " << a )
           }
 
         std::size_t rightDelimiterPosition = a.find( this->m_RightDelimiter );
@@ -260,7 +262,7 @@ CommandLineParser
           {
           if( rightDelimiterPosition < a.length() - 1 )
             {
-            itkExceptionMacro( "Incorrect command line specification. Missing rightDelimiterPosition? " << a );
+            itkExceptionMacro( "Incorrect command line specification. Missing rightDelimiterPosition? " << a )
             }
           else
             {
@@ -290,7 +292,7 @@ CommandLineParser
             }
           else
             {
-            itkExceptionMacro( "Incorrect command line specification. " << a);
+            itkExceptionMacro( "Incorrect command line specification. " << a)
             }
           }
         else if( leftDelimiterPosition != std::string::npos &&
@@ -299,7 +301,7 @@ CommandLineParser
           {
           if( rightDelimiterPosition < a.length() - 1 )
             {
-            itkExceptionMacro( "Incorrect command line specification. " << a );
+            itkExceptionMacro( "Incorrect command line specification. " << a )
             }
           currentArg += a;
           arguments.push_back( currentArg );
@@ -336,7 +338,7 @@ CommandLineParser
       return *it;
       }
     }
-  return ITK_NULLPTR;
+  return nullptr;
 }
 
 CommandLineParser::OptionType::Pointer
@@ -352,7 +354,7 @@ CommandLineParser
       return *it;
       }
     }
-  return ITK_NULLPTR;
+  return nullptr;
 }
 
 bool
@@ -372,7 +374,7 @@ ValidateFlag(const std::string & currentFlag)
       }
     }
 
-  if ( ( ! validFlagFound ) && ( currentFlag.size() > 0 ) && ( !atof( currentFlag.c_str() ) ) )
+  if ( ( ! validFlagFound ) && ( !currentFlag.empty() ) && ( itk::Math::FloatAlmostEqual( atof( currentFlag.c_str() ), 0.0 ) ) )
     {
     std::cout << "ERROR:  Invalid flag provided " << currentFlag << std::endl;
     }
@@ -416,7 +418,7 @@ CommandLineParser
       if( !( (*it)->GetLongName() ).empty() )
         {
         os << ", " << "--" << (*it)->GetLongName() << " " << std::flush;
-        ss << Indent( 5 + ( (*it)->GetLongName() ).length() );
+        ss << Indent( static_cast<std::size_t>( 5 ) + ( (*it)->GetLongName() ).length() );
         }
       else
         {
@@ -427,7 +429,7 @@ CommandLineParser
     else
       {
       os << "--" << (*it)->GetLongName() << " " << std::flush;
-      ss << Indent( 3 + ( (*it)->GetLongName() ).length() );
+      ss << Indent( static_cast<std::size_t>( 3 ) + ( (*it)->GetLongName() ).length() );
       }
     if( (*it)->GetNumberOfUsageOptions() > 0 )
       {
@@ -459,7 +461,7 @@ CommandLineParser
       if( (*it)->GetFunctions().size() == 1 )
         {
         os << indent << indent << "<VALUES>: " << (*it)->GetFunction( 0 )->GetName();
-        if( (*it)->GetFunction( 0 )->GetParameters().size() > 0 )
+        if( !(*it)->GetFunction( 0 )->GetParameters().empty() )
           {
           os << "[";
           if( (*it)->GetFunction( 0 )->GetParameters().size() == 1 )
@@ -472,7 +474,7 @@ CommandLineParser
               {
               os << (*it)->GetFunction( 0 )->GetParameter( i ) << ",";
               }
-            os << (*it)->GetFunction( 0 )->GetParameter( (*it)->GetFunction( 0 )->GetParameters().size() - 1 );
+            os << (*it)->GetFunction( 0 )->GetParameter( (*it)->GetFunction( 0 )->GetParameters().size() - static_cast<std::size_t>( 1 ) );
             }
           os << "]";
           }
@@ -484,7 +486,7 @@ CommandLineParser
         for( unsigned int n = 0; n < (*it)->GetFunctions().size() - 1; n++ )
           {
           os << (*it)->GetFunction( n )->GetName();
-          if( (*it)->GetFunction( n )->GetParameters().size() > 0 )
+          if( !(*it)->GetFunction( n )->GetParameters().empty() )
             {
             os << "[";
             if( (*it)->GetFunction( n )->GetParameters().size() == 1 )
@@ -499,7 +501,7 @@ CommandLineParser
                 }
               os
                 << (*it)->GetFunction( n )->GetParameter( (*it)->GetFunction( n )->GetParameters().size()
-                                                          - 1 ) << "], ";
+                                                          - static_cast<std::size_t>( 1 ) ) << "], ";
               }
             }
           else
@@ -508,10 +510,10 @@ CommandLineParser
             }
           }
 
-        unsigned int nn = (*it)->GetFunctions().size() - 1;
+        unsigned int nn = (*it)->GetFunctions().size() - static_cast<std::size_t>( 1 );
 
         os << (*it)->GetFunction( nn )->GetName();
-        if( (*it)->GetFunction( nn )->GetParameters().size() > 0 )
+        if( !(*it)->GetFunction( nn )->GetParameters().empty() )
           {
           os << "[";
           if( (*it)->GetFunction( nn )->GetParameters().size() == 1 )
@@ -524,7 +526,7 @@ CommandLineParser
               {
               os << (*it)->GetFunction( nn )->GetParameter( i ) << ",";
               }
-            os << (*it)->GetFunction( nn )->GetParameter( (*it)->GetFunction( nn )->GetParameters().size() - 1 ) << "]";
+            os << (*it)->GetFunction( nn )->GetParameter( (*it)->GetFunction( nn )->GetParameters().size() - static_cast<std::size_t>( 1 ) ) << "]";
             }
           }
         }
@@ -600,7 +602,7 @@ CommandLineParser
 
   for( it = this->m_Options.begin(); it != this->m_Options.end(); ++it )
     {
-    typedef OptionType::FunctionStackType OptionFunctionStackType;
+    using OptionFunctionStackType = OptionType::FunctionStackType;
     OptionFunctionStackType functions = (*it)->GetFunctions();
 
     OptionFunctionStackType::const_iterator it2;
@@ -619,11 +621,11 @@ CommandLineParser
         currentOrder = (*it2)->GetArgOrder();
         if( previousOrder == currentOrder + 1 )
           {
-          (*it2)->SetStageID( functions[it2 - functions.begin() - 1]->GetStageID() );
+          (*it2)->SetStageID( functions[it2 - functions.begin() - static_cast<std::size_t>( 1 )]->GetStageID() );
           }
         else
           {
-          (*it2)->SetStageID( functions[it2 - functions.begin() - 1]->GetStageID() + 1 );
+          (*it2)->SetStageID( functions[it2 - functions.begin() - static_cast<std::size_t>( 1 )]->GetStageID() + 1 );
           }
         previousOrder = currentOrder;
         }
@@ -649,7 +651,7 @@ CommandLineParser
     (*it)->Print( os, indent );
     }
 
-  if( this->m_UnknownOptions.size() )
+  if( !this->m_UnknownOptions.empty() )
     {
     os << indent << "Unknown Options: " << std::endl;
     OptionListType::const_iterator its;

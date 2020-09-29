@@ -18,7 +18,7 @@
 #include "itkImageRegionIterator.h"
 #include "itkNeighborhoodAlgorithm.h"
 #include "itkProgressReporter.h"
-#include "itkVectorCastImageFilter.h"
+#include "itkCastImageFilter.h"
 #include "itkZeroFluxNeumannBoundaryCondition.h"
 
 #include "vnl/vnl_det.h"
@@ -35,12 +35,13 @@ DeformationFieldGradientTensorImageFilter<TInputImage, TRealType, TOutputImage>
   this->m_CalculateJacobian = false;
   this->m_Order = 1;
   this->m_DerivativeWeights.Fill( 1.0 );
+  this->DynamicMultiThreadingOff();
 }
 
 template <typename TInputImage, typename TRealType, typename TOutputImage>
 void
 DeformationFieldGradientTensorImageFilter<TInputImage, TRealType, TOutputImage>
-::GenerateInputRequestedRegion() throw( InvalidRequestedRegionError )
+::GenerateInputRequestedRegion()
 {
   // call the superclass' implementation of this method
   Superclass::GenerateInputRequestedRegion();
@@ -97,7 +98,7 @@ DeformationFieldGradientTensorImageFilter<TInputImage, TRealType, TOutputImage>
     {
     for ( unsigned int i = 0; i < ImageDimension; i++ )
       {
-      if ( this->GetInput()->GetSpacing()[i] == 0.0 )
+      if ( itk::Math::FloatAlmostEqual( this->GetInput()->GetSpacing()[i], 0.0 ) )
         {
         itkExceptionMacro(<< "Image spacing in dimension " << i << " is zero.");
         }
@@ -111,8 +112,8 @@ DeformationFieldGradientTensorImageFilter<TInputImage, TRealType, TOutputImage>
       image.  Otherwise just point to the input image. */
   if ( typeid( typename InputImageType::PixelType ) != typeid( RealVectorType ) )
     {
-    typename VectorCastImageFilter<TInputImage, RealVectorImageType>::Pointer
-      caster = VectorCastImageFilter<TInputImage, RealVectorImageType>::New();
+    typename CastImageFilter<TInputImage, RealVectorImageType>::Pointer
+      caster = CastImageFilter<TInputImage, RealVectorImageType>::New();
     caster->SetInput( this->GetInput() );
     caster->Update();
     this->m_RealValuedInputImage = caster->GetOutput();

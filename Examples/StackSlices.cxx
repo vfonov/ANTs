@@ -15,7 +15,7 @@
 #include "antsAllocImage.h"
 #include <algorithm>
 
-#include <stdio.h>
+#include <cstdio>
 
 #include "itkBinaryThresholdImageFilter.h"
 #include "itkExtractImageFilter.h"
@@ -35,7 +35,7 @@ namespace ants
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int StackSlices( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int StackSlices( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -53,7 +53,7 @@ int StackSlices( std::vector<std::string> args, std::ostream* /*out_stream = ITK
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -80,27 +80,27 @@ private:
   // antscout->set_stream( out_stream );
 
   // Pixel and Image typedefs
-  typedef float PixelType;
+  using PixelType = float;
 
-  typedef itk::Image<PixelType, 4> ImageSeriesType;
-  typedef itk::Image<PixelType, 3> ImageType;
-  typedef itk::Image<PixelType, 2> SliceType;
-  typedef itk::Image<unsigned int, 2> LabelSliceType;
+  using ImageSeriesType = itk::Image<PixelType, 4>;
+  using ImageType = itk::Image<PixelType, 3>;
+  using SliceType = itk::Image<PixelType, 2>;
+  using LabelSliceType = itk::Image<unsigned int, 2>;
 
-  typedef itk::ImageFileReader<ImageType> ReaderType;
-  typedef itk::ImageFileReader<ImageSeriesType> Reader4DType;
+  using ReaderType = itk::ImageFileReader<ImageType>;
+  using Reader4DType = itk::ImageFileReader<ImageSeriesType>;
 
-  typedef itk::ExtractImageFilter<ImageType, SliceType> ExtractFilterType;
-  typedef itk::ExtractImageFilter<ImageSeriesType, SliceType> ExtractFilterType2;
+  using ExtractFilterType = itk::ExtractImageFilter<ImageType, SliceType>;
+  using ExtractFilterType2 = itk::ExtractImageFilter<ImageSeriesType, SliceType>;
 
-  typedef itk::ImageRegionIteratorWithIndex<SliceType> SliceIt;
+  using SliceIt = itk::ImageRegionIteratorWithIndex<SliceType>;
 
   // Check for valid input parameters
   if( argc < 5 )
     {
     std::cout << "Usage: " << argv[0] << " outputvolume x y z inputvolume(s)" << std::endl;
     std::cout << "  The specific slice is chosen by specifying the index for x, y, xor z." << std::endl;
-    std::cout << "  For example, an \"x y z\" selection of \"30 -1 -1\" will stack slice 30 " << std::endl;
+    std::cout << R"(  For example, an "x y z" selection of "30 -1 -1" will stack slice 30 )" << std::endl;
     std::cout << "  along the first dimension.  Also note that input 4-D volumes are treated " << std::endl;
     std::cout << "  as a series of 3-D volumes." << std::endl;
     if( argc >= 2 &&
@@ -113,9 +113,9 @@ private:
 
   char * stackName = argv[1];
   int    dimVars[3];
-  dimVars[0] = atoi( argv[2] );
-  dimVars[1] = atoi( argv[3] );
-  dimVars[2] = atoi( argv[4] );
+  dimVars[0] = std::stoi( argv[2] );
+  dimVars[1] = std::stoi( argv[3] );
+  dimVars[2] = std::stoi( argv[4] );
 
   int dim = -1;
   int slice = -1;
@@ -139,7 +139,7 @@ private:
 
   ImageType::RegionType region3D;
 
-  ImageSeriesType::Pointer imageSeries = ITK_NULLPTR;
+  ImageSeriesType::Pointer imageSeries = nullptr;
 
   unsigned long nSlices = 0;
 
@@ -237,7 +237,7 @@ private:
 
   for( unsigned int i = 0; i < nSlices; i++ )
     {
-    SliceType::Pointer stackSlice = ITK_NULLPTR;
+    SliceType::Pointer stackSlice = nullptr;
 
     if( !inputIsA4DImage )
       {
@@ -280,7 +280,7 @@ private:
       stackSlice->DisconnectPipeline();
       }
 
-    typedef itk::BinaryThresholdImageFilter<SliceType, LabelSliceType> ThresholderType;
+    using ThresholderType = itk::BinaryThresholdImageFilter<SliceType, LabelSliceType>;
     ThresholderType::Pointer thresholder = ThresholderType::New();
     thresholder->SetInput( stackSlice );
     thresholder->SetInsideValue( 0 );
@@ -288,7 +288,7 @@ private:
     thresholder->SetLowerThreshold( itk::NumericTraits<PixelType>::NonpositiveMin() );
     thresholder->SetUpperThreshold( 0 );
 
-    typedef itk::LabelStatisticsImageFilter<SliceType, LabelSliceType> StatsFilterType;
+    using StatsFilterType = itk::LabelStatisticsImageFilter<SliceType, LabelSliceType>;
     StatsFilterType::Pointer stats = StatsFilterType::New();
     stats->SetInput( stackSlice );
     stats->SetLabelInput( thresholder->GetOutput() );
@@ -329,9 +329,9 @@ private:
 
   // Input parameters
 //   char * inputName  = argv[1];
-//   unsigned int flip_x = atoi( argv[2] );
-//   unsigned int flip_y = atoi( argv[3] );
-//   unsigned int flip_z = atoi( argv[4] );
+//   unsigned int flip_x = std::stoi( argv[2] );
+//   unsigned int flip_y = std::stoi( argv[3] );
+//   unsigned int flip_z = std::stoi( argv[4] );
 //   char * outputName = argv[5];
 
 //   ReaderType::Pointer reader = ReaderType::New();

@@ -72,7 +72,7 @@
 namespace ants
 {
 
-template <class T>
+template <typename T>
 inline std::string ants_moco_to_string(const T& t)
 {
   std::stringstream ss;
@@ -80,7 +80,7 @@ inline std::string ants_moco_to_string(const T& t)
   return ss.str();
 }
 
-template <class T>
+template <typename T>
 struct ants_moco_index_cmp
   {
   ants_moco_index_cmp(const T _arr) : arr(_arr)
@@ -105,14 +105,14 @@ class RigidTransformTraits
 // Don't worry about the fact that the default option is the
 // affine Transform, that one will not actually be instantiated.
 public:
-  typedef itk::AffineTransform<double, ImageDimension> TransformType;
+  using TransformType = itk::AffineTransform<double, ImageDimension>;
 };
 
 template <>
 class RigidTransformTraits<2>
 {
 public:
-  typedef itk::Euler2DTransform<double> TransformType;
+  using TransformType = itk::Euler2DTransform<double>;
 };
 
 template <>
@@ -121,7 +121,7 @@ class RigidTransformTraits<3>
 public:
   // typedef itk::VersorRigid3DTransform<double> TransformType;
   // typedef itk::QuaternionRigidTransform<double>  TransformType;
-  typedef itk::Euler3DTransform<double> TransformType;
+  using TransformType = itk::Euler3DTransform<double>;
 };
 
 template <unsigned int ImageDimension>
@@ -130,48 +130,48 @@ class SimilarityTransformTraits
 // Don't worry about the fact that the default option is the
 // affine Transform, that one will not actually be instantiated.
 public:
-  typedef itk::AffineTransform<double, ImageDimension> TransformType;
+  using TransformType = itk::AffineTransform<double, ImageDimension>;
 };
 
 template <>
 class SimilarityTransformTraits<2>
 {
 public:
-  typedef itk::Similarity2DTransform<double> TransformType;
+  using TransformType = itk::Similarity2DTransform<double>;
 };
 
 template <>
 class SimilarityTransformTraits<3>
 {
 public:
-  typedef itk::Similarity3DTransform<double> TransformType;
+  using TransformType = itk::Similarity3DTransform<double>;
 };
 
 
 int ants_motion_directions( itk::ants::CommandLineParser *parser )
 {
 
-  const unsigned int ImageDimension = 3;
+  constexpr unsigned int ImageDimension = 3;
 
-  typedef double                                    RealType;
-  typedef itk::Image<RealType, ImageDimension>      FixedImageType;
-  typedef itk::ImageFileReader<FixedImageType>      ImageReaderType;
-  typedef vnl_matrix<RealType>                      vMatrix;
+  using RealType = double;
+  using FixedImageType = itk::Image<RealType, ImageDimension>;
+  using ImageReaderType = itk::ImageFileReader<FixedImageType>;
+  using vMatrix = vnl_matrix<RealType>;
   vMatrix param_values;
-  typedef itk::CompositeTransform<RealType, ImageDimension> CompositeTransformType;
+  using CompositeTransformType = itk::CompositeTransform<RealType, ImageDimension>;
 
   std::vector<CompositeTransformType::Pointer> CompositeTransformVector;
 
-  typedef itk::Euler3DTransform<RealType>                   RigidTransformType;
-  typedef itk::AffineTransform<RealType, ImageDimension>    AffineTransformType;
+  using RigidTransformType = itk::Euler3DTransform<RealType>;
+  using AffineTransformType = itk::AffineTransform<RealType, ImageDimension>;
 
-  typedef itk::ants::CommandLineParser ParserType;
-  typedef ParserType::OptionType       OptionType;
+  using ParserType = itk::ants::CommandLineParser;
+  using OptionType = ParserType::OptionType;
 
-  typedef double                                        ParameterValueType;
-  typedef itk::CSVArray2DFileReader<ParameterValueType> MocoReaderType;
-  typedef MocoReaderType::Array2DDataObjectType         MocoDataArrayType;
-  typedef itk::Array2D<ParameterValueType>              DirectionArrayType;
+  using ParameterValueType = double;
+  using MocoReaderType = itk::CSVArray2DFileReader<ParameterValueType>;
+  using MocoDataArrayType = MocoReaderType::Array2DDataObjectType;
+  using DirectionArrayType = itk::Array2D<ParameterValueType>;
 
   std::string outputName = "";
   std::string mocoName = "";
@@ -319,7 +319,7 @@ int ants_motion_directions( itk::ants::CommandLineParser *parser )
   // Therefore check reference image is 3D, and fail if not
   //
  itk::ImageIOBase::Pointer imageIO =
-   itk::ImageIOFactory::CreateImageIO(physicalName.c_str(), itk::ImageIOFactory::ReadMode);
+   itk::ImageIOFactory::CreateImageIO(physicalName.c_str(), itk::ImageIOFactory::FileModeEnum::ReadMode);
  imageIO->SetFileName(physicalName.c_str() );
  try
    {
@@ -493,7 +493,7 @@ int ants_motion_directions( itk::ants::CommandLineParser *parser )
 
 void antsMotionCorrDiffusionDirectionInitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
-  typedef itk::ants::CommandLineParser::OptionType OptionType;
+  using OptionType = itk::ants::CommandLineParser::OptionType;
 
     {
     std::string description = std::string( "Camino scheme file specificy acquisition parameters." );
@@ -571,7 +571,7 @@ void antsMotionCorrDiffusionDirectionInitializeCommandLineOptions( itk::ants::Co
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int antsMotionCorrDiffusionDirection( std::vector<std::string> args, std::ostream * /*out_stream = ITK_NULLPTR */ )
+int antsMotionCorrDiffusionDirection( std::vector<std::string> args, std::ostream * /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -589,7 +589,7 @@ int antsMotionCorrDiffusionDirection( std::vector<std::string> args, std::ostrea
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {

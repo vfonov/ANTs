@@ -3,7 +3,7 @@
 #include <algorithm>
 #include "ReadWriteData.h"
 
-#include <stdio.h>
+#include <cstdio>
 
 #include "itkImage.h"
 #include "itkImageRegionIteratorWithIndex.h"
@@ -18,12 +18,12 @@ template <unsigned int ImageDimension>
 int TextureCooccurrenceFeatures( int argc, char *argv[] )
 {
 
-  typedef float PixelType;
-  typedef float RealType;
+  using PixelType = float;
+  using RealType = float;
 
 
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
-  typedef itk::Image<RealType, ImageDimension> RealImageType;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  using RealImageType = itk::Image<RealType, ImageDimension>;
 
   typename ImageType::Pointer inputImage = ImageType::New();
   ReadImage<ImageType>( inputImage, argv[2] );
@@ -32,21 +32,20 @@ int TextureCooccurrenceFeatures( int argc, char *argv[] )
   // adds 1 to the upper bound of the joint histogram and small ranges
   // will be greatly affected by this.
 
-  typedef itk::RescaleIntensityImageFilter<ImageType, ImageType> RescalerType;
+  using RescalerType = itk::RescaleIntensityImageFilter<ImageType, ImageType>;
   typename RescalerType::Pointer rescaler = RescalerType::New();
   rescaler->SetInput( inputImage );
   rescaler->SetOutputMinimum( 0 );
   rescaler->SetOutputMaximum( 10000 );
   rescaler->Update();
 
-  typedef itk::Statistics::DenseFrequencyContainer2 HistogramFrequencyContainerType;
+  using HistogramFrequencyContainerType = itk::Statistics::DenseFrequencyContainer2;
 
-  typedef itk::Statistics::ScalarImageToTextureFeaturesFilter
-    <RealImageType, HistogramFrequencyContainerType> TextureFilterType;
+  using TextureFilterType = itk::Statistics::ScalarImageToTextureFeaturesFilter<RealImageType, HistogramFrequencyContainerType>;
   typename TextureFilterType::Pointer textureFilter = TextureFilterType::New();
   textureFilter->SetInput( rescaler->GetOutput() );
 
-  typename ImageType::Pointer mask = ITK_NULLPTR;
+  typename ImageType::Pointer mask = nullptr;
   PixelType label = itk::NumericTraits<PixelType>::OneValue();
   if ( argc > 4 )
     {
@@ -55,7 +54,7 @@ int TextureCooccurrenceFeatures( int argc, char *argv[] )
 
     if ( argc > 5 )
       {
-      label = static_cast<PixelType>( atoi( argv[5] ) );
+      label = static_cast<PixelType>( std::stoi( argv[5] ) );
       }
     textureFilter->SetInsidePixelValue( label );
     }
@@ -63,7 +62,7 @@ int TextureCooccurrenceFeatures( int argc, char *argv[] )
   unsigned int numberOfBins = 256;
   if ( argc > 3 )
     {
-    numberOfBins = static_cast<PixelType>( atoi( argv[3] ) );
+    numberOfBins = static_cast<PixelType>( std::stoi( argv[3] ) );
     }
   textureFilter->SetNumberOfBinsPerAxis( numberOfBins );
 
@@ -75,7 +74,7 @@ int TextureCooccurrenceFeatures( int argc, char *argv[] )
 
   for( ItI.GoToBegin(); !ItI.IsAtEnd(); ++ItI )
     {
-    if ( !mask || ( mask->GetPixel( ItI.GetIndex() ) == label ) )
+    if ( !mask || itk::Math::FloatAlmostEqual( mask->GetPixel( ItI.GetIndex() ), label ) )
       {
       if ( ItI.Get() < minValue )
         {
@@ -154,7 +153,7 @@ int TextureCooccurrenceFeatures( int argc, char *argv[] )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int TextureCooccurrenceFeatures( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int TextureCooccurrenceFeatures( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -172,7 +171,7 @@ int TextureCooccurrenceFeatures( std::vector<std::string> args, std::ostream* /*
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -203,7 +202,7 @@ private:
     exit( 1 );
     }
 
-  switch( atoi( argv[1] ) )
+  switch( std::stoi( argv[1] ) )
     {
     case 2:
       TextureCooccurrenceFeatures<2>( argc, argv );

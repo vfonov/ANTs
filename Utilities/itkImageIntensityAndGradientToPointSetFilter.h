@@ -11,8 +11,8 @@
      PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
-#ifndef __itkImageIntensityAndGradientToPointSetFilter_h
-#define __itkImageIntensityAndGradientToPointSetFilter_h
+#ifndef itkImageIntensityAndGradientToPointSetFilter_h
+#define itkImageIntensityAndGradientToPointSetFilter_h
 
 #include "itkCovariantVector.h"
 #include "itkGradientRecursiveGaussianImageFilter.h"
@@ -28,7 +28,7 @@ namespace itk
  *
  */
 template <typename TInputImage, typename TMaskImage, typename TOutputMesh>
-class ImageIntensityAndGradientToPointSetFilter
+class ImageIntensityAndGradientToPointSetFilter final
   : public MeshSource<TOutputMesh>
 {
 public:
@@ -39,14 +39,14 @@ public:
   typedef SmartPointer<const Self>                         ConstPointer;
 
   /** Method for creation through the object factory. */
-  itkNewMacro( Self );
+  itkNewMacro( Self )
 
   /** Extract dimension from the input image. */
   itkStaticConstMacro( Dimension, unsigned int,
                        TInputImage::ImageDimension );
 
   /** Run-time type information (and related methods). */
-  itkTypeMacro( ImageIntensityAndGradientToPointSetFilter, MeshSource );
+  itkTypeMacro( ImageIntensityAndGradientToPointSetFilter, MeshSource )
 
   /** Hold on to the type information specified by the template parameters. */
   typedef TInputImage                         InputImageType;
@@ -102,35 +102,33 @@ public:
     return static_cast<const MaskImageType*>( this->ProcessObject::GetInput( 1 ) );
     }
 
-  void Update() ITK_OVERRIDE;
+  void Update() final;
 
   /**
    * Set/Get sigma for the gradient recursive gaussian image filter
    */
-  itkSetMacro( Sigma, double );
-  itkGetConstMacro( Sigma, double );
+  itkSetMacro( Sigma, double )
+  itkGetConstMacro( Sigma, double )
 
   /**
    * Set/Get boolean for gradient calculation.
    */
-  itkSetMacro( UseCentralDifferenceFunction, bool );
-  itkGetConstMacro( UseCentralDifferenceFunction, bool );
+  itkSetMacro( UseCentralDifferenceFunction, bool )
+  itkGetConstMacro( UseCentralDifferenceFunction, bool )
 
   /**
    * Set/Get neighborhood radius
    */
-  itkSetMacro( NeighborhoodRadius, NeighborhoodRadiusType );
-  itkGetConstMacro( NeighborhoodRadius, NeighborhoodRadiusType );
+  itkSetMacro( NeighborhoodRadius, NeighborhoodRadiusType )
+  itkGetConstMacro( NeighborhoodRadius, NeighborhoodRadiusType )
 
 protected:
   ImageIntensityAndGradientToPointSetFilter();
-  virtual ~ImageIntensityAndGradientToPointSetFilter() ITK_OVERRIDE
-  {
-  }
+  ~ImageIntensityAndGradientToPointSetFilter() override = default;
 
-  void PrintSelf( std::ostream& os, Indent indent ) const ITK_OVERRIDE;
+  void PrintSelf( std::ostream& os, Indent indent ) const override;
 
-  void GenerateData() ITK_OVERRIDE;
+  void GenerateData() final;
 
   double                    m_Sigma;
 

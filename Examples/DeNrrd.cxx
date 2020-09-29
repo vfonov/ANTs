@@ -18,7 +18,7 @@
 #include <itkImageSeriesReader.h>
 #include <itkGDCMImageIO.h>
 #include <itkGDCMSeriesFileNames.h>
-#include <itkExceptionObject.h>
+#include <itkMacro.h>
 #include <itkImageRegionIteratorWithIndex.h>
 #include <itkImageFileWriter.h>
 #include <itkImageFileReader.h>
@@ -33,7 +33,7 @@
 #include <sys/stat.h>
 
 #include <fstream>
-#include <stdio.h>
+#include <cstdio>
 
 #include <cstring>
 #include <sstream>
@@ -43,7 +43,7 @@ namespace ants
 {
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int DeNrrd( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int DeNrrd( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -61,7 +61,7 @@ int DeNrrd( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULL
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -103,11 +103,10 @@ private:
   const char * const output_image_filename = argv[2];
   const char * const output_gradients_filename = argv[3];
 
-  typedef float                             PixelType;
-  typedef itk::VectorImage<PixelType,3>	    DiffusionImageType;
+  using PixelType = float;
+  using DiffusionImageType = itk::VectorImage<PixelType, 3>;
 
-  typedef itk::ImageFileReader<DiffusionImageType,
-  itk::DefaultConvertPixelTraits< PixelType > > FileReaderType;
+  using FileReaderType = itk::ImageFileReader<DiffusionImageType, itk::DefaultConvertPixelTraits<PixelType> >;
   FileReaderType::Pointer reader = FileReaderType::New();
   reader->SetFileName(input_image_filename);
   reader->Update();
@@ -155,10 +154,10 @@ private:
   gradientfile.open(output_gradients_filename);
   gradientfile << "VERSION: 2" << std::endl;
 
-  for ( unsigned int i=0; i<reader->GetOutput()->GetNumberOfComponentsPerPixel(); i++ )
+  for ( unsigned short i=0; i < static_cast<unsigned short>( reader->GetOutput()->GetNumberOfComponentsPerPixel() ); i++ )
     {
-    char gradKey[20];
-    sprintf( gradKey, "DWMRI_gradient_%04d", i );
+    char gradKey[40];
+    sprintf( gradKey, "DWMRI_gradient_%04hu", i );
     itk::ExposeMetaData<std::string>(mdd, gradKey, v_string);
     //std::cout << "Gradient = " << v_string << std::endl;
 
@@ -166,7 +165,7 @@ private:
     double x, y, z;
     iss >> x >> y >> z;
 
-    if ( (x*x + y*y + z*z ) == 0 )
+    if ( itk::Math::FloatAlmostEqual( x*x + y*y + z*z, itk::NumericTraits<double>::ZeroValue() ) )
       {
       gradientfile << v_string << " 0" << std::endl;
       }
@@ -232,7 +231,7 @@ private:
 */
 
 
-  typedef itk::ImageFileWriter<DiffusionImageType> FileWriterType;
+  using FileWriterType = itk::ImageFileWriter<DiffusionImageType>;
   FileWriterType::Pointer writer = FileWriterType::New();
   writer->SetFileName(output_image_filename);
   writer->SetInput( reader->GetOutput() );

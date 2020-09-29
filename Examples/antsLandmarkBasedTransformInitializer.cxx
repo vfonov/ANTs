@@ -21,7 +21,7 @@
 namespace ants
 {
 
-template<class ImageType, class PointSetType>
+template<typename ImageType, typename PointSetType>
 void ReadLabeledPointSetFromImage( typename ImageType::Pointer image, typename PointSetType::Pointer pointSet, std::vector<typename ImageType::PixelType> & labels )
 {
   labels.clear();
@@ -70,7 +70,7 @@ void ReadLabeledPointSetFromImage( typename ImageType::Pointer image, typename P
           {
           center[d] += point[d];
           }
-        N += 1.0;
+        N += 1.0f;
         }
       ++ItP;
       ++ItD;
@@ -84,23 +84,22 @@ void ReadLabeledPointSetFromImage( typename ImageType::Pointer image, typename P
     }
 }
 
-template <unsigned int ImageDimension, class TransformType>
+template <unsigned int ImageDimension, typename TransformType>
 int InitializeLinearTransform( int itkNotUsed( argc ), char *argv[] )
 {
-  typedef unsigned int                          LabelType;
-  typedef itk::Image<LabelType, ImageDimension> LabelImageType;
+  using LabelType = unsigned int;
+  using LabelImageType = itk::Image<LabelType, ImageDimension>;
 
-  typedef itk::LandmarkBasedTransformInitializer<TransformType,
-    LabelImageType, LabelImageType> TransformInitializerType;
-  typedef typename TransformInitializerType::LandmarkPointContainer  LandmarkContainerType;
+  using TransformInitializerType = itk::LandmarkBasedTransformInitializer<TransformType, LabelImageType, LabelImageType>;
+  using LandmarkContainerType = typename TransformInitializerType::LandmarkPointContainer;
 
-  typedef itk::PointSet<LabelType, ImageDimension> PointSetType;
+  using PointSetType = itk::PointSet<LabelType, ImageDimension>;
 
   //
   // Read in the fixed and moving images and convert to point sets
   //
 
-  typedef itk::ImageFileReader<LabelImageType> ImageReaderType;
+  using ImageReaderType = itk::ImageFileReader<LabelImageType>;
   typename ImageReaderType::Pointer fixedReader = ImageReaderType::New();
   fixedReader->SetFileName( argv[2] );
   fixedReader->Update();
@@ -181,9 +180,9 @@ int InitializeLinearTransform( int itkNotUsed( argc ), char *argv[] )
     {
     transformWriter->Update();
     }
-  catch( itk::ExceptionObject & err )
+  catch( itk::ExceptionObject & itkNotUsed(err) )
     {
-    std::cerr << "Exception in writing tranform file: " << argv[5] << std::endl;
+    std::cerr << "Exception in writing transform file: " << argv[5] << std::endl;
     return EXIT_FAILURE;
     }
 
@@ -193,17 +192,17 @@ int InitializeLinearTransform( int itkNotUsed( argc ), char *argv[] )
 template <unsigned int ImageDimension>
 int InitializeBSplineTransform( int argc, char *argv[] )
 {
-  typedef float                                 RealType;
-  typedef unsigned int                          LabelType;
-  typedef itk::Image<LabelType, ImageDimension> LabelImageType;
+  using RealType = float;
+  using LabelType = unsigned int;
+  using LabelImageType = itk::Image<LabelType, ImageDimension>;
 
-  typedef itk::PointSet<LabelType, ImageDimension> PointSetType;
+  using PointSetType = itk::PointSet<LabelType, ImageDimension>;
 
   //
   // Read in the fixed and moving images and convert to point sets
   //
 
-  typedef itk::ImageFileReader<LabelImageType> ImageReaderType;
+  using ImageReaderType = itk::ImageFileReader<LabelImageType>;
   typename ImageReaderType::Pointer fixedReader = ImageReaderType::New();
   fixedReader->SetFileName( argv[2] );
   fixedReader->Update();
@@ -256,7 +255,7 @@ int InitializeBSplineTransform( int argc, char *argv[] )
 
   const bool filterHandlesMemory = false;
 
-  typedef itk::ImportImageFilter<LabelType, ImageDimension> ImporterType;
+  using ImporterType = itk::ImportImageFilter<LabelType, ImageDimension>;
   typename ImporterType::Pointer importer = ImporterType::New();
   importer->SetImportPointer( const_cast<LabelType *>( fixedImage->GetBufferPointer() ), numberOfPixels, filterHandlesMemory );
   importer->SetRegion( fixedImage->GetBufferedRegion() );
@@ -267,8 +266,8 @@ int InitializeBSplineTransform( int argc, char *argv[] )
 
   const typename ImporterType::OutputImageType * parametricInputImage = importer->GetOutput();
 
-  typedef itk::Vector<RealType, ImageDimension>  VectorType;
-  typedef itk::Image<VectorType, ImageDimension> DisplacementFieldType;
+  using VectorType = itk::Vector<RealType, ImageDimension>;
+  using DisplacementFieldType = itk::Image<VectorType, ImageDimension>;
 
   // Read in the optional label weights
 
@@ -329,15 +328,14 @@ int InitializeBSplineTransform( int argc, char *argv[] )
 
   // Now match up the center points
 
-  typedef itk::PointSet<VectorType, ImageDimension> DisplacementFieldPointSetType;
-  typedef itk::BSplineScatteredDataPointSetToImageFilter
-    <DisplacementFieldPointSetType, DisplacementFieldType> BSplineFilterType;
-  typedef typename BSplineFilterType::WeightsContainerType WeightsContainerType;
+  using DisplacementFieldPointSetType = itk::PointSet<VectorType, ImageDimension>;
+  using BSplineFilterType = itk::BSplineScatteredDataPointSetToImageFilter<DisplacementFieldPointSetType, DisplacementFieldType>;
+  using WeightsContainerType = typename BSplineFilterType::WeightsContainerType;
 
   typename WeightsContainerType::Pointer weights = WeightsContainerType::New();
   weights->Initialize();
   const typename WeightsContainerType::Element boundaryWeight = 1.0e10;
-  const typename WeightsContainerType::Element weight = 1.0;
+  typename WeightsContainerType::Element weight = 1.0;
 
   typename DisplacementFieldPointSetType::Pointer fieldPoints = DisplacementFieldPointSetType::New();
   fieldPoints->Initialize();
@@ -382,7 +380,7 @@ int InitializeBSplineTransform( int argc, char *argv[] )
 
         if( useWeights )
           {
-          std::vector<LabelType>::const_iterator it = std::find( userLabels.begin(), userLabels.end(), mItD.Value() );
+          auto it = std::find( userLabels.begin(), userLabels.end(), mItD.Value() );
           if( it != userLabels.end() )
             {
             weights->InsertElement( count, labelWeights[it - userLabels.begin()] );
@@ -413,7 +411,7 @@ int InitializeBSplineTransform( int argc, char *argv[] )
   bool enforceStationaryBoundary = true;
   if( argc > 9 )
     {
-    enforceStationaryBoundary = static_cast<bool>( atoi( argv[9] ) );
+    enforceStationaryBoundary = static_cast<bool>( std::stoi( argv[9] ) );
     }
   if( enforceStationaryBoundary )
     {
@@ -456,13 +454,13 @@ int InitializeBSplineTransform( int argc, char *argv[] )
   unsigned int numberOfLevels = 4;
   if( argc > 7 )
     {
-    numberOfLevels = atoi( argv[7] );
+    numberOfLevels = std::stoi( argv[7] );
     }
 
   unsigned int splineOrder = 3;
   if( argc > 8 )
     {
-    splineOrder = atoi( argv[8] );
+    splineOrder = std::stoi( argv[8] );
     }
 
 
@@ -502,7 +500,7 @@ int InitializeBSplineTransform( int argc, char *argv[] )
   bspliner->SetPointWeights( weights );
   bspliner->Update();
 
-  typedef itk::ImageFileWriter<DisplacementFieldType> WriterType;
+  using WriterType = itk::ImageFileWriter<DisplacementFieldType>;
   typename WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( argv[5] );
   writer->SetInput( bspliner->GetOutput() );
@@ -513,7 +511,7 @@ int InitializeBSplineTransform( int argc, char *argv[] )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int antsLandmarkBasedTransformInitializer( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */)
+int antsLandmarkBasedTransformInitializer( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */)
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -530,7 +528,7 @@ int antsLandmarkBasedTransformInitializer( std::vector<std::string> args, std::o
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -562,7 +560,7 @@ private:
       << "outputTransform [meshSize[0]xmeshSize[1]x...=1x1x1] [numberOfLevels=4] [order=3] "
       << "[enforceStationaryBoundaries=1] [landmarkWeights] " << std::endl;
     std::cerr << std::endl << "Notes:" << std::endl;
-    std::cerr << " 1) transformType = \"rigid\", \"affine\", or \"bspline\"." << std::endl;
+    std::cerr << R"( 1) transformType = "rigid", "affine", or "bspline".)" << std::endl;
     std::cerr << " 2) The optional arguments only apply to the bspline transform." << std::endl;
     std::cerr << " 3) The landmark weights are read from a text file where each row is either:" << std::endl;
     std::cerr << "     \"label,labelWeight\" or " << std::endl;
@@ -577,12 +575,12 @@ private:
     return EXIT_FAILURE;
     }
 
-  const unsigned int dimension = static_cast<unsigned int>( atoi( argv[1] ) );
+  const unsigned int dimension = static_cast<unsigned int>( std::stoi( argv[1] ) );
 
-  typedef itk::Rigid2DTransform<double>           Rigid2DTransformType;
-  typedef itk::VersorRigid3DTransform<double>     Rigid3DTransformType;
-  typedef itk::AffineTransform<double, 2>         AffineTransform2DType;
-  typedef itk::AffineTransform<double, 3>         AffineTransform3DType;
+  using Rigid2DTransformType = itk::Rigid2DTransform<double>;
+  using Rigid3DTransformType = itk::VersorRigid3DTransform<double>;
+  using AffineTransform2DType = itk::AffineTransform<double, 2>;
+  using AffineTransform3DType = itk::AffineTransform<double, 3>;
 
   std::string transformType( argv[4] );
   ConvertToLowerCase( transformType );

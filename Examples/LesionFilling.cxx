@@ -41,17 +41,17 @@ namespace ants
       std::cout << "Missing output filename." << std::endl;
       throw;
       }
-    typedef itk::Image< double, ImageDimension> T1ImageType;
-    typedef itk::Image< unsigned char, ImageDimension> LesionImageType;
-    typedef itk::ImageFileReader<T1ImageType>  T1ImageReaderType;
-    typedef itk::ImageFileReader<LesionImageType>  LesionImageReaderType;
+    using T1ImageType = itk::Image<double, ImageDimension>;
+    using LesionImageType = itk::Image<unsigned char, ImageDimension>;
+    using T1ImageReaderType = itk::ImageFileReader<T1ImageType>;
+    using LesionImageReaderType = itk::ImageFileReader<LesionImageType>;
     typename LesionImageReaderType::Pointer LesionReader = LesionImageReaderType::New();
     LesionReader->SetFileName( LesionMapFileName );
     try
       {
       LesionReader->Update();
       }
-    catch( itk::ExceptionObject & excp )
+    catch( itk::ExceptionObject & itkNotUsed( excp ) )
       {
       std::cout << "no lesion mask that can be read" << std::endl;
       return 0;
@@ -62,25 +62,18 @@ namespace ants
       {
       T1Reader->Update();
       }
-    catch( itk::ExceptionObject & excp )
+    catch( itk::ExceptionObject & itkNotUsed( excp ) )
       {
       std::cout << "no T1 image that can be read" << std::endl;
       return 0;
       }
-    typename T1ImageType::Pointer outImage = ITK_NULLPTR ;
+    typename T1ImageType::Pointer outImage = nullptr ;
     outImage = T1Reader->GetOutput() ;
-    typedef itk::ImageRegionIterator< T1ImageType> IteratorType;
-    typedef itk::BinaryThresholdImageFilter <T1ImageType, T1ImageType>
-                                 BinaryThresholdImageFilterType;
-    typedef itk::BinaryBallStructuringElement<
-                                 double,
-                                 ImageDimension> StructuringElementType;
-    typedef itk::BinaryDilateImageFilter<
-                                 T1ImageType,
-                                 T1ImageType,
-                                 StructuringElementType >  DilateFilterType;
-    typedef itk::ConnectedComponentImageFilter <LesionImageType, LesionImageType>
-                ConnectedComponentFilterType;
+    using IteratorType = itk::ImageRegionIterator<T1ImageType>;
+    using BinaryThresholdImageFilterType = itk::BinaryThresholdImageFilter<T1ImageType, T1ImageType>;
+    using StructuringElementType = itk::BinaryBallStructuringElement<double, ImageDimension>;
+    using DilateFilterType = itk::BinaryDilateImageFilter<T1ImageType, T1ImageType, StructuringElementType>;
+    using ConnectedComponentFilterType = itk::ConnectedComponentImageFilter<LesionImageType, LesionImageType>;
     typename ConnectedComponentFilterType::Pointer connected =
                 ConnectedComponentFilterType::New();
     connected->SetInput( LesionReader->GetOutput() );
@@ -89,7 +82,7 @@ namespace ants
     std::cout << "Number of lesions: " << LesionNumber << std::endl;
     for ( int i = 1;  i < LesionNumber + 1 ; i++)
     {
-       typedef itk::CastImageFilter< LesionImageType, T1ImageType> FilterType;
+       using FilterType = itk::CastImageFilter<LesionImageType, T1ImageType>;
        typename FilterType::Pointer filter = FilterType::New();
        filter->SetInput( connected->GetOutput() );
        filter->Update() ;
@@ -115,8 +108,7 @@ namespace ants
        binaryDilate->SetDilateValue( 1 );
        binaryDilate->Update() ;
        // subtract dilated image form non-dilated one
-       typedef itk::SubtractImageFilter <T1ImageType, T1ImageType>
-                                    SubtractImageFilterType;
+       using SubtractImageFilterType = itk::SubtractImageFilter<T1ImageType, T1ImageType>;
        typename SubtractImageFilterType::Pointer subtractFilter
                      = SubtractImageFilterType::New ();
        //output = image1 - image2
@@ -124,12 +116,12 @@ namespace ants
        subtractFilter->SetInput2( thresholdFilter->GetOutput() );
        subtractFilter->Update();
        //multiply the outer lesion mask with T1 to get only the neighbouring voxels
-       typedef itk::MaskImageFilter< T1ImageType, T1ImageType > MaskFilterType;
+       using MaskFilterType = itk::MaskImageFilter<T1ImageType, T1ImageType>;
        typename MaskFilterType::Pointer maskFilter = MaskFilterType::New();
        maskFilter->SetInput( outImage ) ;
        maskFilter->SetMaskImage( subtractFilter->GetOutput() );
        maskFilter->Update() ;
-       typename T1ImageType::Pointer LesionEdge= ITK_NULLPTR ;
+       typename T1ImageType::Pointer LesionEdge= nullptr ;
        LesionEdge = maskFilter->GetOutput() ;
 
        //calculating mean lesion intesity
@@ -149,7 +141,7 @@ namespace ants
        double meanInsideLesion = 0;
        while ( !it.IsAtEnd() )
          {
-           if( it.Value() != 0)
+           if( ! itk::Math::FloatAlmostEqual( it.Value(), 0.0 ) )
            {
              //coutning number of voxels inside lesion
              counter++;
@@ -186,7 +178,7 @@ namespace ants
       itL.GoToBegin();
       while ( !it4.IsAtEnd() )
       {
-        if (itL.Get() == 1)
+        if (itk::Math::FloatAlmostEqual( itL.Get(), 1.0 ) )
         {
           int index = min  + (rand() % (int)(max - min )) ;
           it4.Set( outerWMVoxels[ index ] );
@@ -195,7 +187,7 @@ namespace ants
         ++itL;
       }//end while
     }//end of loop for lesions
-  typedef itk::ImageFileWriter< T1ImageType>  WriterType;
+  using WriterType = itk::ImageFileWriter<T1ImageType>;
   typename WriterType::Pointer writer = WriterType::New();
   writer->SetInput( outImage);
   writer->SetFileName( OutputFileName );
@@ -230,7 +222,7 @@ namespace ants
       // place the null character in the end
       argv[i][args[i].length()] = '\0';
       }
-    argv[argc] = 0;
+    argv[argc] = nullptr;
     // class to automatically cleanup argv upon destruction
     class Cleanup_argv
     {
@@ -269,7 +261,7 @@ namespace ants
       return EXIT_FAILURE;
       }
 
-      switch( atoi( argv[1] ) )
+      switch( std::stoi( argv[1] ) )
         {
         case 2:
           {

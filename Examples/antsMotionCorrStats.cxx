@@ -37,33 +37,33 @@ namespace ants
 int ants_motion_stats( itk::ants::CommandLineParser *parser )
 {
 
-  const unsigned int ImageDimension = 3;
+  constexpr unsigned int ImageDimension = 3;
 
-  typedef double                                    RealType;
+  using RealType = double;
 
-  typedef itk::Image<RealType, ImageDimension>      ImageType;
-  typedef vnl_matrix<RealType>                      vMatrix;
+  using ImageType = itk::Image<RealType, ImageDimension>;
+  using vMatrix = vnl_matrix<RealType>;
   vMatrix param_values;
-  typedef itk::Image<RealType, 4>                   TimeSeriesImageType;
-  typedef TimeSeriesImageType::RegionType           TimeSeriesRegionType;
-  typedef TimeSeriesImageType::IndexType            TimeSeriesIndexType;
-  typedef TimeSeriesImageType::SizeType             TimeSeriesSizeType;
-  typedef itk::ImageRegionIterator< TimeSeriesImageType > TimeSeriesIteratorType;
+  using TimeSeriesImageType = itk::Image<RealType, 4>;
+  using TimeSeriesRegionType = TimeSeriesImageType::RegionType;
+  using TimeSeriesIndexType = TimeSeriesImageType::IndexType;
+  using TimeSeriesSizeType = TimeSeriesImageType::SizeType;
+  using TimeSeriesIteratorType = itk::ImageRegionIterator<TimeSeriesImageType>;
 
-  typedef itk::ImageRegionIteratorWithIndex<ImageType>      IteratorType;
-  typedef itk::AffineTransform<RealType, ImageDimension>    AffineTransformType;
-  typedef itk::Euler3DTransform<RealType>                   RigidTransformType;
-  typedef itk::TransformFileWriterTemplate<RealType>        TransformWriterType;
+  using IteratorType = itk::ImageRegionIteratorWithIndex<ImageType>;
+  using AffineTransformType = itk::AffineTransform<RealType, ImageDimension>;
+  using RigidTransformType = itk::Euler3DTransform<RealType>;
+  using TransformWriterType = itk::TransformFileWriterTemplate<RealType>;
 
-  typedef itk::ants::CommandLineParser ParserType;
-  typedef ParserType::OptionType       OptionType;
+  using ParserType = itk::ants::CommandLineParser;
+  using OptionType = ParserType::OptionType;
 
-  typedef double                                        ParameterValueType;
-  typedef itk::CSVArray2DFileReader<ParameterValueType> MocoReaderType;
-  typedef MocoReaderType::Array2DDataObjectType         MocoDataArrayType;
+  using ParameterValueType = double;
+  using MocoReaderType = itk::CSVArray2DFileReader<ParameterValueType>;
+  using MocoDataArrayType = MocoReaderType::Array2DDataObjectType;
 
-  typedef itk::CSVNumericObjectFileWriter<ParameterValueType> WriterType;
-  typedef WriterType::vnlMatrixType                           WriterMatrixType;
+  using WriterType = itk::CSVNumericObjectFileWriter<ParameterValueType>;
+  using WriterMatrixType = WriterType::vnlMatrixType;
 
 
   std::string outputName = "";
@@ -106,7 +106,7 @@ int ants_motion_stats( itk::ants::CommandLineParser *parser )
   OptionType::Pointer transformOption = parser->GetOption( "transform" );
   if( transformOption && transformOption->GetNumberOfFunctions() )
     {
-    transformIndex = atoi( transformOption->GetFunction(0)->GetName().c_str() );
+    transformIndex = std::stoi( transformOption->GetFunction(0)->GetName().c_str() );
     std::cout << "Index of transform to output: " << transformIndex << std::endl;
     writeTransform = true;
     }
@@ -166,7 +166,7 @@ int ants_motion_stats( itk::ants::CommandLineParser *parser )
     }
 
 
-  bool doFramewise = 0;
+  bool doFramewise = false;
   doFramewise = parser->Convert<bool>( parser->GetOption( "framewise" )->GetFunction()->GetName() );
   std::cout << "Framewise = " << doFramewise << std::endl;
 
@@ -382,7 +382,7 @@ int ants_motion_stats( itk::ants::CommandLineParser *parser )
 
 void antsMotionCorrStatsInitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
-  typedef itk::ants::CommandLineParser::OptionType OptionType;
+  using OptionType = itk::ants::CommandLineParser::OptionType;
 
     {
     std::string description = std::string( "Mask image - compute displacements within mask." );
@@ -481,7 +481,7 @@ void antsMotionCorrStatsInitializeCommandLineOptions( itk::ants::CommandLinePars
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int antsMotionCorrStats( std::vector<std::string> args, std::ostream * /*out_stream = ITK_NULLPTR */ )
+int antsMotionCorrStats( std::vector<std::string> args, std::ostream * /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -499,7 +499,7 @@ int antsMotionCorrStats( std::vector<std::string> args, std::ostream * /*out_str
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {

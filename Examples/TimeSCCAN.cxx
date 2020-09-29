@@ -29,14 +29,14 @@
 namespace ants
 {
 
-template <class TComp>
+template <typename TComp>
 double vnl_pearson_corr( vnl_vector<TComp> v1, vnl_vector<TComp> v2 )
 {
   double xysum = 0;
 
   for( unsigned int i = 0; i < v1.size(); i++ )
     {
-    xysum += v1(i) * v2(i);
+    xysum += static_cast<double>( v1(i) * v2(i) );
     }
   double frac = 1.0 / (double)v1.size();
   double xsum = v1.sum(), ysum = v2.sum();
@@ -51,14 +51,14 @@ double vnl_pearson_corr( vnl_vector<TComp> v1, vnl_vector<TComp> v2 )
   return numer / denom;
 }
 
-template <class NetworkType>
+template <typename NetworkType>
 bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Pointer time, typename NetworkType::Pointer labels,
                 unsigned int nLabels, unsigned int minRegionSize, unsigned int n_evec, unsigned int iterct, float sparsity,
                 bool robust, bool useL1, float gradstep, bool keepPositive, unsigned int minClusterSize )
 {
-  typedef itk::ants::antsSCCANObject<NetworkType, double>  SCCANType;
-  typedef typename SCCANType::MatrixType                   MatrixType;
-  typedef typename SCCANType::VectorType                   VectorType;
+  using SCCANType = itk::ants::antsSCCANObject<NetworkType, double>;
+  using MatrixType = typename SCCANType::MatrixType;
+  using VectorType = typename SCCANType::VectorType;
 
   // Determine the number of regions to examine
   std::set<unsigned int> labelset;
@@ -109,7 +109,7 @@ bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Poi
             << nVoxels << " voxels with " << nTimes << " time points each" << std::endl;
 
   //unsigned int labelCounts[N];
-  unsigned int *labelCounts = new unsigned int [N] ;
+  auto *labelCounts = new unsigned int [N] ;
 
   for (unsigned int i=0; i<N; i++)
     {
@@ -120,7 +120,7 @@ bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Poi
     for ( unsigned int v=0; v<nVoxels; v++)
       {
       idx[0] = v;
-      if ( labels->GetPixel(idx) == (i+1) )
+      if ( itk::Math::FloatAlmostEqual(  static_cast<float>( labels->GetPixel(idx) ), static_cast<float>( i+1 ) ) )
         {
         ++labelCounts[i];
         }
@@ -144,7 +144,7 @@ bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Poi
       typename NetworkType::IndexType timeIdx;
       timeIdx[1] = v;
 
-      if ( labels->GetPixel(idx) == (i+1) )
+      if ( itk::Math::FloatAlmostEqual(  static_cast<float>( labels->GetPixel(idx) ), static_cast<float>( i+1 ) ) )
         {
         for ( unsigned int t=0; t<nTimes; t++)
           {
@@ -176,7 +176,7 @@ bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Poi
           typename NetworkType::IndexType timeIdx2;
           timeIdx2[1] = v2;
 
-          if ( labels->GetPixel(idx2) == (j+1) )
+          if ( itk::Math::FloatAlmostEqual(  static_cast<float>( labels->GetPixel(idx2) ), static_cast<float>( j+1 ) ) )
             {
             for ( unsigned int t2=0; t2<nTimes; t2++)
               {
@@ -217,7 +217,7 @@ bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Poi
           VectorType pVec = cca->GetVariateP();
           for ( unsigned int ip=0; ip<pVec.size(); ip++)
             {
-            pVec[ip] = vnl_math_abs( pVec[ip] );
+            pVec[ip] = itk::Math::abs ( pVec[ip] );
             }
           // pVec = pVec.normalize();
           pVec = P * pVec;
@@ -225,13 +225,13 @@ bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Poi
           VectorType qVec = cca->GetVariateQ();
           for ( unsigned int iq=0; iq<qVec.size(); iq++)
             {
-            qVec[iq] = vnl_math_abs( qVec[iq] );
+            qVec[iq] = itk::Math::abs ( qVec[iq] );
             }
           //qVec = qVec.normalize();
           qVec = Q * qVec;
 
           double final_corr = vnl_pearson_corr(pVec,qVec);
-          if ( ! vnl_math_isfinite( final_corr ) )
+          if ( ! std::isfinite( final_corr ) )
             {
             final_corr = 0.0;
             }
@@ -256,13 +256,13 @@ bool RegionSCCA(typename NetworkType::Pointer network, typename NetworkType::Poi
 }
 
 
-template <class NetworkType>
+template <typename NetworkType>
 bool RegionAveraging(typename NetworkType::Pointer network, typename NetworkType::Pointer time, typename NetworkType::Pointer labels,
                      unsigned int nLabels, unsigned int minSize )
 {
 
-  typedef vnl_vector<float>                                     VectorType;
-  typedef vnl_matrix<float>                                     MatrixType;
+  using VectorType = vnl_vector<float>;
+  using MatrixType = vnl_matrix<float>;
 
   // Determine the number of regions to examine
   std::set<unsigned int> labelset;
@@ -322,7 +322,7 @@ bool RegionAveraging(typename NetworkType::Pointer network, typename NetworkType
     for ( unsigned int v=0; v<nVoxels; v++)
       {
       idx[0] = v;
-      if ( labels->GetPixel(idx) == (i+1) )
+      if ( itk::Math::FloatAlmostEqual(  static_cast<float>( labels->GetPixel(idx) ), static_cast<float>( i+1 ) ) )
         {
         labelCounts[i]++;
 
@@ -360,7 +360,7 @@ for (unsigned int i=0; i<N; i++)
 
         double corr = vnl_pearson_corr(p,q);
 
-        if ( ! vnl_math_isfinite( corr ) )
+        if ( ! std::isfinite( corr ) )
           {
           corr = 0.0;
           }
@@ -384,7 +384,7 @@ for (unsigned int i=0; i<N; i++)
 int timesccan( itk::ants::CommandLineParser *parser )
 {
 
-  typedef itk::Image<float,2>               NetworkType;
+  using NetworkType = itk::Image<float, 2>;
 
 
   std::string                                       outname = "output.nii.gz";
@@ -544,13 +544,13 @@ int timesccan( itk::ants::CommandLineParser *parser )
       std::cout << "Time Series Data: " << timeMatrixName << std::endl;
       std::cout << "Time Series Labels: " << labelMatrixName << std::endl;
 
-      NetworkType::Pointer timeMat = ITK_NULLPTR;
+      NetworkType::Pointer timeMat = nullptr;
       ReadImage<NetworkType>( timeMat, timeMatrixName.c_str() );
 
-      NetworkType::Pointer labelMat = ITK_NULLPTR;
+      NetworkType::Pointer labelMat = nullptr;
       ReadImage<NetworkType>( labelMat, labelMatrixName.c_str() );
 
-      float gradstep = -0.5 + vnl_math_abs( usel1 );
+      float gradstep = -0.5 + itk::Math::abs ( usel1 );
 
       RegionSCCA<NetworkType>( network, timeMat, labelMat, nLabels, roiSize, evec_ct, iterations,
                                sparsity, robustify, usel1, gradstep, keepPositive, clusterSize );
@@ -560,10 +560,10 @@ int timesccan( itk::ants::CommandLineParser *parser )
       std::cout << "Time Series Data: " << timeMatrixName << std::endl;
       std::cout << "Time Series Labels: " << labelMatrixName << std::endl;
 
-      NetworkType::Pointer timeMat = ITK_NULLPTR;
+      NetworkType::Pointer timeMat = nullptr;
       ReadImage<NetworkType>( timeMat, timeMatrixName.c_str() );
 
-      NetworkType::Pointer labelMat = ITK_NULLPTR;
+      NetworkType::Pointer labelMat = nullptr;
       ReadImage<NetworkType>( labelMat, labelMatrixName.c_str() );
 
       RegionAveraging<NetworkType>( network, timeMat, labelMat, nLabels, roiSize );
@@ -585,7 +585,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 {
   /** in this function, list all the operations you will perform */
 
-  typedef itk::ants::CommandLineParser::OptionType OptionType;
+  using OptionType = itk::ants::CommandLineParser::OptionType;
 
   {
   std::string         description = std::string( "Print the help menu (short version)." );
@@ -770,7 +770,7 @@ void InitializeCommandLineOptions( itk::ants::CommandLineParser *parser )
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int TimeSCCAN( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int TimeSCCAN( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -788,7 +788,7 @@ int TimeSCCAN( std::vector<std::string> args, std::ostream* /*out_stream = ITK_N
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -859,12 +859,11 @@ private:
       parser->GetOptions();
     for( unsigned int n = 0; n < longHelpOption->GetNumberOfFunctions(); n++ )
       {
-      std::string                                                  value = longHelpOption->GetFunction( n )->GetName();
-      itk::ants::CommandLineParser::OptionListType::const_iterator it;
-      for( it = options.begin(); it != options.end(); ++it )
+      const std::string & value = longHelpOption->GetFunction( n )->GetName();
+      for( auto it = options.cbegin(); it != options.cend(); ++it )
         {
-        const char *longName = ( ( *it )->GetLongName() ).c_str();
-        if( strstr( longName, value.c_str() ) == longName  )
+        const std::string & longname = ( *it )->GetLongName();
+        if ( longname.rfind(value, 0) == 0 )  // determining if `longname` starts with `value`
           {
           parser->PrintMenu( std::cout, 5, false );
           }

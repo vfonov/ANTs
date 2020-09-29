@@ -2,7 +2,7 @@
 #include "antsUtilities.h"
 #include <algorithm>
 
-#include <stdio.h>
+#include <cstdio>
 
 #include "itkCastImageFilter.h"
 #include "itkImage.h"
@@ -21,10 +21,10 @@ namespace ants
 template <unsigned int ImageDimension>
 int ExtractRegionFromImageByMask(int argc, char *argv[])
 {
-  typedef float PixelType;
+  using PixelType = float;
 
-  typedef itk::Image<PixelType, ImageDimension> ImageType;
-  typedef itk::ImageFileReader<ImageType>       ReaderType;
+  using ImageType = itk::Image<PixelType, ImageDimension>;
+  using ReaderType = itk::ImageFileReader<ImageType>;
   typename ReaderType::Pointer reader = ReaderType::New();
   reader->SetFileName(argv[2]);
   reader->Update();
@@ -33,7 +33,7 @@ int ExtractRegionFromImageByMask(int argc, char *argv[])
   typename ImageType::RegionType::SizeType size;
   typename ImageType::RegionType::IndexType index;
 
-  if( 0 )
+  if( false )
     {
     std::vector<int> minIndex;
     std::vector<int> maxIndex;
@@ -49,20 +49,19 @@ int ExtractRegionFromImageByMask(int argc, char *argv[])
     }
   else
     {
-    typedef itk::Image<unsigned short, ImageDimension> ShortImageType;
+    using ShortImageType = itk::Image<unsigned short, ImageDimension>;
 //    typedef itk::CastImageFilter<ImageType, ShortImageType> CasterType;
 //    typename CasterType::Pointer caster = CasterType::New();
 //    caster->SetInput(reader->GetOutput());
 //    caster->Update();
 
-    typedef itk::ImageFileReader<ShortImageType> ShortImageReaderType;
+    using ShortImageReaderType = itk::ImageFileReader<ShortImageType>;
     typename ShortImageReaderType::Pointer shortReader = ShortImageReaderType::New();
     shortReader->SetFileName(argv[4]);
     shortReader->Update();
 
     // typedef itk::LabelStatisticsImageFilter<ShortImageType, ShortImageType>
-    typedef itk::LabelStatisticsImageFilter<ImageType, ShortImageType>
-      StatsFilterType;
+    using StatsFilterType = itk::LabelStatisticsImageFilter<ImageType, ShortImageType>;
     typename StatsFilterType::Pointer stats = StatsFilterType::New();
 //    stats->SetLabelInput(caster->GetOutput());
     stats->SetLabelInput(shortReader->GetOutput() );
@@ -70,13 +69,13 @@ int ExtractRegionFromImageByMask(int argc, char *argv[])
     stats->SetInput(reader->GetOutput() );
     stats->Update();
 
-    const unsigned int label = (argc >= 6) ? atoi(argv[5]) : 1;
+    const unsigned int label = (argc >= 6) ? std::stoi(argv[5]) : 1;
     region = stats->GetRegion(label);
 
     std::cout << "bounding box of label=" << label
              << " : " << region << std::endl;
 
-    const unsigned int padWidth = (argc >= 7) ? atoi(argv[6]) : 0;
+    const unsigned int padWidth = (argc >= 7) ? std::stoi(argv[6]) : 0;
 
     region.PadByRadius(padWidth);
 
@@ -91,14 +90,14 @@ int ExtractRegionFromImageByMask(int argc, char *argv[])
 
   std::cout << "final cropped region: " << region << std::endl;
 
-  typedef itk::ExtractImageFilter<ImageType, ImageType> CropperType;
+  using CropperType = itk::ExtractImageFilter<ImageType, ImageType>;
   typename CropperType::Pointer cropper = CropperType::New();
   cropper->SetInput(reader->GetOutput() );
   cropper->SetExtractionRegion(region);
   cropper->SetDirectionCollapseToSubmatrix();
   cropper->Update();
 
-  typedef itk::ImageFileWriter<ImageType> WriterType;
+  using WriterType = itk::ImageFileWriter<ImageType>;
   typename WriterType::Pointer writer = WriterType::New();
   writer->SetInput(cropper->GetOutput() );
   writer->SetFileName(argv[3]);
@@ -109,7 +108,7 @@ int ExtractRegionFromImageByMask(int argc, char *argv[])
 
 // entry point for the library; parameter 'args' is equivalent to 'argv' in (argc,argv) of commandline parameters to
 // 'main()'
-int ExtractRegionFromImageByMask( std::vector<std::string> args, std::ostream* /*out_stream = ITK_NULLPTR */ )
+int ExtractRegionFromImageByMask( std::vector<std::string> args, std::ostream* /*out_stream = nullptr */ )
 {
   // put the arguments coming in as 'args' into standard (argc,argv) format;
   // 'args' doesn't have the command name as first, argument, so add it manually;
@@ -127,7 +126,7 @@ int ExtractRegionFromImageByMask( std::vector<std::string> args, std::ostream* /
     // place the null character in the end
     argv[i][args[i].length()] = '\0';
     }
-  argv[argc] = ITK_NULLPTR;
+  argv[argc] = nullptr;
   // class to automatically cleanup argv upon destruction
   class Cleanup_argv
   {
@@ -168,7 +167,7 @@ private:
     return EXIT_FAILURE;
     }
 
-  switch( atoi(argv[1]) )
+  switch( std::stoi(argv[1]) )
     {
     case 2:
       {
